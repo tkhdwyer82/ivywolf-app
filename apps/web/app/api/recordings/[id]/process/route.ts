@@ -1,17 +1,21 @@
 // apps/web/app/api/recordings/[id]/process/route.ts
-// The app uploads a recording and inserts its row with the creator's own JWT, then calls this to run the pipeline.
+// The app uploads a recording and inserts its row (status 'queued') with the creator's own JWT, then calls this.
+// It returns immediately; the app polls recordings.status.
 //
-// Ownership is checked with supabaseAsUser() — RLS on recordings means a creator can only see their own row, so a
-// row that comes back is theirs. Only then does the pipeline worker run, which uses the service role (the one
-// server path besides the Stripe webhook allowed to; see lib/supabase.ts).
+// 1. Ownership is checked with supabaseAsUser() — RLS on recordings means only the creator's own row comes back.
+// 2. claimRecording() moves the row queued → processing in one conditional UPDATE, so a duplicate submit (double
+//    tap, retry) gets 409 instead of a second pipeline run.
+// 3. The pipeline runs after the response via after(), with the service role (the pipeline worker; lib/supabase.ts).
+//    On Vercel, after() keeps the function alive up to maxDuration.
 
+import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-import { processRecording } from '@ivywolf/pipeline'
+import { claimRecording, markFailed, processRecording } from '@ivywolf/pipeline'
 import { supabaseAsUser } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
-// Deepgram + classify on a few minutes of audio.
+// Deepgram + classify on a few minutes of audio, run after the response.
 export const maxDuration = 300
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -20,28 +24,25 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params
   const supabase = await supabaseAsUser()
-  const { data: rec, error } = await supabase
-    .from('recordings')
-    .select('id, transcript, is_junk')
-    .eq('id', id)
-    .maybeSingle()
+  const { data: rec, error } = await supabase.from('recordings').select('id, status').eq('id', id).maybeSingle()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!rec) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  // Processed already (transcript set, or marked junk): don't classify twice.
-  if (rec.transcript !== null || rec.is_junk) {
-    return NextResponse.json({ status: 'already_processed' }, { status: 409 })
+
+  if (!(await claimRecording(id))) {
+    return NextResponse.json({ status: rec.status, error: 'Already submitted' }, { status: 409 })
   }
 
-  try {
-    const result = await processRecording(id)
-    return NextResponse.json(
-      result.junk
-        ? { status: 'junk', reason: result.junk }
-        : { status: 'processed', cards: result.out.cards.length, title: result.out.title }
-    )
-  } catch (err) {
-    console.error(`[recordings/process] ${id} failed:`, err)
-    return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
-  }
+  after(async () => {
+    try {
+      await processRecording(id)
+    } catch (err) {
+      console.error(`[recordings/process] ${id} failed:`, err)
+      await markFailed(id, err instanceof Error ? err.message : String(err)).catch((e) =>
+        console.error(`[recordings/process] ${id} could not be marked failed:`, e)
+      )
+    }
+  })
+
+  return NextResponse.json({ status: 'processing' }, { status: 202 })
 }

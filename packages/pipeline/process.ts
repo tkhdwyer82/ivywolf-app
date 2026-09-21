@@ -1,12 +1,15 @@
 // packages/pipeline/process.ts
-// Recording in → graph out. transcribe → junk gates → classify_v1 → write.
+// Recording in → graph out. transcribe → junk gates → classify → write → status.
+// Callers claim the recording first (claimRecording) so it is processed at most once.
 
 import { createClient } from '@supabase/supabase-js'
 import type { ClassifyOutput, RecordingSource } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
 import { classify, PROMPT_VERSION, type CreatorContext, type PromptVersion } from './classify'
-import { loadCreatorContext, markJunk, writeClassification } from './graph'
+import { loadCreatorContext, markDone, markJunk, writeClassification } from './graph'
+
+export { claimRecording, markFailed } from './graph'
 
 const MIN_DURATION_MS = 3000
 
@@ -38,7 +41,7 @@ export async function analyse(args: {
   return { junk: null, transcript, out }
 }
 
-/** Full pipeline for one recordings row. */
+/** Full pipeline for one recordings row the caller has already claimed (status 'processing'). */
 export async function processRecording(recordingId: string): Promise<ProcessResult> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
@@ -67,5 +70,6 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
     out: result.out,
     promptVersion: PROMPT_VERSION,
   })
+  await markDone(rec.id)
   return result
 }

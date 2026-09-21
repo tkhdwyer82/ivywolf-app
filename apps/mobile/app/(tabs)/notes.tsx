@@ -1,7 +1,8 @@
 // apps/mobile/app/(tabs)/notes.tsx
 // Profile = Voice notes: every recording, grouped by the day it was recorded, newest first.
+// While any recording is queued or processing, the list re-polls so "Ivy is listening…" resolves on its own.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native'
 import { Link, useFocusEffect } from 'expo-router'
 import type { RecordingRow } from '@ivywolf/schema'
@@ -10,17 +11,20 @@ import { color, space, type } from '@/lib/theme'
 
 type Section = { title: string; data: RecordingRow[] }
 
+const POLL_MS = 3000
+const IN_FLIGHT = new Set<RecordingRow['status']>(['queued', 'processing'])
+
 export default function Notes() {
   const supabase = useSupabase()
   const [sections, setSections] = useState<Section[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const inFlight = useRef(false)
 
   const load = useCallback(async () => {
-    // transcript is only selected as a processed/not-processed signal; `transcript->0` keeps the payload small.
     const { data, error } = await supabase
       .from('recordings')
-      .select('id, source, duration_ms, recorded_at, received_at, title, is_junk, junk_reason, transcript:transcript->0')
+      .select('id, source, duration_ms, recorded_at, received_at, title, is_junk, junk_reason, status')
       .order('received_at', { ascending: false })
       .limit(200)
     if (error) {
@@ -28,6 +32,7 @@ export default function Notes() {
       return
     }
     setError(null)
+    inFlight.current = (data as RecordingRow[]).some((r) => IN_FLIGHT.has(r.status))
     const byDay = new Map<string, RecordingRow[]>()
     for (const r of data as RecordingRow[]) {
       const day = dayLabel(r.recorded_at ?? r.received_at)
@@ -39,6 +44,10 @@ export default function Notes() {
   useFocusEffect(
     useCallback(() => {
       load()
+      const timer = setInterval(() => {
+        if (inFlight.current) load()
+      }, POLL_MS)
+      return () => clearInterval(timer)
     }, [load])
   )
 
@@ -70,7 +79,7 @@ export default function Notes() {
       renderItem={({ item }) => (
         <View style={[styles.row, item.is_junk && { opacity: 0.5 }]}>
           <Text style={type.heading} numberOfLines={1}>
-            {item.title ?? (item.is_junk ? 'Nothing kept' : item.transcript === null ? 'Ivy is listening…' : 'Untitled')}
+            {item.title ?? STATUS_TITLE[item.status]}
           </Text>
           <Text style={type.meta}>
             {timeLabel(item.recorded_at ?? item.received_at)}
@@ -81,6 +90,14 @@ export default function Notes() {
       )}
     />
   )
+}
+
+const STATUS_TITLE: Record<RecordingRow['status'], string> = {
+  queued: 'Ivy is listening…',
+  processing: 'Ivy is listening…',
+  done: 'Untitled',
+  junk: 'Nothing kept',
+  failed: 'Ivy couldn’t process this one',
 }
 
 function dayLabel(iso: string) {

@@ -14,6 +14,9 @@ export const SegmentType = z.enum([
 export const ThreadStage = z.enum(['sparked', 'developing', 'ready', 'shipped'])
 export const ActionScope = z.enum(['personal', 'work'])
 export const RequestKind = z.enum(['life', 'idea'])
+/** 0006_recording_status.sql: queued → processing → done | junk | failed. Only the pipeline worker moves it. */
+export const RecordingStatus = z.enum(['queued', 'processing', 'done', 'junk', 'failed'])
+export type RecordingStatus = z.infer<typeof RecordingStatus>
 
 export type RecordingSource = z.infer<typeof RecordingSource>
 export type SegmentType = z.infer<typeof SegmentType>
@@ -111,8 +114,7 @@ export const RecordingRow = z.object({
   title: z.string().nullable(),
   is_junk: z.boolean(),
   junk_reason: z.string().nullable(),
-  /** Non-null once the pipeline has run. */
-  transcript: z.unknown().nullable(),
+  status: RecordingStatus,
 })
 export type RecordingRow = z.infer<typeof RecordingRow>
 

@@ -1,5 +1,6 @@
 // apps/mobile/app/(tabs)/record.tsx
-// The + button. Tap to record, tap to stop; the take uploads to the recordings bucket and the pipeline runs.
+// The + button. Tap to record, tap to stop; the take uploads, the server queues it, and this screen polls until
+// Ivy is done. Leaving the screen doesn't cancel anything — Voice notes shows the same status.
 // Recordings under 3 s are still uploaded — the pipeline marks them junk (too_short) rather than the app
 // deciding silently.
 
@@ -15,13 +16,14 @@ import {
 } from 'expo-audio'
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
-import { submitRecording, type ProcessOutcome } from '@/lib/record'
+import { submitRecording, waitForRecording, type ProcessOutcome } from '@/lib/record'
 import { color, space, type } from '@/lib/theme'
 
 type Phase =
   | { kind: 'idle' }
   | { kind: 'recording' }
   | { kind: 'sending' }
+  | { kind: 'listening' }
   | { kind: 'done'; outcome: ProcessOutcome }
   | { kind: 'failed'; message: string }
 
@@ -32,9 +34,13 @@ export default function Record() {
   const { userId, getToken } = useAuth()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const startedAt = useRef<Date | null>(null)
+  const unmounted = useRef(false)
 
   useEffect(() => {
     setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true })
+    return () => {
+      unmounted.current = true
+    }
   }, [])
 
   async function start() {
@@ -61,7 +67,7 @@ export default function Record() {
     try {
       const token = await getToken()
       if (!token) throw new Error('Signed out')
-      const { outcome } = await submitRecording({
+      const { recordingId } = await submitRecording({
         supabase,
         userId,
         token,
@@ -69,9 +75,13 @@ export default function Record() {
         durationMs,
         recordedAt: startedAt.current ?? new Date(),
       })
-      setPhase({ kind: 'done', outcome })
+      setPhase({ kind: 'listening' })
+      const outcome = await waitForRecording(supabase, recordingId, () => unmounted.current)
+      // Only report back if the screen is still waiting on this take — not if a new recording has started.
+      if (!unmounted.current) setPhase((p) => (p.kind === 'listening' ? { kind: 'done', outcome } : p))
     } catch (e) {
-      setPhase({ kind: 'failed', message: e instanceof Error ? e.message : 'Upload failed' })
+      const message = e instanceof Error ? e.message : 'Upload failed'
+      setPhase((p) => (p.kind === 'recording' ? p : { kind: 'failed', message }))
     }
   }
 
@@ -82,15 +92,18 @@ export default function Record() {
       <View style={styles.status}>
         {phase.kind === 'idle' && <Text style={type.meta}>Tap to start. Say it however it comes out.</Text>}
         {recording && <Text style={styles.timer}>{formatDuration(state.durationMillis)}</Text>}
-        {phase.kind === 'sending' && (
+        {(phase.kind === 'sending' || phase.kind === 'listening') && (
           <View style={styles.sending}>
             <ActivityIndicator color={color.ink} />
-            <Text style={type.meta}>Ivy is listening back…</Text>
+            <Text style={type.meta}>{phase.kind === 'sending' ? 'Saving…' : 'Ivy is listening…'}</Text>
+            {phase.kind === 'listening' && (
+              <Text style={type.meta}>You can record again — this keeps going in Voice notes.</Text>
+            )}
           </View>
         )}
-        {phase.kind === 'done' && phase.outcome.status === 'processed' && (
+        {phase.kind === 'done' && phase.outcome.status === 'done' && (
           <Pressable onPress={() => router.navigate('/')}>
-            <Text style={type.heading}>{phase.outcome.title}</Text>
+            <Text style={type.heading}>{phase.outcome.title ?? 'Done'}</Text>
             <Text style={type.meta}>
               {phase.outcome.cards} {phase.outcome.cards === 1 ? 'card' : 'cards'} · see them in Threads
             </Text>
@@ -100,6 +113,12 @@ export default function Record() {
           <Text style={type.meta}>
             {phase.outcome.reason === 'too_short' ? 'That was too short to keep.' : 'Ivy didn’t hear any speech.'}
           </Text>
+        )}
+        {phase.kind === 'done' && phase.outcome.status === 'failed' && (
+          <Text style={styles.error}>Ivy couldn’t process that one. The audio is saved.</Text>
+        )}
+        {phase.kind === 'done' && phase.outcome.status === 'still_processing' && (
+          <Text style={type.meta}>Still working on it — it will appear in Voice notes.</Text>
         )}
         {phase.kind === 'failed' && <Text style={styles.error}>{phase.message}</Text>}
       </View>

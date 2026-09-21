@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js'
 import { RecordingSource } from '@ivywolf/schema'
 import { uploadBuffer } from './storage'
 import { processRecording } from './process'
+import { claimRecording, markFailed } from './graph'
 
 const CONTENT_TYPES: Record<string, string> = {
   '.m4a': 'audio/mp4',
@@ -60,7 +61,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   })
   console.log(JSON.stringify({ recordingId, storagePath }))
   if (process.argv.includes('--process')) {
-    const result = await processRecording(recordingId)
-    console.log(JSON.stringify(result.junk ? { junk: result.junk } : result.out, null, 2))
+    if (!(await claimRecording(recordingId))) throw new Error(`${recordingId} is not queued`)
+    try {
+      const result = await processRecording(recordingId)
+      console.log(JSON.stringify(result.junk ? { junk: result.junk } : result.out, null, 2))
+    } catch (err) {
+      await markFailed(recordingId, err instanceof Error ? err.message : String(err))
+      throw err
+    }
   }
 }

@@ -54,12 +54,35 @@ export async function loadCreatorContext(creatorId: string): Promise<CreatorCont
   }
 }
 
+/**
+ * Move a recording from 'queued' to 'processing'. True only for the one caller that won — this is the lock
+ * against duplicate submits (see 0006_recording_status.sql).
+ */
+export async function claimRecording(recordingId: string): Promise<boolean> {
+  return check('claim', await db().rpc('claim_recording', { p_recording_id: recordingId })) === true
+}
+
 export async function markJunk(recordingId: string, reason: 'no_speech' | 'too_short', transcript: unknown) {
   check(
     'junk',
     await db()
       .from('recordings')
-      .update({ is_junk: true, junk_reason: reason, transcript })
+      .update({ is_junk: true, junk_reason: reason, transcript, status: 'junk' })
+      .eq('id', recordingId)
+  )
+}
+
+export async function markDone(recordingId: string) {
+  check('done', await db().from('recordings').update({ status: 'done' }).eq('id', recordingId))
+}
+
+/** 'failed' is terminal: graph writes aren't transactional, so a half-written recording must not be re-run. */
+export async function markFailed(recordingId: string, error: string) {
+  check(
+    'failed',
+    await db()
+      .from('recordings')
+      .update({ status: 'failed', processing_error: error.slice(0, 2000) })
       .eq('id', recordingId)
   )
 }
