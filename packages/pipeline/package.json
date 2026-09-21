@@ -1,0 +1,6 @@
+{
+  "name": "@ivywolf/pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "main": "storage.ts"
+}

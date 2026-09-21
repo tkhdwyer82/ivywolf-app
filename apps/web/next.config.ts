@@ -1,0 +1,9 @@
+import type { NextConfig } from 'next'
+
+const nextConfig: NextConfig = {
+  // apps/web is a workspace package; trace from the repo root so the monorepo
+  // resolves correctly on Vercel.
+  outputFileTracingRoot: require('path').join(__dirname, '../../'),
+}
+
+export default nextConfig

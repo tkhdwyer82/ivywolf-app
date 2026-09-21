@@ -1,0 +1,14 @@
+{
+  "name": "ivywolf-app",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace apps/web",
+    "dev": "npm run dev --workspace apps/web",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}
