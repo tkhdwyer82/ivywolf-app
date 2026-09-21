@@ -1,9 +1,9 @@
 // packages/pipeline/eval/run.ts
-// Runs one memo through transcribe + classify_v1 (no graph writes) and diffs it against <memo>.expected.json,
+// Runs one memo through transcribe + classify (no graph writes) and diffs it against <memo>.expected.json,
 // using the scoring in eval/README.md.
 //
-//   npx tsx --env-file=../../.env.local eval/run.ts <memo> <recordings-bucket storage path>
-//   e.g. eval/run.ts 2026-09-21_thomas-st user_abc/1f2e….m4a
+//   npx tsx --env-file=../../.env.local eval/run.ts <memo> <recordings-bucket storage path> [prompt_version]
+//   e.g. eval/run.ts 2026-09-21_thomas-st eval/2026-09-21_thomas-st.m4a classify_v2
 //
 // Writes eval/runs/<memo>.<prompt_version>.actual.json and prints the diff. Exit code 1 if any check fails.
 // Card titles/gists are matched "by meaning" per the README — that part is printed side by side for a human.
@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import type { ClassifyOutput } from '@ivywolf/schema'
 import { signedUrl } from '../storage'
 import { analyse } from '../process'
-import { PROMPT_VERSION } from '../classify'
+import { PROMPT_VERSION, type PromptVersion } from '../classify'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const PLAY_FROM_TOLERANCE_MS = 3000
@@ -45,12 +45,12 @@ export function diff(exp: Expected, act: ClassifyOutput): Check[] {
 
   push('trigger', act.trigger === exp.trigger, `expected ${exp.trigger}, got ${act.trigger}`)
 
-  // Segment types: an expected span is matched if an actual segment of the same type covers ≥50% of it.
-  // Expected spans may nest (a loose_end inside an idea), so each is checked independently.
+  // Segment types: an expected span is matched if any actual segment of the same type overlaps it.
+  // Boundaries are hand-placed, so position is not scored beyond overlap. Expected spans may nest
+  // (a loose_end inside an idea), so each is checked independently.
   let segHits = 0
   for (const e of exp.segments) {
-    const len = Math.max(1, e.end_ms - e.start_ms)
-    const hit = act.segments.find((a) => a.type === e.type && overlap(a, e) / len >= 0.5)
+    const hit = act.segments.find((a) => a.type === e.type && overlap(a, e) > 0)
     if (hit) segHits++
     const best = [...act.segments].sort((x, y) => overlap(y, e) - overlap(x, e))[0]
     push(
@@ -58,7 +58,7 @@ export function diff(exp: Expected, act: ClassifyOutput): Check[] {
       !!hit,
       hit
         ? `matched "${hit.text.slice(0, 60)}"`
-        : `no ${e.type} covering it; most overlap: ${best ? `${best.type} @${best.start_ms}–${best.end_ms}` : 'none'}`
+        : `no overlapping ${e.type}; most overlap: ${best ? `${best.type} @${best.start_ms}–${best.end_ms}` : 'none'}`
     )
     if (e.boundary_marker) {
       const marked = act.segments.some((a) => a.boundary_marker && overlap(a, e) > 0)
@@ -151,9 +151,10 @@ export function diff(exp: Expected, act: ClassifyOutput): Check[] {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const [memo, storagePath] = process.argv.slice(2)
+  const [memo, storagePath, promptArg] = process.argv.slice(2)
+  const promptVersion = (promptArg ?? PROMPT_VERSION) as PromptVersion
   if (!memo || !storagePath) {
-    console.error('usage: eval/run.ts <memo> <recordings-bucket storage path>')
+    console.error('usage: eval/run.ts <memo> <recordings-bucket storage path> [prompt_version]')
     process.exit(1)
   }
   const expected = JSON.parse(
@@ -163,6 +164,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const result = await analyse({
     audioUrl: await signedUrl('recordings', storagePath, 15 * 60),
     source: expected.source,
+    promptVersion,
     creator: {
       handle: null,
       niche: null,
@@ -172,13 +174,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   })
 
   mkdirSync(path.join(here, 'runs'), { recursive: true })
-  const outFile = path.join(here, 'runs', `${memo}.${PROMPT_VERSION}.actual.json`)
+  const outFile = path.join(here, 'runs', `${memo}.${promptVersion}.actual.json`)
   writeFileSync(outFile, JSON.stringify(result.junk ? { junk: result.junk } : result.out, null, 2))
 
   if (result.junk) {
     console.log(`${memo}: FAIL — classified as junk (${result.junk})`)
     process.exit(1)
   }
+  console.log(`prompt: ${promptVersion}`)
   console.log(`duration: expected ${expected.duration_ms} ms, transcribed ${result.transcript.duration_ms} ms`)
   console.log(`title: expected "${expected.title}", got "${result.out.title}"\n`)
   const checks = diff(expected, result.out)

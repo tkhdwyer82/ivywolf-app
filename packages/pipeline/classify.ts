@@ -10,11 +10,13 @@ import Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import { ClassifyOutput, type RecordingSource, type Utterance } from '@ivywolf/schema'
 
-export const PROMPT_VERSION = 'classify_v1'
+export type PromptVersion = 'classify_v1' | 'classify_v2'
+/** The version that ships. Change only when the candidate passes every memo in eval/ (CLAUDE.md). */
+export const PROMPT_VERSION: PromptVersion = 'classify_v1'
 const MODEL = 'claude-opus-5'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const SYSTEM = readFileSync(path.join(here, 'prompts', `${PROMPT_VERSION}.md`), 'utf8')
+const loadPrompt = (v: PromptVersion) => readFileSync(path.join(here, 'prompts', `${v}.md`), 'utf8')
 
 export interface CreatorContext {
   handle: string | null
@@ -32,7 +34,9 @@ export async function classify(input: {
   utterances: Utterance[]
   creator: CreatorContext
   source: RecordingSource
+  promptVersion?: PromptVersion
 }): Promise<ClassifyOutput> {
+  const { promptVersion = PROMPT_VERSION, ...payload } = input
   // Server-side fallback: if Opus 5 declines, the API re-runs the same request on a fallback model in-call.
   client ??= new Anthropic()
   const response = await client.beta.messages.parse({
@@ -40,8 +44,8 @@ export async function classify(input: {
     fallbacks: 'default',
     model: MODEL,
     max_tokens: 16000,
-    system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: JSON.stringify(input) }],
+    system: [{ type: 'text', text: loadPrompt(promptVersion), cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: JSON.stringify(payload) }],
     output_config: { format: betaZodOutputFormat(ClassifyOutput) },
   })
 

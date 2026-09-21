@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { ClassifyOutput, RecordingSource } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
-import { classify, PROMPT_VERSION, type CreatorContext } from './classify'
+import { classify, PROMPT_VERSION, type CreatorContext, type PromptVersion } from './classify'
 import { loadCreatorContext, markJunk, writeClassification } from './graph'
 
 const MIN_DURATION_MS = 3000
@@ -19,6 +19,7 @@ export async function analyse(args: {
   audioUrl: string
   source: RecordingSource
   creator: CreatorContext
+  promptVersion?: PromptVersion
 }): Promise<ProcessResult> {
   const transcript = await transcribe(args.audioUrl)
 
@@ -32,6 +33,7 @@ export async function analyse(args: {
     utterances: transcript.utterances,
     creator: args.creator,
     source: args.source,
+    promptVersion: args.promptVersion,
   })
   return { junk: null, transcript, out }
 }

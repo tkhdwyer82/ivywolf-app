@@ -1,0 +1,121 @@
+{
+  "trigger": "wake_word",
+  "title": "Multi-creator launch video for Ivy",
+  "segments": [
+    {
+      "start_ms": 0,
+      "end_ms": 960,
+      "type": "filler",
+      "text": "Hey, Ivy.",
+      "speaker": "0",
+      "confidence": 0.97,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 1440,
+      "end_ms": 27945,
+      "type": "idea",
+      "text": "Got a bit of an idea that's interesting for a video, which is to sell the Ivy product itself. It's to get several creators and have them talking to the device, with the hook being that the ideas are connected into something like…",
+      "speaker": "0",
+      "confidence": 0.9,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 28345,
+      "end_ms": 38430,
+      "type": "loose_end",
+      "text": "…Mr. Beast's viral video that I was watching the other day on YouTube, if you can find it.",
+      "speaker": "0",
+      "confidence": 0.88,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 40590,
+      "end_ms": 64580,
+      "type": "idea",
+      "text": "The video should be pretty short. I'm thinking that we have it in different hands and different people, and that the goal of the video is to make the product, then the AI, and then the output, and then a video all really seamless, all really fun.",
+      "speaker": "0",
+      "confidence": 0.88,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 64900,
+      "end_ms": 92428,
+      "type": "idea",
+      "text": "And I think fun is the goal, is to make the UI and the AI really personable and really, I guess, optimistic around great ideas and talkative, and we can kind of show the visuals of that.",
+      "speaker": "0",
+      "confidence": 0.85,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 93468,
+      "end_ms": 100028,
+      "type": "request",
+      "text": "Like to have your thoughts on it and put together some ideas and storyboards and even some demo concepts.",
+      "speaker": "0",
+      "confidence": 0.94,
+      "boundary_marker": null,
+      "retracted_by": null
+    }
+  ],
+  "cards": [
+    {
+      "segment_index": 1,
+      "title": "Several creators talking to the device",
+      "gist": "A video selling the product itself by filming several creators speaking to the device, with the hook that their ideas get connected together.",
+      "play_from_ms": 1440,
+      "confidence": 0.88,
+      "energy": 0.6,
+      "format_hint": "launch_video",
+      "is_reference": false,
+      "their_idea": null,
+      "her_take": null,
+      "candidate_threads": [
+        "Ivy launch video"
+      ]
+    },
+    {
+      "segment_index": 3,
+      "title": "Short film, device passed hand to hand",
+      "gist": "Keep the cut short and pass the device between different hands and people so product, AI, output and finished video feel like one seamless flow.",
+      "play_from_ms": 40590,
+      "confidence": 0.86,
+      "energy": 0.6,
+      "format_hint": "launch_video",
+      "is_reference": false,
+      "their_idea": null,
+      "her_take": null,
+      "candidate_threads": [
+        "Ivy launch video"
+      ]
+    }
+  ],
+  "actions": [],
+  "entities": [],
+  "loose_ends": [
+    {
+      "segment_index": 2,
+      "text": "Find the Mr. Beast viral video she watched on YouTube the other day",
+      "needs": "link"
+    }
+  ],
+  "requests": [
+    {
+      "segment_index": 5,
+      "kind": "idea",
+      "text": "Give thoughts on the video concept and put together ideas, storyboards and demo concepts."
+    }
+  ],
+  "style_signals": [
+    "fun",
+    "personable",
+    "optimistic",
+    "talkative",
+    "seamless"
+  ]
+}

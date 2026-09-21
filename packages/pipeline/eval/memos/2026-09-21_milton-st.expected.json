@@ -1,20 +1,20 @@
 {
-  "source": "phone", "duration_ms": 61760, "trigger": "none",
+  "source": "phone", "duration_ms": 61652, "trigger": "none",
   "title": "Launch video: the chase - 'it's done'",
   "segments": [
-    {"start_ms": 0, "end_ms": 20000, "type": "idea", "text": "Arabella runs a chase scene from a Higgsfield clip"},
-    {"start_ms": 2000, "end_ms": 8000, "type": "loose_end", "text": "the Higgsfield chase clip - find it", "needs": "link"},
-    {"start_ms": 20000, "end_ms": 23000, "type": "filler", "text": "Actually, one second", "boundary_marker": "one second"},
-    {"start_ms": 23000, "end_ms": 30000, "type": "action", "text": "get milk", "scope": "personal", "priority": "low"},
-    {"start_ms": 25000, "end_ms": 30000, "type": "request", "kind": "life", "text": "put a reminder in"},
-    {"start_ms": 30000, "end_ms": 33000, "type": "filler", "text": "Anyway, back to the idea", "boundary_marker": "back to the idea"},
-    {"start_ms": 33000, "end_ms": 61760, "type": "idea", "text": "swap Arabella in for the original performer; she ends with Ivy in hand: 'it's done'; cut to logo"}
+    {"start_ms": 880, "end_ms": 20645, "type": "idea", "text": "Arabella runs a chase scene from a Higgsfield clip"},
+    {"start_ms": 8240, "end_ms": 14080, "type": "loose_end", "text": "the Higgsfield chase clip - find it", "needs": "link"},
+    {"start_ms": 21205, "end_ms": 22565, "type": "filler", "text": "Actually, one second", "boundary_marker": "one second"},
+    {"start_ms": 23445, "end_ms": 29300, "type": "action", "text": "get milk", "scope": "personal", "priority": "low"},
+    {"start_ms": 25525, "end_ms": 29300, "type": "request", "kind": "life", "text": "put a reminder in"},
+    {"start_ms": 29300, "end_ms": 31140, "type": "filler", "text": "Anyway, back to the idea", "boundary_marker": "back to the idea"},
+    {"start_ms": 32420, "end_ms": 61652, "type": "idea", "text": "swap Arabella in for the original performer; she ends with Ivy in hand: 'it's done'; cut to logo"}
   ],
   "cards": [
-    {"title": "The chase - 'it's done'", "play_from_ms": 0, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_threads": ["Kickstarter video"]}
+    {"title": "The chase - 'it's done'", "play_from_ms": 880, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_threads": ["Kickstarter video"]}
   ],
   "actions": [{"text": "milk", "scope": "personal"}],
-  "entities": [{"name": "Arabella", "kind": "person", "canonical": null, "aliases_seen": ["Arabella","Abela"]}],
+  "entities": [{"name": "Arabella", "kind": "person", "canonical": null, "aliases_seen": ["Arabella"]}],
   "loose_ends": [{"text": "Higgsfield chase clip", "needs": "link"}],
   "requests": [{"kind": "life"}],
   "must_not": {"cards_contain": ["milk"], "physical_descriptors_on_cards": true},
