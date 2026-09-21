@@ -2,5 +2,22 @@
   "name": "@ivywolf/pipeline",
   "version": "0.0.0",
   "private": true,
-  "main": "storage.ts"
+  "type": "module",
+  "main": "process.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx --env-file=../../.env.local eval/run.ts",
+    "ingest": "tsx --env-file=../../.env.local ingest.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "@supabase/supabase-js": "^2.116.0",
+    "zod": "^4.6.5",
+    "@ivywolf/schema": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
 }
