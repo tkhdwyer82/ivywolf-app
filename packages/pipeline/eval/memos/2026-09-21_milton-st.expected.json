@@ -7,8 +7,7 @@
     {"start_ms": 21205, "end_ms": 22565, "type": "filler", "text": "Actually, one second", "boundary_marker": "one second"},
     {"start_ms": 23445, "end_ms": 29300, "type": "action", "text": "get milk", "scope": "personal", "priority": "low"},
     {"start_ms": 25525, "end_ms": 29300, "type": "request", "kind": "life", "text": "put a reminder in"},
-    {"start_ms": 29300, "end_ms": 31140, "type": "filler", "text": "Anyway, back to the idea", "boundary_marker": "back to the idea"},
-    {"start_ms": 32420, "end_ms": 61652, "type": "idea", "text": "swap Arabella in for the original performer; she ends with Ivy in hand: 'it's done'; cut to logo"}
+    {"start_ms": 29300, "end_ms": 61652, "type": "idea", "text": "Anyway, back to the idea - swap Arabella in for the original performer; she ends with Ivy in hand: 'it's done'; cut to logo", "boundary_marker": "back to the idea"}
   ],
   "cards": [
     {"title": "The chase - 'it's done'", "play_from_ms": 880, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_threads": ["Kickstarter video"]}

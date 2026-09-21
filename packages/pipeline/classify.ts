@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import { ClassifyOutput, type RecordingSource, type Utterance } from '@ivywolf/schema'
 
-export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3'
+export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3' | 'classify_v4'
 /** The version that ships. Change only when the candidate passes every memo in eval/ (CLAUDE.md). */
 export const PROMPT_VERSION: PromptVersion = 'classify_v1'
 const MODEL = 'claude-opus-5'

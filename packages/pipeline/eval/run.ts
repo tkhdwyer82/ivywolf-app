@@ -11,7 +11,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ClassifyOutput } from '@ivywolf/schema'
+import type { ClassifyOutput, Utterance } from '@ivywolf/schema'
 import { signedUrl } from '../storage'
 import { analyse } from '../process'
 import { PROMPT_VERSION, type PromptVersion } from '../classify'
@@ -39,9 +39,21 @@ type Check = { name: string; pass: boolean | null; detail: string }
 const overlap = (a: { start_ms: number; end_ms: number }, b: { start_ms: number; end_ms: number }) =>
   Math.max(0, Math.min(a.end_ms, b.end_ms) - Math.max(a.start_ms, b.start_ms))
 
-export function diff(exp: Expected, act: ClassifyOutput): Check[] {
+export function diff(exp: Expected, act: ClassifyOutput, utterances: Utterance[]): Check[] {
   const checks: Check[] = []
   const push = (name: string, pass: boolean | null, detail: string) => checks.push({ name, pass, detail })
+
+  // Rule 9 (do not invent): segment text is copied from the transcript. Whitespace is the only normalisation.
+  const squash = (t: string) => t.replace(/\s+/g, ' ').trim()
+  const transcript = squash(utterances.map((u) => u.text).join(' '))
+  const paraphrased = act.segments.filter((s) => !transcript.includes(squash(s.text)))
+  push(
+    'segment text verbatim from transcript',
+    paraphrased.length === 0,
+    paraphrased.length === 0
+      ? `${act.segments.length}/${act.segments.length}`
+      : paraphrased.map((s) => `${s.type} @${s.start_ms}: "${s.text.slice(0, 70)}"`).join(' | ')
+  )
 
   push('trigger', act.trigger === exp.trigger, `expected ${exp.trigger}, got ${act.trigger}`)
 
@@ -184,7 +196,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`prompt: ${promptVersion}`)
   console.log(`duration: expected ${expected.duration_ms} ms, transcribed ${result.transcript.duration_ms} ms`)
   console.log(`title: expected "${expected.title}", got "${result.out.title}"\n`)
-  const checks = diff(expected, result.out)
+  const checks = diff(expected, result.out, result.transcript.utterances)
   for (const c of checks) {
     console.log(`${c.pass === null ? 'JUDGE' : c.pass ? 'pass ' : 'FAIL '}  ${c.name} — ${c.detail}`)
   }
