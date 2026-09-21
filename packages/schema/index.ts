@@ -99,3 +99,65 @@ export const ClassifyOutput = z.object({
   style_signals: z.array(z.string()),
 })
 export type ClassifyOutput = z.infer<typeof ClassifyOutput>
+
+// ── Graph rows (as read by the app under RLS) ────────────────────────────────────
+// Column names and nullability follow supabase/migrations/0001_graph.sql. Only the columns the app selects.
+export const RecordingRow = z.object({
+  id: z.string().uuid(),
+  source: RecordingSource,
+  duration_ms: z.number().int().nullable(),
+  recorded_at: z.string().nullable(),
+  received_at: z.string(),
+  title: z.string().nullable(),
+  is_junk: z.boolean(),
+  junk_reason: z.string().nullable(),
+  /** Non-null once the pipeline has run. */
+  transcript: z.unknown().nullable(),
+})
+export type RecordingRow = z.infer<typeof RecordingRow>
+
+export const CardRow = z.object({
+  id: z.string().uuid(),
+  recording_id: z.string().uuid(),
+  title: z.string(),
+  gist: z.string(),
+  play_from_ms: z.number().int(),
+  confidence: z.number(),
+  energy: z.number().nullable(),
+  is_reference: z.boolean(),
+  frame_url: z.string().nullable(),
+  created_at: z.string(),
+})
+export type CardRow = z.infer<typeof CardRow>
+
+export const ThreadRow = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  stage: ThreadStage,
+  last_seen: z.string(),
+})
+export type ThreadRow = z.infer<typeof ThreadRow>
+
+export const ActionRow = z.object({
+  id: z.string().uuid(),
+  recording_id: z.string().uuid().nullable(),
+  text: z.string(),
+  scope: ActionScope,
+  priority: z.enum(['low', 'med', 'high']),
+  done: z.boolean(),
+  created_at: z.string(),
+})
+export type ActionRow = z.infer<typeof ActionRow>
+
+export const LooseEndRow = z.object({
+  id: z.string().uuid(),
+  recording_id: z.string().uuid().nullable(),
+  text: z.string(),
+  needs: z.enum(['link', 'answer', 'lookup']).nullable(),
+  resolved_url: z.string().nullable(),
+  created_at: z.string(),
+})
+export type LooseEndRow = z.infer<typeof LooseEndRow>
+
+/** Below this a card is shown greyed with "Ivy isn't sure" (CLAUDE.md pipeline invariants). */
+export const LOW_CONFIDENCE = 0.6

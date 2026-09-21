@@ -4,7 +4,6 @@
 // in CLAUDE.md that must hold whatever the model returns.
 
 import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
@@ -21,8 +20,15 @@ export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3' | 'cla
 export const PROMPT_VERSION: PromptVersion = 'classify_v4'
 const MODEL = 'claude-opus-5'
 
-const here = path.dirname(fileURLToPath(import.meta.url))
-const loadPrompt = (v: PromptVersion) => readFileSync(path.join(here, 'prompts', `${v}.md`), 'utf8')
+// Static `new URL(…, import.meta.url)` per version so bundlers (Next, for the process route) ship the markdown
+// alongside the code. Keep one entry per prompts/*.md.
+const PROMPT_FILES: Record<PromptVersion, URL> = {
+  classify_v1: new URL('./prompts/classify_v1.md', import.meta.url),
+  classify_v2: new URL('./prompts/classify_v2.md', import.meta.url),
+  classify_v3: new URL('./prompts/classify_v3.md', import.meta.url),
+  classify_v4: new URL('./prompts/classify_v4.md', import.meta.url),
+}
+const loadPrompt = (v: PromptVersion) => readFileSync(fileURLToPath(PROMPT_FILES[v]), 'utf8')
 
 export interface CreatorContext {
   handle: string | null

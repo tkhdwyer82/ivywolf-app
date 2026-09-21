@@ -18,7 +18,7 @@ The object is for thinking. The platform is for what you thought.
 - **Rising** — private pilot feed of shared cards/formats/boards, ranked by remix velocity.
 
 ## Rules that shape every screen
-1. No blank state — the first thing on screen is a thread or a board.
+1. No blank state — the first thing on screen is a thread, a board, or, before the first card exists, a single record prompt. Never an empty list.
 2. Ivy speaks only from the graph — every sentence cites a recording + timestamp; never first; one turn, then an object; ≤10 s.
 3. Visuals over text — cards, boards, even to-dos carry a frame. Cache common ones; generate only novel ones.
 4. Integrations are verbs on a board (tools as footnotes). Home shows a verb only when a thread has earned it.

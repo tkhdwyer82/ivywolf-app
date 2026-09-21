@@ -8,14 +8,15 @@
 //                "Never store raw audio outside Supabase storage").
 //   frames     — generated card/board imagery. Cache common frames; generate only novel ones (rule 3).
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type Bucket = 'recordings' | 'frames'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Created on first use, not at import: importing this module (e.g. while Next collects route config at build
+// time) must not require the service role key to be present.
+let client: SupabaseClient | undefined
+const admin = () =>
+  (client ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!))
 
 /**
  * Upload a raw buffer (already in memory) to Supabase Storage.
@@ -38,7 +39,7 @@ export async function uploadBuffer({
   contentType: string
   upsert?: boolean
 }): Promise<string> {
-  const { error } = await supabaseAdmin.storage.from(bucket).upload(path, buffer, {
+  const { error } = await admin().storage.from(bucket).upload(path, buffer, {
     contentType,
     upsert,
     cacheControl: '31536000', // 1 year — generated frames never change; recordings never change by definition
@@ -50,7 +51,7 @@ export async function uploadBuffer({
 
   if (bucket === 'recordings') return path
 
-  const { data } = supabaseAdmin.storage.from(bucket).getPublicUrl(path)
+  const { data } = admin().storage.from(bucket).getPublicUrl(path)
   return data.publicUrl
 }
 
@@ -90,7 +91,7 @@ export async function signedUrl(
   path: string,
   expiresInSeconds = 60 * 60
 ): Promise<string> {
-  const { data, error } = await supabaseAdmin.storage
+  const { data, error } = await admin().storage
     .from(bucket)
     .createSignedUrl(path, expiresInSeconds)
 
