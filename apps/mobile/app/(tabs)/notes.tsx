@@ -1,12 +1,14 @@
 // apps/mobile/app/(tabs)/notes.tsx
 // Profile = Voice notes: every recording, grouped by the day it was recorded, newest first.
 // While any recording is queued or processing, the list re-polls so "Ivy is listening…" resolves on its own.
+// Long-press a note to delete it and everything Ivy derived from it.
 
 import { useCallback, useRef, useState } from 'react'
-import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native'
 import { Link, useFocusEffect } from 'expo-router'
 import type { RecordingRow } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
+import { deleteRecording } from '@/lib/record'
 import { color, space, type } from '@/lib/theme'
 
 type Section = { title: string; data: RecordingRow[] }
@@ -24,7 +26,7 @@ export default function Notes() {
   const load = useCallback(async () => {
     const { data, error } = await supabase
       .from('recordings')
-      .select('id, source, duration_ms, recorded_at, received_at, title, is_junk, junk_reason, status')
+      .select('id, source, storage_path, duration_ms, recorded_at, received_at, title, is_junk, junk_reason, status')
       .order('received_at', { ascending: false })
       .limit(200)
     if (error) {
@@ -50,6 +52,28 @@ export default function Notes() {
       return () => clearInterval(timer)
     }, [load])
   )
+
+  function confirmDelete(item: RecordingRow) {
+    Alert.alert(
+      'Delete this voice note?',
+      'The audio, transcript, and every card, to-do and loose end Ivy took from it will be deleted. This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRecording(supabase, item)
+              await load()
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'Delete failed')
+            }
+          },
+        },
+      ]
+    )
+  }
 
   const refresh = async () => {
     setRefreshing(true)
@@ -77,7 +101,13 @@ export default function Notes() {
       }
       renderSectionHeader={({ section }) => <Text style={[type.meta, styles.day]}>{section.title}</Text>}
       renderItem={({ item }) => (
-        <View style={[styles.row, item.is_junk && { opacity: 0.5 }]}>
+        <Pressable
+          style={[styles.row, item.is_junk && { opacity: 0.5 }]}
+          onLongPress={() => confirmDelete(item)}
+          accessibilityHint="Long-press to delete"
+          accessibilityActions={[{ name: 'delete', label: 'Delete voice note' }]}
+          onAccessibilityAction={(e) => e.nativeEvent.actionName === 'delete' && confirmDelete(item)}
+        >
           <Text style={type.heading} numberOfLines={1}>
             {item.title ?? STATUS_TITLE[item.status]}
           </Text>
@@ -86,7 +116,7 @@ export default function Notes() {
             {item.duration_ms ? ` · ${Math.round(item.duration_ms / 1000)} s` : ''}
             {item.is_junk ? ` · ${item.junk_reason === 'too_short' ? 'too short' : 'no speech'}` : ''}
           </Text>
-        </View>
+        </Pressable>
       )}
     />
   )

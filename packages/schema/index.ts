@@ -108,6 +108,7 @@ export type ClassifyOutput = z.infer<typeof ClassifyOutput>
 export const RecordingRow = z.object({
   id: z.string().uuid(),
   source: RecordingSource,
+  storage_path: z.string(),
   duration_ms: z.number().int().nullable(),
   recorded_at: z.string().nullable(),
   received_at: z.string(),
