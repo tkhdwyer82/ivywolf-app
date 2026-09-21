@@ -94,9 +94,13 @@ export async function POST(req: NextRequest) {
         }
 
         const bundledMonths = PLANS[plan].bundledMonths
-        const bundledUntil = bundledMonths
-          ? new Date(Date.now() + bundledMonths * 30 * 24 * 60 * 60 * 1000).toISOString()
-          : null
+        // Calendar months, not 30-day blocks: 12 bundled months ends exactly one year from now.
+        let bundledUntil: string | null = null
+        if (bundledMonths) {
+          const until = new Date()
+          until.setUTCMonth(until.getUTCMonth() + bundledMonths)
+          bundledUntil = until.toISOString()
+        }
 
         const { error } = await supabaseAdmin()
           .from('subscriptions')
