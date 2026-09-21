@@ -8,4 +8,4 @@
    classify_v1 with structured output, then write to the graph tables. Run the two eval memos and report the diff
    against expected.json."
 4. Then: "Scaffold apps/mobile with Expo: Record (+), Notes (Profile), Threads list (Home), Life (inbox). TestFlight build."
-5. Every new voice memo: check Ivy's output by hand, then add an expected.json to pipeline/eval/memos.
+5. Every new voice memo: check Ivy's output by hand, then add an expected.json to packages/pipeline/eval/memos.
