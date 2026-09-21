@@ -1,0 +1,8 @@
+# Eval set
+
+One file per memo: `<date>_<name>.expected.json` — the hand-labelled output the classifier must reproduce
+(audio lives in Supabase storage or the R&D Drive folder, not in git).
+Score: segment-type accuracy; card precision/recall (a card is correct if title/gist match by meaning and play_from_ms
+is within 3 s); zero cards from retracted/filler/request/loose_end segments; zero actions inside cards; entity canonicalisation.
+A prompt version ships only when it passes every memo. Add a memo every time the pipeline gets something wrong.
+This set is the R&D evidence for CA1 (per-segment classification) and CA2 (thread identity) — commit it weekly.

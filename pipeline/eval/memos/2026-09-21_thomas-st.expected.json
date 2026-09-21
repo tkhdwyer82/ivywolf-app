@@ -1,0 +1,20 @@
+{
+  "source": "phone", "duration_ms": 100330, "trigger": "wake_word",
+  "title": "Launch video: many hands, one thread",
+  "segments": [
+    {"start_ms": 0, "end_ms": 1500, "type": "filler", "text": "Hey Ivy"},
+    {"start_ms": 1500, "end_ms": 27000, "type": "idea", "text": "video to sell Ivy: several creators talking to the device, ideas connecting into one output"},
+    {"start_ms": 27000, "end_ms": 34000, "type": "loose_end", "text": "a MrBeast-style video seen on YouTube — find it", "needs": "link"},
+    {"start_ms": 34000, "end_ms": 58000, "type": "idea", "text": "short; device in different hands; product -> AI -> video, seamless"},
+    {"start_ms": 58000, "end_ms": 88000, "type": "idea", "text": "fun is the goal; UI and AI personable, optimistic; show visuals not text", "style_signals": ["fun","personable","optimistic","talkative"]},
+    {"start_ms": 88000, "end_ms": 100330, "type": "request", "kind": "idea", "text": "thoughts, storyboards, demo concepts"}
+  ],
+  "cards": [
+    {"title": "Many hands, one thread", "play_from_ms": 1500, "format_hint": "launch_video", "min_confidence": 0.85},
+    {"title": "Product -> AI -> video, seamless", "play_from_ms": 34000, "format_hint": "launch_video", "min_confidence": 0.8}
+  ],
+  "actions": [], "entities": [],
+  "loose_ends": [{"text": "MrBeast-style video", "needs": "link"}],
+  "requests": [{"kind": "idea"}],
+  "must_not": {"cards_from_types": ["filler","request","loose_end"]}
+}
