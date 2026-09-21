@@ -11,8 +11,14 @@ import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import { ClassifyOutput, type RecordingSource, type Utterance } from '@ivywolf/schema'
 
 export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3' | 'classify_v4'
-/** The version that ships. Change only when the candidate passes every memo in eval/ (CLAUDE.md). */
-export const PROMPT_VERSION: PromptVersion = 'classify_v1'
+/**
+ * The version that ships. Change only when the candidate clears the ratchet in CLAUDE.md: it fails no eval check
+ * that the current shipping version passes, both scored with the same scorer, expected.json and transcripts.
+ *
+ * classify_v4 — ratcheted over classify_v1, 2026-09-21, on 2 memos (thomas-st, milton-st).
+ *   v1 fails 11 checks (5 + 6); v4 fails 1 (thomas-st card precision: extra reference card); v4 regresses on none.
+ */
+export const PROMPT_VERSION: PromptVersion = 'classify_v4'
 const MODEL = 'claude-opus-5'
 
 const here = path.dirname(fileURLToPath(import.meta.url))

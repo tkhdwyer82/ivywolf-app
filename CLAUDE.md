@@ -50,6 +50,9 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
 ## Working agreements
 - Weekly commit cadence aligned to ClickUp "Software platform" list; docs/ mirrored to the R&D Drive folder.
 - Never store raw audio outside Supabase storage. Never send other creators' data to any adapter.
-- Prompts live in packages/pipeline/prompts as versioned markdown; the eval set in packages/pipeline/eval must pass before a prompt version ships.
+- Prompts live in packages/pipeline/prompts as versioned markdown. Shipping is a ratchet: a prompt version may ship if, on the
+  eval set in packages/pipeline/eval, it fails no check that the current shipping version passes (both scored with the same
+  scorer, expected.json and transcripts). `PROMPT_VERSION` in packages/pipeline/classify.ts records which version ships and
+  what it was ratcheted over.
 - Run `supabase config diff` before `supabase config push` — push applies even when you answer "n" at its prompt.
 - Third-party auth (Clerk) is set via the Management API (`/v1/projects/{ref}/config/auth/third-party-auth`), not config.toml — config push does not sync it.

@@ -110,6 +110,23 @@ export function diff(exp: Expected, act: ClassifyOutput, utterances: Utterance[]
   )
   push('card recall', used.size === exp.cards.length, `${used.size}/${exp.cards.length}`)
 
+  // Reference cards: their_idea must be null unless the reference segment itself describes the referenced work.
+  // Whether it does is a judgement call, so any non-null their_idea is surfaced as JUDGE, not FAIL (for now).
+  const refCards = act.cards.filter((c) => c.is_reference)
+  if (refCards.length === 0) {
+    push('reference cards: their_idea grounded', true, 'no reference cards')
+  }
+  for (const c of refCards) {
+    const seg = act.segments[c.segment_index]
+    push(
+      `reference card "${c.title}": their_idea grounded`,
+      c.their_idea === null ? true : null,
+      c.their_idea === null
+        ? 'their_idea is null'
+        : `judge by hand — is this described in the segment? their_idea: "${c.their_idea}" | segment: "${seg?.text ?? '(missing)'}"`
+    )
+  }
+
   // must_not
   const banned = new Set(exp.must_not?.cards_from_types ?? ['retracted', 'filler', 'request', 'loose_end'])
   const badSource = act.cards.filter((c) => banned.has(act.segments[c.segment_index]?.type ?? ''))

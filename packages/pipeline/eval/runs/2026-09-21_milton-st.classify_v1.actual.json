@@ -1,14 +1,14 @@
 {
-  "trigger": "none",
-  "title": "Arabella AI chase scene ending on Ivy logo",
+  "trigger": "wake_word",
+  "title": "Arabella in the AI chase scene",
   "segments": [
     {
       "start_ms": 0,
       "end_ms": 400,
-      "type": "filler",
+      "type": "junk",
       "text": "Cord.",
       "speaker": "0",
-      "confidence": 0.4,
+      "confidence": 0.3,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -18,7 +18,7 @@
       "type": "idea",
       "text": "I'm thinking of an idea where we have Arabella in this really interesting fight scene that I saw on Higgs Field AI.",
       "speaker": "0",
-      "confidence": 0.85,
+      "confidence": 0.8,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -28,7 +28,7 @@
       "type": "loose_end",
       "text": "It'd be great to find that video.",
       "speaker": "0",
-      "confidence": 0.9,
+      "confidence": 0.85,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -38,7 +38,7 @@
       "type": "idea",
       "text": "Use Arabella's character to run that chase, to jump over things.",
       "speaker": "0",
-      "confidence": 0.85,
+      "confidence": 0.8,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -48,28 +48,38 @@
       "type": "filler",
       "text": "Actually, one second.",
       "speaker": "0",
-      "confidence": 0.8,
+      "confidence": 0.9,
       "boundary_marker": "Actually, one second.",
       "retracted_by": null
     },
     {
       "start_ms": 23445,
-      "end_ms": 31140,
+      "end_ms": 28965,
       "type": "request",
       "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
-      "confidence": 0.92,
+      "confidence": 0.95,
       "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 29300,
+      "end_ms": 31140,
+      "type": "filler",
+      "text": "Anyway, back to the idea.",
+      "speaker": "0",
+      "confidence": 0.9,
+      "boundary_marker": "Anyway, back to the idea.",
       "retracted_by": null
     },
     {
       "start_ms": 32420,
       "end_ms": 61157,
       "type": "idea",
-      "text": "Arabella runs through that scene, she jumps, she pushes away from people. It's a really cool AI scene, but using Arabella instead of the original performer in the actual video. When she gets to the end she has Ivy in her hand and says into the mic, \"it's done.\" Then it goes to the Ivy branding logo.",
+      "text": "Arabella runs through that scene. She jumps, she pushes away from people. It's a really cool AI scene, but using Arabella instead of the original performer in the actual video. When she gets to the end she has Ivy in her hand and says into the mic, it's done. Then it goes to the Ivy branding logo.",
       "speaker": "0",
-      "confidence": 0.88,
-      "boundary_marker": "Anyway, back to the idea.",
+      "confidence": 0.85,
+      "boundary_marker": null,
       "retracted_by": null
     }
   ],
@@ -77,18 +87,17 @@
     {
       "segment_index": 1,
       "title": "Arabella runs the AI chase scene",
-      "gist": "Recreate the Higgs Field AI fight/chase clip with Arabella's character in place of the original performer — she jumps, pushes past people, and at the end holds Ivy to the mic, says \"it's done,\" cutting to the Ivy logo.",
+      "gist": "Recreate a Higgs Field AI fight/chase scene with Arabella's character jumping and pushing past people, ending with her speaking into the mic — \"it's done\" — before cutting to the Ivy branding logo.",
       "play_from_ms": 880,
       "confidence": 0.78,
-      "energy": 0.65,
+      "energy": 0.7,
       "format_hint": "launch_video",
-      "is_reference": false,
-      "their_idea": null,
-      "her_take": null,
+      "is_reference": true,
+      "their_idea": "An AI-generated fight and chase scene on Higgs Field AI featuring the original performer running and leaping through a crowd.",
+      "her_take": "Swap in Arabella as the character running the chase, and land it on a mic line and the Ivy logo.",
       "candidate_threads": [
-        "Ivy brand film",
-        "AI-generated action scenes",
-        "Arabella character work"
+        "AI-generated brand films",
+        "Arabella character scenes"
       ]
     }
   ],
@@ -97,7 +106,7 @@
       "segment_index": 5,
       "text": "Get milk",
       "scope": "personal",
-      "priority": "low"
+      "priority": "med"
     }
   ],
   "entities": [
@@ -129,7 +138,7 @@
   "loose_ends": [
     {
       "segment_index": 2,
-      "text": "Find the Higgs Field AI fight/chase video she saw",
+      "text": "Find the Higgs Field AI fight/chase video that inspired this.",
       "needs": "link"
     }
   ],
@@ -137,13 +146,12 @@
     {
       "segment_index": 5,
       "kind": "life",
-      "text": "Put in a reminder to get milk"
+      "text": "Put a reminder in to get milk."
     }
   ],
   "style_signals": [
     "visual",
     "cinematic",
-    "stream-of-consciousness",
-    "enthusiastic"
+    "stream-of-consciousness"
   ]
 }
