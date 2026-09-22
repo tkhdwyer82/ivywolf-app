@@ -1,7 +1,8 @@
 // apps/mobile/app/life.tsx
-// Life (top-right inbox): open actions and unresolved loose ends. Tapping an action marks it done.
+// Life (top-right inbox): open actions and unresolved loose ends. Tapping an action marks it done; an Undo toast
+// stays for a few seconds so a stray tap is recoverable.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { SymbolView } from 'expo-symbols'
@@ -12,6 +13,8 @@ import { color, space, type } from '@/lib/theme'
 type Item = { kind: 'action'; row: ActionRow } | { kind: 'loose_end'; row: LooseEndRow }
 type Section = { title: string; data: Item[] }
 
+const UNDO_MS = 5000
+
 const NEEDS_LABEL: Record<string, string> = { link: 'needs a link', answer: 'needs an answer', lookup: 'needs a lookup' }
 
 export default function Life() {
@@ -19,6 +22,12 @@ export default function Life() {
   const [sections, setSections] = useState<Section[]>([])
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [undoable, setUndoable] = useState<{ id: string; text: string } | null>(null)
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+  }, [])
 
   const load = useCallback(async () => {
     const [actions, looseEnds] = await Promise.all([
@@ -50,8 +59,21 @@ export default function Life() {
     }, [load])
   )
 
-  async function markDone(id: string) {
-    const { error } = await supabase.from('actions').update({ done: true }).eq('id', id)
+  async function markDone(row: ActionRow) {
+    const { error } = await supabase.from('actions').update({ done: true }).eq('id', row.id)
+    if (error) return setError(error.message)
+    load()
+    // Only the latest tap is undoable; an earlier one stays done.
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    setUndoable({ id: row.id, text: row.text })
+    undoTimer.current = setTimeout(() => setUndoable(null), UNDO_MS)
+  }
+
+  async function undo() {
+    if (!undoable) return
+    if (undoTimer.current) clearTimeout(undoTimer.current)
+    setUndoable(null)
+    const { error } = await supabase.from('actions').update({ done: false }).eq('id', undoable.id)
     if (error) setError(error.message)
     else load()
   }
@@ -63,51 +85,65 @@ export default function Life() {
   }
 
   return (
-    <SectionList
-      sections={sections}
-      keyExtractor={(i) => `${i.kind}:${i.row.id}`}
-      contentContainerStyle={styles.list}
-      stickySectionHeadersEnabled={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-      ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
-      renderSectionHeader={({ section }) => (
-        <Text style={[type.meta, styles.header]}>
-          {section.title}
-          {section.data.length === 0 ? ' · all clear' : ''}
-        </Text>
-      )}
-      renderItem={({ item }) =>
-        item.kind === 'action' ? (
-          <Pressable
-            style={styles.row}
-            onPress={() => markDone(item.row.id)}
-            accessibilityRole="button"
-            accessibilityLabel={`Mark done: ${item.row.text}`}
-          >
-            <SymbolView name="circle" tintColor={color.inkSoft} size={22} />
-            <View style={styles.text}>
-              <Text style={type.body}>{item.row.text}</Text>
-              <Text style={type.meta}>
-                {item.row.scope}
-                {item.row.priority !== 'low' ? ` · ${item.row.priority}` : ''}
-              </Text>
+    <View style={styles.screen}>
+      <SectionList
+        sections={sections}
+        keyExtractor={(i) => `${i.kind}:${i.row.id}`}
+        contentContainerStyle={styles.list}
+        stickySectionHeadersEnabled={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+        ListHeaderComponent={error ? <Text style={styles.error}>{error}</Text> : null}
+        renderSectionHeader={({ section }) => (
+          <Text style={[type.meta, styles.header]}>
+            {section.title}
+            {section.data.length === 0 ? ' · all clear' : ''}
+          </Text>
+        )}
+        renderItem={({ item }) =>
+          item.kind === 'action' ? (
+            <Pressable
+              style={styles.row}
+              onPress={() => markDone(item.row)}
+              accessibilityRole="button"
+              accessibilityLabel={`Mark done: ${item.row.text}`}
+            >
+              <SymbolView name="circle" tintColor={color.inkSoft} size={22} />
+              <View style={styles.text}>
+                <Text style={type.body}>{item.row.text}</Text>
+                <Text style={type.meta}>
+                    {item.row.scope}
+                  {item.row.priority !== 'low' ? ` · ${item.row.priority}` : ''}
+                </Text>
+              </View>
+            </Pressable>
+          ) : (
+            <View style={styles.row}>
+              <SymbolView name="link" tintColor={color.inkSoft} size={20} />
+              <View style={styles.text}>
+                <Text style={type.body}>{item.row.text}</Text>
+                {item.row.needs ? <Text style={type.meta}>{NEEDS_LABEL[item.row.needs]}</Text> : null}
+              </View>
             </View>
+          )
+        }
+      />
+      {undoable ? (
+        <View style={styles.toast} accessibilityLiveRegion="polite">
+          <Text style={styles.toastText} numberOfLines={1}>
+            Done: {undoable.text}
+          </Text>
+          <Pressable onPress={undo} hitSlop={12} accessibilityRole="button" accessibilityLabel={`Undo: ${undoable.text}`}>
+            <Text style={styles.toastUndo}>Undo</Text>
           </Pressable>
-        ) : (
-          <View style={styles.row}>
-            <SymbolView name="link" tintColor={color.inkSoft} size={20} />
-            <View style={styles.text}>
-              <Text style={type.body}>{item.row.text}</Text>
-              {item.row.needs ? <Text style={type.meta}>{NEEDS_LABEL[item.row.needs]}</Text> : null}
-            </View>
-          </View>
-        )
-      }
-    />
+        </View>
+      ) : null}
+    </View>
   )
 }
 
+
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   list: { padding: space.l, gap: space.s },
   header: { textTransform: 'uppercase', letterSpacing: 0.6, marginTop: space.l, marginBottom: space.xs },
   row: {
@@ -122,4 +158,19 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1, gap: 2 },
   error: { color: color.accent },
+  toast: {
+    position: 'absolute',
+    left: space.l,
+    right: space.l,
+    bottom: space.xxl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.m,
+    backgroundColor: color.ink,
+    borderRadius: 12,
+    paddingVertical: space.m,
+    paddingHorizontal: space.l,
+  },
+  toastText: { flex: 1, color: color.paper, fontSize: 15 },
+  toastUndo: { color: '#fff', fontSize: 15, fontWeight: '700' },
 })
