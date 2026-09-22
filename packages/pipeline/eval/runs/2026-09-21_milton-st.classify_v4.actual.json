@@ -1,6 +1,6 @@
 {
   "trigger": "none",
-  "title": "Arabella in the AI chase scene",
+  "title": "Arabella in the AI chase scene for Ivy",
   "segments": [
     {
       "start_ms": 0,
@@ -8,7 +8,7 @@
       "type": "junk",
       "text": "Cord.",
       "speaker": "0",
-      "confidence": 0.3,
+      "confidence": 0.4,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -48,7 +48,7 @@
       "type": "action",
       "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
-      "confidence": 0.9,
+      "confidence": 0.92,
       "boundary_marker": "Actually, one second.",
       "retracted_by": null
     },
@@ -58,7 +58,7 @@
       "type": "request",
       "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
-      "confidence": 0.9,
+      "confidence": 0.92,
       "boundary_marker": "Actually, one second.",
       "retracted_by": null
     },
@@ -77,7 +77,7 @@
     {
       "segment_index": 1,
       "title": "Arabella runs the AI chase scene",
-      "gist": "Recreate a fight-and-chase scene she saw made with Higgs Field AI, swapping the original performer for Arabella's character as she runs, jumps and pushes past people, ending with her holding the device, saying \"it's done\" into the mic, and cutting to the Ivy branding logo.",
+      "gist": "Recreate the AI fight/chase scene she saw on Higgs Field with Arabella's character in place of the original performer — running, jumping, pushing past people — ending with Arabella holding Ivy, saying \"it's done\" into the mic, then cutting to the Ivy branding logo.",
       "play_from_ms": 880,
       "confidence": 0.88,
       "energy": 0.65,
@@ -86,8 +86,7 @@
       "their_idea": null,
       "her_take": null,
       "candidate_threads": [
-        "Short video, many hands, seamless flow",
-        "Several creators talking to the device"
+        "Ivy launch video"
       ]
     }
   ],

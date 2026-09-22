@@ -7,7 +7,8 @@
 //               1. by name: the classifier's candidate_threads for the card fuzzy-match an existing thread title
 //                  (titleMatch ≥ NAME_MATCH_MIN) → attach to the best match;
 //               2. by embedding: cosine(card, thread centroid) ≥ THREAD_ATTACH_MIN → attach to the nearest;
-//               3. otherwise start a new thread titled from the card.
+//               3. otherwise start a new thread, named from the card's first candidate_thread when it gave one,
+//                  else from the card title — cards are named by content, threads by purpose.
 //   propose — two cards in different threads with cosine ≥ MERGE_PROPOSE_MIN get a merge_suggestions row.
 //             Propose, never merge (CLAUDE.md: never silently dedupe).
 
@@ -108,11 +109,17 @@ export function assignCards(
     else if (nearest && nearest.similarity >= THREAD_ATTACH_MIN) attachTo(nearest.threadId, 'embedding')
     else {
       const id = newThreadId()
-      threads.push({ id, title: card.title, cards: [{ id: card.id, embedding: card.embedding }] })
+      threads.push({ id, title: threadName(card), cards: [{ id: card.id, embedding: card.embedding }] })
       out.push({ cardId: card.id, threadId: id, created: true, via: 'new', nameMatch, nearest })
     }
   }
   return out
+}
+
+/** A new thread's name: the card's first candidate thread, else the card title. */
+export function threadName(card: { title: string; candidateThreads: string[] }): string {
+  const named = card.candidateThreads.map((c) => c.trim()).find((c) => c.length > 0)
+  return named ?? card.title
 }
 
 export interface MergeProposal {

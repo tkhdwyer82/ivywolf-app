@@ -50,9 +50,33 @@ type Check = { name: string; pass: boolean | null; detail: string }
 const overlap = (a: { start_ms: number; end_ms: number }, b: { start_ms: number; end_ms: number }) =>
   Math.max(0, Math.min(a.end_ms, b.end_ms) - Math.max(a.start_ms, b.start_ms))
 
-export function diff(exp: Expected, act: ClassifyOutput, utterances: Utterance[]): Check[] {
+export function diff(
+  exp: Expected,
+  act: ClassifyOutput,
+  utterances: Utterance[],
+  recentThreadTitles: string[] = []
+): Check[] {
   const checks: Check[] = []
   const push = (name: string, pass: boolean | null, detail: string) => checks.push({ name, pass, detail })
+
+  // Echo guard (CA2 experiment 2): a card whose candidate_threads are exactly the recent_thread_titles it was given
+  // has copied its context rather than judged it. Needs ≥ 2 titles: with one, naming it is also what a correct
+  // judgement looks like, so the two can't be told apart.
+  if (recentThreadTitles.length >= 2) {
+    const given = [...recentThreadTitles].map((t) => t.trim().toLowerCase()).sort().join('\u0000')
+    const echoed = act.cards.filter(
+      (c) => [...c.candidate_threads].map((t) => t.trim().toLowerCase()).sort().join('\u0000') === given
+    )
+    push(
+      'candidate_threads not an echo of recent_thread_titles',
+      echoed.length === 0,
+      echoed.length === 0
+        ? `given ${JSON.stringify(recentThreadTitles)}`
+        : `${echoed.map((c) => `"${c.title}"`).join(', ')} named exactly the ${recentThreadTitles.length} titles given`
+    )
+  } else if (recentThreadTitles.length === 1) {
+    push('candidate_threads not an echo of recent_thread_titles', null, `only one title given (${JSON.stringify(recentThreadTitles)}) — echo and judgement look the same`)
+  }
 
   // Rule 9 (do not invent): segment text is copied from the transcript. Whitespace is the only normalisation.
   const squash = (t: string) => t.replace(/\s+/g, ' ').trim()
@@ -243,6 +267,7 @@ export async function threadingCheck(
 
   const title = new Map([...state.cards, ...b].map((c) => [c.id, c.title]))
   const threadOf = new Map([...state.assignments, ...laterAssignments].map((x) => [x.cardId, x.threadId]))
+  const threadTitle = new Map(state.threads.map((t) => [t.id, t.title]))
   const report: string[] = [
     `thresholds: name ≥ ${NAME_MATCH_MIN}, attach ≥ ${THREAD_ATTACH_MIN}, propose merge ≥ ${MERGE_PROPOSE_MIN}`,
     `candidate_threads: ${[...state.cards.map((c) => `${state.name} "${c.title}" ${JSON.stringify(c.candidateThreads)}`), ...b.map((c) => `this "${c.title}" ${JSON.stringify(c.candidateThreads)}`)].join(' | ')}`,
@@ -254,7 +279,9 @@ export async function threadingCheck(
     }
   }
   report.push('assignment, in recording order:')
-  for (const x of [...state.assignments, ...laterAssignments]) report.push(describe(x, title.get(x.cardId)!))
+  for (const x of [...state.assignments, ...laterAssignments]) {
+    report.push(describe(x, title.get(x.cardId)!) + `  | thread named "${threadTitle.get(x.threadId)}"`)
+  }
   report.push(
     `merges proposed: ${merges.length ? merges.map((m) => `${title.get(m.aCardId)} ↔ ${title.get(m.bCardId)} ${m.similarity.toFixed(3)}`).join('; ') : 'none'}`
   )
@@ -326,7 +353,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (earlierState) console.log(`recent_thread_titles given to classify: ${JSON.stringify(recent)}`)
   console.log(`duration: expected ${expected.duration_ms} ms, transcribed ${result.transcript.duration_ms} ms`)
   console.log(`title: expected "${expected.title}", got "${result.out.title}"\n`)
-  const checks = diff(expected, result.out, result.transcript.utterances)
+  const checks = diff(expected, result.out, result.transcript.utterances, recent)
   if (earlierMissing) {
     checks.push({ name: `thread identity with ${expected.expect_merge_suggestion_with}`, pass: false, detail: earlierMissing })
   }
