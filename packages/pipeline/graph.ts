@@ -186,6 +186,7 @@ export async function writeClassification(args: {
           text: a.text,
           scope: a.scope,
           priority: a.priority,
+          due_date: a.due_date,
         }))
       )
     )

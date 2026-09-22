@@ -1,0 +1,19 @@
+{
+  "source": "phone", "duration_ms": 42028, "trigger": "wake_word",
+  "recorded": {"local_date": "2026-09-22", "weekday": "Tuesday", "timezone": "Australia/Sydney"},
+  "title": "Launch video: Arabella rooftop chase",
+  "segments": [
+    {"start_ms": 2960, "end_ms": 4000, "type": "filler", "text": "Hey, Ivy."},
+    {"start_ms": 5440, "end_ms": 32240, "type": "idea", "text": "Arabella runs through a street fending off bad guys, jumps a roof, opens the device in her hands, radios through 'I've got it'"},
+    {"start_ms": 33920, "end_ms": 41600, "type": "action", "text": "I need to have milk for the office for Thursday", "boundary_marker": "by the way"}
+  ],
+  "cards": [
+    {"title": "Arabella rooftop chase launch video", "play_from_ms": 5440, "format_hint": "launch_video", "min_confidence": 0.85}
+  ],
+  "actions": [{"text": "milk", "scope": "work", "due_date": "2026-09-24"}],
+  "entities": [{"name": "Arabella", "kind": "person", "canonical": null, "aliases_seen": ["Arabella"]}],
+  "loose_ends": [],
+  "requests": [],
+  "must_not": {"cards_contain": ["milk"], "physical_descriptors_on_cards": true},
+  "expect_merge_suggestion_with": "2026-09-21_milton-st"
+}

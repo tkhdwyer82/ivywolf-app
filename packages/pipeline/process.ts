@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import type { ClassifyOutput, RecordingSource } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
-import { classify, PROMPT_VERSION, type CreatorContext, type PromptVersion } from './classify'
+import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
 import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification } from './graph'
 
 export { claimRecording, markFailed } from './graph'
@@ -22,6 +22,7 @@ export async function analyse(args: {
   audioUrl: string
   source: RecordingSource
   creator: CreatorContext
+  recorded: RecordedDay | null
   promptVersion?: PromptVersion
 }): Promise<ProcessResult> {
   const transcript = await transcribe(args.audioUrl)
@@ -36,6 +37,7 @@ export async function analyse(args: {
     utterances: transcript.utterances,
     creator: args.creator,
     source: args.source,
+    recorded: args.recorded,
     promptVersion: args.promptVersion,
   })
   return { junk: null, transcript, out }
@@ -48,14 +50,15 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   })
   const { data: rec, error } = await supabase
     .from('recordings')
-    .select('id, creator_id, source, storage_path')
+    .select('id, creator_id, source, storage_path, recorded_at, recorded_tz')
     .eq('id', recordingId)
     .single()
   if (error || !rec) throw new Error(`recording ${recordingId}: ${error?.message ?? 'not found'}`)
 
   const creator = await loadCreatorContext(rec.creator_id)
   const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
-  const result = await analyse({ audioUrl, source: rec.source, creator })
+  const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
+  const result = await analyse({ audioUrl, source: rec.source, creator, recorded })
 
   if (result.junk) {
     await markJunk(rec.id, result.junk, result.transcript.raw)

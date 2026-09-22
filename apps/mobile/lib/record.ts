@@ -51,6 +51,8 @@ export async function submitRecording(args: {
     storage_path: storagePath,
     duration_ms: args.durationMs,
     recorded_at: args.recordedAt.toISOString(),
+    // The device's zone, so the pipeline can resolve "for Thursday" against her local day.
+    recorded_tz: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
     trigger: 'button',
   })
   if (row.error) throw new Error(`recording row: ${row.error.message}`)

@@ -69,6 +69,8 @@ export const Action = z.object({
   text: z.string(),
   scope: ActionScope,
   priority: z.enum(['low', 'med', 'high']),
+  /** YYYY-MM-DD the action is for, resolved against the recording's local date; null when none was said. */
+  due_date: z.string().nullable(),
 })
 
 export const Entity = z.object({
@@ -147,6 +149,7 @@ export const ActionRow = z.object({
   text: z.string(),
   scope: ActionScope,
   priority: z.enum(['low', 'med', 'high']),
+  due_date: z.string().nullable(),
   done: z.boolean(),
   created_at: z.string(),
 })

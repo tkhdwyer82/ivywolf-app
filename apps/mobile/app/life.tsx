@@ -33,7 +33,7 @@ export default function Life() {
     const [actions, looseEnds] = await Promise.all([
       supabase
         .from('actions')
-        .select('id, recording_id, text, scope, priority, done, created_at')
+        .select('id, recording_id, text, scope, priority, due_date, done, created_at')
         .eq('done', false)
         .order('created_at', { ascending: false }),
       supabase
@@ -111,7 +111,8 @@ export default function Life() {
               <View style={styles.text}>
                 <Text style={type.body}>{item.row.text}</Text>
                 <Text style={type.meta}>
-                    {item.row.scope}
+                  {item.row.due_date ? <Text style={isOverdue(item.row.due_date) && styles.overdue}>{dueLabel(item.row.due_date)} · </Text> : null}
+                  {item.row.scope}
                   {item.row.priority !== 'low' ? ` · ${item.row.priority}` : ''}
                 </Text>
               </View>
@@ -141,6 +142,27 @@ export default function Life() {
   )
 }
 
+/** due_date is a calendar day (YYYY-MM-DD) — compare and format it as a local date, never as a UTC instant. */
+function localDay(d: string) {
+  const [y, m, day] = d.split('-').map(Number)
+  return new Date(y, m - 1, day)
+}
+
+function daysFromToday(d: string) {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((localDay(d).getTime() - today.getTime()) / 86_400_000)
+}
+
+const isOverdue = (d: string) => daysFromToday(d) < 0
+
+function dueLabel(d: string) {
+  const n = daysFromToday(d)
+  if (n === 0) return 'due today'
+  if (n === 1) return 'due tomorrow'
+  const day = localDay(d).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+  return n < 0 ? `overdue · ${day}` : `due ${day}`
+}
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -158,6 +180,7 @@ const styles = StyleSheet.create({
   },
   text: { flex: 1, gap: 2 },
   error: { color: color.accent },
+  overdue: { color: color.accent },
   toast: {
     position: 'absolute',
     left: space.l,

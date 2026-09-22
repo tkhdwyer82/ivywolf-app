@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import type { ClassifyOutput, Utterance } from '@ivywolf/schema'
 import { signedUrl } from '../storage'
 import { analyse } from '../process'
-import { PROMPT_VERSION, type PromptVersion } from '../classify'
+import { PROMPT_VERSION, type PromptVersion, type RecordedDay } from '../classify'
 import { cardText, embed } from '../embed'
 import {
   assignCards,
@@ -34,10 +34,12 @@ interface Expected {
   source: 'phone'
   duration_ms: number
   trigger: 'wake_word' | 'none'
+  /** The local day it was recorded. When set, every action's due_date is scored (absent = must be null). */
+  recorded?: RecordedDay
   title: string
   segments: { start_ms: number; end_ms: number; type: string; text: string; boundary_marker?: string }[]
   cards: { title: string; play_from_ms: number; format_hint?: string; min_confidence?: number; candidate_threads?: string[] }[]
-  actions: { text: string; scope?: string }[]
+  actions: { text: string; scope?: string; due_date?: string | null }[]
   entities: { name: string; kind: string; canonical: string | null; aliases_seen: string[] }[]
   loose_ends: { text: string; needs: string }[]
   requests: { kind: string }[]
@@ -181,6 +183,18 @@ export function diff(
       exp.actions.every((e) => act.actions.some((a) => a.text.toLowerCase().includes(e.text.toLowerCase()) && (!e.scope || a.scope === e.scope))),
     `expected ${JSON.stringify(exp.actions)}, got ${JSON.stringify(act.actions.map(({ text, scope }) => ({ text, scope })))}`
   )
+  if (exp.recorded) {
+    // Each expected action's matching actual action carries the expected date — or none, when none was said.
+    const wrong = exp.actions.filter((e) => {
+      const a = act.actions.find((x) => x.text.toLowerCase().includes(e.text.toLowerCase()))
+      return !a || a.due_date !== (e.due_date ?? null)
+    })
+    push(
+      'action due dates',
+      wrong.length === 0,
+      `recorded ${exp.recorded.weekday} ${exp.recorded.local_date}; expected ${JSON.stringify(exp.actions.map((e) => ({ text: e.text, due_date: e.due_date ?? null })))}, got ${JSON.stringify(act.actions.map(({ text, due_date }) => ({ text, due_date })))}`
+    )
+  }
   push(
     'loose_ends',
     act.loose_ends.length === exp.loose_ends.length && exp.loose_ends.every((e) => act.loose_ends.some((l) => l.needs === e.needs)),
@@ -332,6 +346,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const result = await analyse({
     audioUrl: await signedUrl('recordings', storagePath, 15 * 60),
     source: expected.source,
+    recorded: expected.recorded ?? null,
     promptVersion,
     creator: {
       handle: null,

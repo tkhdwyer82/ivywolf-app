@@ -1,0 +1,85 @@
+{
+  "trigger": "wake_word",
+  "title": "Launch video: Arabella chase scene",
+  "segments": [
+    {
+      "start_ms": 2960,
+      "end_ms": 4000,
+      "type": "filler",
+      "text": "Hey, Ivy.",
+      "speaker": "0",
+      "confidence": 0.97,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 5440,
+      "end_ms": 32240,
+      "type": "idea",
+      "text": "Have some really cool ideas around this new video for the launch of the Ivy product. It has Arabella running through a street defending off bad guys. And then at the end of that, she jumps over a roof and then opens up the device in her hands and then radios through and says, I've got it.",
+      "speaker": "0",
+      "confidence": 0.92,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 33920,
+      "end_ms": 40240,
+      "type": "action",
+      "text": "Oh, and by the way, I just forgot. I need to have milk for the office for Thursday.",
+      "speaker": "0",
+      "confidence": 0.93,
+      "boundary_marker": "Oh, and by the way, I just forgot.",
+      "retracted_by": null
+    },
+    {
+      "start_ms": 41200,
+      "end_ms": 41600,
+      "type": "filler",
+      "text": "Thanks.",
+      "speaker": "0",
+      "confidence": 0.95,
+      "boundary_marker": null,
+      "retracted_by": null
+    }
+  ],
+  "cards": [
+    {
+      "segment_index": 1,
+      "title": "Arabella chase launch video",
+      "gist": "A launch video where Arabella runs through a street fending off bad guys, jumps over a roof, opens the device in her hands and radios through, \"I've got it.\"",
+      "play_from_ms": 5440,
+      "confidence": 0.89,
+      "energy": 0.65,
+      "format_hint": "launch_video",
+      "is_reference": false,
+      "their_idea": null,
+      "her_take": null,
+      "candidate_threads": [
+        "Creators talking to the device"
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "segment_index": 2,
+      "text": "Get milk for the office for Thursday",
+      "scope": "work",
+      "priority": "med",
+      "due_date": "2026-09-24"
+    }
+  ],
+  "entities": [
+    {
+      "name": "Arabella",
+      "kind": "person",
+      "canonical": null,
+      "aliases_seen": [
+        "Arabella"
+      ]
+    }
+  ],
+  "loose_ends": [],
+  "requests": [],
+  "style_signals": []
+}
