@@ -34,9 +34,6 @@
           "backgroundColor": "#F6F2EC"
         }
       ]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+    ]
   }
 }
