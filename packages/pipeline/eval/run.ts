@@ -20,8 +20,10 @@ import {
   assignCards,
   cosine,
   MERGE_PROPOSE_MIN,
+  NAME_MATCH_MIN,
   proposeMerges,
   THREAD_ATTACH_MIN,
+  type Assignment,
   type ThreadState,
 } from '../threading'
 
@@ -181,65 +183,88 @@ export function diff(exp: Expected, act: ClassifyOutput, utterances: Utterance[]
   return checks
 }
 
-/**
- * CA2: replay thread identity across two memos, in recording order (`earlier` first), with the same functions the
- * pipeline uses. Passes if a card from `later` lands in a thread holding a card from `earlier`, or a merge is
- * proposed between them. Prints every similarity so the thresholds can be tuned.
- */
-export async function threadingCheck(
-  earlierName: string,
-  earlier: ClassifyOutput,
-  later: ClassifyOutput
-): Promise<{ check: Check; report: string[] }> {
-  const tag = (prefix: string, cards: ClassifyOutput['cards']) =>
-    cards.map((c, i) => ({ id: `${prefix}#${i}`, title: c.title, gist: c.gist }))
-  const a = tag('earlier', earlier.cards)
-  const b = tag('this', later.cards)
-  const vectors = await embed([...a, ...b].map(cardText))
-  const vec = new Map([...a, ...b].map((c, i) => [c.id, vectors[i]]))
+/** Thread state after a creator's earlier recording, as the pipeline would have left it. */
+export interface EarlierState {
+  name: string
+  cards: { id: string; title: string; gist: string; candidateThreads: string[] }[]
+  vectors: Map<string, number[]>
+  threads: ThreadState[]
+  assignments: Assignment[]
+  mint: () => string
+}
 
+/**
+ * Replay the earlier memo through thread assignment from an empty graph (it was the creator's first recording),
+ * exactly as threadNewCards would. Its thread titles then feed the later memo's classify call as
+ * recent_thread_titles, as loadCreatorContext would supply them.
+ */
+export async function replayEarlier(name: string, earlier: ClassifyOutput): Promise<EarlierState> {
+  const cards = earlier.cards.map((c, i) => ({
+    id: `earlier#${i}`,
+    title: c.title,
+    gist: c.gist,
+    candidateThreads: c.candidate_threads,
+  }))
+  const vectors = await embed(cards.map(cardText))
+  const vec = new Map(cards.map((c, i) => [c.id, vectors[i]]))
   const threads: ThreadState[] = []
   let n = 0
   const mint = () => `thread-${++n}`
-  const assignments = [
-    ...assignCards(a.map((c) => ({ ...c, embedding: vec.get(c.id)! })), threads, mint),
-    ...assignCards(b.map((c) => ({ ...c, embedding: vec.get(c.id)! })), threads, mint),
-  ]
-  const merges = proposeMerges(new Set(b.map((c) => c.id)), threads)
+  const assignments = assignCards(cards.map((c) => ({ ...c, embedding: vec.get(c.id)! })), threads, mint)
+  return { name, cards, vectors: vec, threads, assignments, mint }
+}
 
-  const title = new Map([...a, ...b].map((c) => [c.id, c.title]))
-  const threadOf = new Map(assignments.map((x) => [x.cardId, x.threadId]))
+/** Most recently created first — loadCreatorContext orders by last_seen desc, and later threads were seen last. */
+export const recentThreadTitles = (state: EarlierState) => [...state.threads].reverse().map((t) => t.title)
+
+const describe = (x: Assignment, title: string) =>
+  `  "${title}" → ${x.threadId} via ${x.via}` +
+  (x.nameMatch ? `  | best name: "${x.nameMatch.candidate}" ~ "${x.nameMatch.title}" ${x.nameMatch.score.toFixed(2)}` : '  | no name match possible') +
+  (x.nearest ? `  | nearest centroid: "${x.nearest.title}" ${x.nearest.similarity.toFixed(3)}` : '')
+
+/**
+ * CA2: continue the earlier memo's thread state with the later memo's cards, using the pipeline's functions.
+ * Passes if a later card lands in a thread holding an earlier card, or a merge is proposed between them.
+ */
+export async function threadingCheck(
+  state: EarlierState,
+  later: ClassifyOutput
+): Promise<{ check: Check; report: string[] }> {
+  const b = later.cards.map((c, i) => ({
+    id: `this#${i}`,
+    title: c.title,
+    gist: c.gist,
+    candidateThreads: c.candidate_threads,
+  }))
+  const bVectors = await embed(b.map(cardText))
+  const vec = new Map([...state.vectors, ...b.map((c, i) => [c.id, bVectors[i]] as const)])
+  const laterAssignments = assignCards(b.map((c) => ({ ...c, embedding: vec.get(c.id)! })), state.threads, state.mint)
+  const merges = proposeMerges(new Set(b.map((c) => c.id)), state.threads)
+
+  const title = new Map([...state.cards, ...b].map((c) => [c.id, c.title]))
+  const threadOf = new Map([...state.assignments, ...laterAssignments].map((x) => [x.cardId, x.threadId]))
   const report: string[] = [
-    `thresholds: attach ≥ ${THREAD_ATTACH_MIN}, propose merge ≥ ${MERGE_PROPOSE_MIN}`,
+    `thresholds: name ≥ ${NAME_MATCH_MIN}, attach ≥ ${THREAD_ATTACH_MIN}, propose merge ≥ ${MERGE_PROPOSE_MIN}`,
+    `candidate_threads: ${[...state.cards.map((c) => `${state.name} "${c.title}" ${JSON.stringify(c.candidateThreads)}`), ...b.map((c) => `this "${c.title}" ${JSON.stringify(c.candidateThreads)}`)].join(' | ')}`,
     'card-to-card cosine:',
   ]
   for (const x of b) {
-    for (const y of a) {
-      report.push(`  ${cosine(vec.get(x.id)!, vec.get(y.id)!).toFixed(3)}  "${x.title}" ↔ ${earlierName} "${y.title}"`)
+    for (const y of state.cards) {
+      report.push(`  ${cosine(vec.get(x.id)!, vec.get(y.id)!).toFixed(3)}  "${x.title}" ↔ ${state.name} "${y.title}"`)
     }
   }
-  if (a.length > 1) {
-    report.push(`within ${earlierName}:`)
-    for (let i = 0; i < a.length; i++)
-      for (let j = i + 1; j < a.length; j++)
-        report.push(`  ${cosine(vec.get(a[i].id)!, vec.get(a[j].id)!).toFixed(3)}  "${a[i].title}" ↔ "${a[j].title}"`)
-  }
-  report.push('assignment, in recording order (similarity to nearest thread centroid at the time):')
-  for (const x of assignments) {
-    report.push(
-      `  "${title.get(x.cardId)}" → ${x.threadId}${x.created ? ' (new)' : ' (attached)'}` +
-        (x.nearest ? `  nearest ${x.nearest.threadId} "${x.nearest.title}" ${x.nearest.similarity.toFixed(3)}` : '  (no threads yet)')
-    )
-  }
-  report.push(`merges proposed: ${merges.length ? merges.map((m) => `${title.get(m.aCardId)} ↔ ${title.get(m.bCardId)} ${m.similarity.toFixed(3)}`).join('; ') : 'none'}`)
+  report.push('assignment, in recording order:')
+  for (const x of [...state.assignments, ...laterAssignments]) report.push(describe(x, title.get(x.cardId)!))
+  report.push(
+    `merges proposed: ${merges.length ? merges.map((m) => `${title.get(m.aCardId)} ↔ ${title.get(m.bCardId)} ${m.similarity.toFixed(3)}`).join('; ') : 'none'}`
+  )
 
-  const sameThread = b.filter((x) => a.some((y) => threadOf.get(y.id) === threadOf.get(x.id)))
-  const crossMerge = merges.filter((m) => (m.aCardId.startsWith('this') !== m.bCardId.startsWith('this')))
-  const pass = sameThread.length > 0 || crossMerge.length > 0
+  const sameThread = b.filter((x) => state.cards.some((y) => threadOf.get(y.id) === threadOf.get(x.id)))
+  const crossMerge = merges.filter((m) => m.aCardId.startsWith('this') !== m.bCardId.startsWith('this'))
   return {
     check: {
-      name: `thread identity with ${earlierName}`,
-      pass,
+      name: `thread identity with ${state.name}`,
+      pass: sameThread.length > 0 || crossMerge.length > 0,
       detail: sameThread.length
         ? `same thread: ${sameThread.map((x) => `"${x.title}"`).join(', ')}`
         : crossMerge.length
@@ -261,6 +286,22 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     readFileSync(path.join(here, 'memos', `${memo}.expected.json`), 'utf8')
   ) as Expected
 
+  // A memo that expects thread identity with an earlier one is classified in that creator's state: the earlier
+  // memo's cards replayed into threads, their titles passed as recent_thread_titles — as the pipeline would.
+  let earlierState: EarlierState | null = null
+  let earlierMissing: string | null = null
+  if (expected.expect_merge_suggestion_with) {
+    const other = expected.expect_merge_suggestion_with
+    const otherFile = path.join(here, 'runs', `${other}.${promptVersion}.actual.json`)
+    try {
+      earlierState = await replayEarlier(other, JSON.parse(readFileSync(otherFile, 'utf8')) as ClassifyOutput)
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
+      earlierMissing = `run ${other} on ${promptVersion} first (${path.relative(process.cwd(), otherFile)} missing)`
+    }
+  }
+  const recent = earlierState ? recentThreadTitles(earlierState) : []
+
   const result = await analyse({
     audioUrl: await signedUrl('recordings', storagePath, 15 * 60),
     source: expected.source,
@@ -269,7 +310,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       handle: null,
       niche: null,
       people: [], // expected.json has Arabella canonical=null: the eval creator has no people list
-      recent_thread_titles: [],
+      recent_thread_titles: recent,
     },
   })
 
@@ -282,23 +323,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1)
   }
   console.log(`prompt: ${promptVersion}`)
+  if (earlierState) console.log(`recent_thread_titles given to classify: ${JSON.stringify(recent)}`)
   console.log(`duration: expected ${expected.duration_ms} ms, transcribed ${result.transcript.duration_ms} ms`)
   console.log(`title: expected "${expected.title}", got "${result.out.title}"\n`)
   const checks = diff(expected, result.out, result.transcript.utterances)
-  if (expected.expect_merge_suggestion_with) {
-    const other = expected.expect_merge_suggestion_with
-    const otherFile = path.join(here, 'runs', `${other}.${promptVersion}.actual.json`)
-    let earlier: ClassifyOutput | null = null
-    try {
-      earlier = JSON.parse(readFileSync(otherFile, 'utf8')) as ClassifyOutput
-    } catch {
-      checks.push({ name: `thread identity with ${other}`, pass: false, detail: `run ${other} on ${promptVersion} first (${path.relative(process.cwd(), otherFile)} missing)` })
-    }
-    if (earlier) {
-      const { check, report } = await threadingCheck(other, earlier, result.out)
-      checks.push(check)
-      console.log(report.join('\n') + '\n')
-    }
+  if (earlierMissing) {
+    checks.push({ name: `thread identity with ${expected.expect_merge_suggestion_with}`, pass: false, detail: earlierMissing })
+  }
+  if (earlierState) {
+    const { check, report } = await threadingCheck(earlierState, result.out)
+    checks.push(check)
+    console.log(report.join('\n') + '\n')
   }
   for (const c of checks) {
     console.log(`${c.pass === null ? 'JUDGE' : c.pass ? 'pass ' : 'FAIL '}  ${c.name} — ${c.detail}`)

@@ -1,14 +1,42 @@
 // packages/pipeline/threading.ts
-// Thread identity (CA2), as pure functions over embeddings. The pipeline (graph.ts) and the eval both call these,
-// so the eval scores exactly the logic that ships. Thresholds are tuned against the eval set — change them here.
+// Thread identity (CA2), as pure functions. The pipeline (graph.ts) and the eval both call these, so the eval
+// scores exactly the logic that ships. Thresholds are tuned against the eval set — change them here.
 //
-//   attach  — a new card joins its nearest thread when cosine(card, thread centroid) ≥ THREAD_ATTACH_MIN;
-//             otherwise it starts a new thread titled from the card.
+//   attach  — hybrid (docs/rnd/ca2-experiment-1.md showed card-text cosine alone can't separate same-thread from
+//             unrelated ideas):
+//               1. by name: the classifier's candidate_threads for the card fuzzy-match an existing thread title
+//                  (titleMatch ≥ NAME_MATCH_MIN) → attach to the best match;
+//               2. by embedding: cosine(card, thread centroid) ≥ THREAD_ATTACH_MIN → attach to the nearest;
+//               3. otherwise start a new thread titled from the card.
 //   propose — two cards in different threads with cosine ≥ MERGE_PROPOSE_MIN get a merge_suggestions row.
 //             Propose, never merge (CLAUDE.md: never silently dedupe).
 
 export const THREAD_ATTACH_MIN = 0.8
 export const MERGE_PROPOSE_MIN = 0.85
+/** Fuzzy title match for step 1. New with experiment 2; not yet tuned against negative memos. */
+export const NAME_MATCH_MIN = 0.6
+
+const STOPWORDS = new Set(['a', 'an', 'the', 'of', 'for', 'and', 'to', 'in', 'on', 'my', 'our', 'with'])
+const words = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w && !STOPWORDS.has(w))
+
+/**
+ * 0–1 match between a candidate thread name and a thread title: 1 when one's content words all appear in the other
+ * ("Launch video" vs "Ivy launch video"), else Jaccard overlap of content words.
+ */
+export function titleMatch(candidate: string, title: string): number {
+  const a = new Set(words(candidate))
+  const b = new Set(words(title))
+  if (a.size === 0 || b.size === 0) return 0
+  const shared = [...a].filter((w) => b.has(w)).length
+  if (shared === a.size || shared === b.size) return 1
+  return shared / (a.size + b.size - shared)
+}
 
 export type Vec = number[]
 
@@ -41,6 +69,9 @@ export interface Assignment {
   cardId: string
   threadId: string
   created: boolean
+  via: 'name' | 'embedding' | 'new'
+  /** Best candidate-name match found (null when the card named no candidate threads or there were no threads). */
+  nameMatch: { candidate: string; threadId: string; title: string; score: number } | null
   /** Cosine to the nearest existing thread's centroid (null when the creator had no threads). */
   nearest: { threadId: string; title: string; similarity: number } | null
 }
@@ -50,24 +81,35 @@ export interface Assignment {
  * as cards join). `newThreadId` mints ids for created threads.
  */
 export function assignCards(
-  cards: { id: string; title: string; embedding: Vec }[],
+  cards: { id: string; title: string; embedding: Vec; candidateThreads: string[] }[],
   threads: ThreadState[],
   newThreadId: () => string
 ): Assignment[] {
   const out: Assignment[] = []
   for (const card of cards) {
+    let nameMatch: Assignment['nameMatch'] = null
+    for (const candidate of card.candidateThreads) {
+      for (const t of threads) {
+        const score = titleMatch(candidate, t.title)
+        if (!nameMatch || score > nameMatch.score) nameMatch = { candidate, threadId: t.id, title: t.title, score }
+      }
+    }
     let nearest: Assignment['nearest'] = null
     for (const t of threads) {
       const similarity = cosine(card.embedding, mean(t.cards.map((c) => c.embedding)))
       if (!nearest || similarity > nearest.similarity) nearest = { threadId: t.id, title: t.title, similarity }
     }
-    if (nearest && nearest.similarity >= THREAD_ATTACH_MIN) {
-      threads.find((t) => t.id === nearest!.threadId)!.cards.push({ id: card.id, embedding: card.embedding })
-      out.push({ cardId: card.id, threadId: nearest.threadId, created: false, nearest })
-    } else {
+
+    const attachTo = (threadId: string, via: 'name' | 'embedding') => {
+      threads.find((t) => t.id === threadId)!.cards.push({ id: card.id, embedding: card.embedding })
+      out.push({ cardId: card.id, threadId, created: false, via, nameMatch, nearest })
+    }
+    if (nameMatch && nameMatch.score >= NAME_MATCH_MIN) attachTo(nameMatch.threadId, 'name')
+    else if (nearest && nearest.similarity >= THREAD_ATTACH_MIN) attachTo(nearest.threadId, 'embedding')
+    else {
       const id = newThreadId()
       threads.push({ id, title: card.title, cards: [{ id: card.id, embedding: card.embedding }] })
-      out.push({ cardId: card.id, threadId: id, created: true, nearest })
+      out.push({ cardId: card.id, threadId: id, created: true, via: 'new', nameMatch, nearest })
     }
   }
   return out

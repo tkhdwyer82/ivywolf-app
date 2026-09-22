@@ -105,7 +105,7 @@ export async function writeClassification(args: {
   transcript: unknown
   out: ClassifyOutput
   promptVersion: string
-}): Promise<{ cards: { id: string; title: string; gist: string }[] }> {
+}): Promise<{ cards: { id: string; title: string; gist: string; candidateThreads: string[] }[] }> {
   const { creatorId, recordingId, out } = args
   const supabase = db()
 
@@ -244,7 +244,14 @@ export async function writeClassification(args: {
   }
 
   // Insert order is preserved, so cards[i] is out.cards[i].
-  return { cards: (cards ?? []).map((c, i) => ({ id: c.id, title: out.cards[i].title, gist: out.cards[i].gist })) }
+  return {
+    cards: (cards ?? []).map((c, i) => ({
+      id: c.id,
+      title: out.cards[i].title,
+      gist: out.cards[i].gist,
+      candidateThreads: out.cards[i].candidate_threads,
+    })),
+  }
 }
 
 /** pgvector columns come back from PostgREST as text: "[0.1,0.2,…]". */
@@ -265,7 +272,7 @@ export interface ThreadingResult {
  */
 export async function threadNewCards(
   creatorId: string,
-  cards: { id: string; title: string; gist: string }[]
+  cards: { id: string; title: string; gist: string; candidateThreads: string[] }[]
 ): Promise<ThreadingResult> {
   if (cards.length === 0) return { assignments: [], merges: [] }
   const supabase = db()
@@ -292,7 +299,7 @@ export async function threadNewCards(
   })).filter((t) => t.cards.length > 0)
 
   const assignments = assignCards(
-    cards.map((c, i) => ({ id: c.id, title: c.title, embedding: vectors[i] })),
+    cards.map((c, i) => ({ id: c.id, title: c.title, embedding: vectors[i], candidateThreads: c.candidateThreads })),
     threads,
     () => randomUUID()
   )

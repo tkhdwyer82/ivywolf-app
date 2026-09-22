@@ -1,6 +1,6 @@
 {
   "trigger": "none",
-  "title": "Arabella AI chase scene idea",
+  "title": "Arabella in the AI chase scene",
   "segments": [
     {
       "start_ms": 0,
@@ -8,7 +8,7 @@
       "type": "junk",
       "text": "Cord.",
       "speaker": "0",
-      "confidence": 0.4,
+      "confidence": 0.3,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -18,7 +18,7 @@
       "type": "idea",
       "text": "I'm thinking of an idea where we have Arabella in this really interesting fight scene that I saw on Higgs Field AI.",
       "speaker": "0",
-      "confidence": 0.92,
+      "confidence": 0.9,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -28,7 +28,7 @@
       "type": "loose_end",
       "text": "It'd be great to find that video",
       "speaker": "0",
-      "confidence": 0.88,
+      "confidence": 0.85,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -43,10 +43,10 @@
       "retracted_by": null
     },
     {
-      "start_ms": 21205,
-      "end_ms": 22565,
-      "type": "filler",
-      "text": "Actually, one second.",
+      "start_ms": 23445,
+      "end_ms": 28965,
+      "type": "action",
+      "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
       "confidence": 0.9,
       "boundary_marker": "Actually, one second.",
@@ -55,28 +55,18 @@
     {
       "start_ms": 23445,
       "end_ms": 28965,
-      "type": "action",
-      "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
-      "speaker": "0",
-      "confidence": 0.93,
-      "boundary_marker": null,
-      "retracted_by": null
-    },
-    {
-      "start_ms": 23445,
-      "end_ms": 28965,
       "type": "request",
       "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
-      "confidence": 0.93,
-      "boundary_marker": null,
+      "confidence": 0.9,
+      "boundary_marker": "Actually, one second.",
       "retracted_by": null
     },
     {
-      "start_ms": 29300,
+      "start_ms": 32420,
       "end_ms": 61157,
       "type": "idea",
-      "text": "Anyway, back to the idea. And Arabella runs through that scene. She jumps. She pushes away from people. It's a really cool AI scene, but using Arabella instead of the Chinese guy in the actual video. And when she gets to the end, she has Ivy in her hand and she says into the mic, it's done. And then it goes to the Ivy branding logo.",
+      "text": "And Arabella runs through that scene. She jumps. She pushes away from people. It's a really cool AI scene, but using Arabella instead of the Chinese guy in the actual video. And when she gets to the end, she has Ivy in her hand and she says into the mic, it's done. And then it goes to the Ivy branding logo.",
       "speaker": "0",
       "confidence": 0.9,
       "boundary_marker": "Anyway, back to the idea.",
@@ -87,7 +77,7 @@
     {
       "segment_index": 1,
       "title": "Arabella runs the AI chase scene",
-      "gist": "Recreate the AI fight-and-chase scene she saw, swapping in Arabella's character to run, jump and push past people, ending with her holding Ivy, saying \"it's done\" into the mic, then cutting to the Ivy branding logo.",
+      "gist": "Recreate a fight-and-chase scene she saw made with Higgs Field AI, swapping the original performer for Arabella's character as she runs, jumps and pushes past people, ending with her holding the device, saying \"it's done\" into the mic, and cutting to the Ivy branding logo.",
       "play_from_ms": 880,
       "confidence": 0.88,
       "energy": 0.65,
@@ -95,12 +85,15 @@
       "is_reference": false,
       "their_idea": null,
       "her_take": null,
-      "candidate_threads": []
+      "candidate_threads": [
+        "Short video, many hands, seamless flow",
+        "Several creators talking to the device"
+      ]
     }
   ],
   "actions": [
     {
-      "segment_index": 5,
+      "segment_index": 4,
       "text": "Get milk",
       "scope": "personal",
       "priority": "med"
@@ -119,15 +112,15 @@
   "loose_ends": [
     {
       "segment_index": 2,
-      "text": "Find the original fight/chase video seen on Higgs Field AI",
+      "text": "Find the Higgs Field AI fight/chase video she saw",
       "needs": "link"
     }
   ],
   "requests": [
     {
-      "segment_index": 6,
+      "segment_index": 5,
       "kind": "life",
-      "text": "Put in a reminder to get milk"
+      "text": "Put a reminder in to get milk"
     }
   ],
   "style_signals": []
