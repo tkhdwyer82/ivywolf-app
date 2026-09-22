@@ -18,6 +18,8 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+const isApiRoute = createRouteMatcher(['/api/(.*)'])
+
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
@@ -33,7 +35,14 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
   requestHeaders.set('x-pathname', pathname)
 
   if (!isPublicRoute(request)) {
-    await auth.protect()
+    if (isApiRoute(request)) {
+      // API callers (the app, scripts) get a 401 they can act on, not a redirect to the sign-in page.
+      // Each route still checks auth() itself; this is the outer gate.
+      const { userId } = await auth()
+      if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    } else {
+      await auth.protect()
+    }
   }
 
   return NextResponse.next({ request: { headers: requestHeaders } })
