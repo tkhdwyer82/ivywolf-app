@@ -18,6 +18,10 @@ import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { submitRecording, waitForRecording, type ProcessOutcome } from '@/lib/record'
 import { color, space, type } from '@/lib/theme'
+import { LiveWaveform } from '@/components/LiveWaveform'
+
+// Metering drives the live waveform; polling at 100 ms keeps it in step with the voice.
+const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true }
 
 type Phase =
   | { kind: 'idle' }
@@ -28,8 +32,8 @@ type Phase =
   | { kind: 'failed'; message: string }
 
 export default function Record() {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY)
-  const state = useAudioRecorderState(recorder, 250)
+  const recorder = useAudioRecorder(RECORDING_OPTIONS)
+  const state = useAudioRecorderState(recorder, 100)
   const supabase = useSupabase()
   const { userId, getToken } = useAuth()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
@@ -91,7 +95,12 @@ export default function Record() {
     <View style={styles.screen}>
       <View style={styles.status}>
         {phase.kind === 'idle' && <Text style={type.meta}>Tap to start. Say it however it comes out.</Text>}
-        {recording && <Text style={styles.timer}>{formatDuration(state.durationMillis)}</Text>}
+        {recording && (
+          <View style={styles.live}>
+            <Text style={styles.timer}>{formatDuration(state.durationMillis)}</Text>
+            <LiveWaveform level={state.metering} />
+          </View>
+        )}
         {(phase.kind === 'sending' || phase.kind === 'listening') && (
           <View style={styles.sending}>
             <ActivityIndicator color={color.ink} />
@@ -145,6 +154,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.xxl, padding: space.xl },
   status: { minHeight: 64, alignItems: 'center', justifyContent: 'center' },
   timer: { fontSize: 44, fontWeight: '300', color: color.ink, fontVariant: ['tabular-nums'] },
+  live: { alignItems: 'center', gap: space.l },
   sending: { alignItems: 'center', gap: space.s },
   error: { color: color.accent, textAlign: 'center' },
   button: {
