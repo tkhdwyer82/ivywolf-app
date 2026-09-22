@@ -1,6 +1,6 @@
 {
   "trigger": "none",
-  "title": "Arabella in the AI chase scene",
+  "title": "Arabella AI chase scene idea",
   "segments": [
     {
       "start_ms": 0,
@@ -18,7 +18,7 @@
       "type": "idea",
       "text": "I'm thinking of an idea where we have Arabella in this really interesting fight scene that I saw on Higgs Field AI.",
       "speaker": "0",
-      "confidence": 0.9,
+      "confidence": 0.92,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -28,7 +28,7 @@
       "type": "loose_end",
       "text": "It'd be great to find that video",
       "speaker": "0",
-      "confidence": 0.85,
+      "confidence": 0.88,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -38,7 +38,7 @@
       "type": "idea",
       "text": "and use Arabella's character to run that chase, to jump over things.",
       "speaker": "0",
-      "confidence": 0.85,
+      "confidence": 0.88,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -58,7 +58,7 @@
       "type": "action",
       "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
-      "confidence": 0.9,
+      "confidence": 0.93,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -68,7 +68,7 @@
       "type": "request",
       "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
-      "confidence": 0.9,
+      "confidence": 0.93,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -87,7 +87,7 @@
     {
       "segment_index": 1,
       "title": "Arabella runs the AI chase scene",
-      "gist": "Rebuild the AI fight/chase scene spotted on Higgs Field AI with Arabella's character running, jumping and pushing past people in place of the original performer, ending with her holding Ivy, saying \"it's done\" into the mic, and cutting to the Ivy branding logo.",
+      "gist": "Recreate the AI fight-and-chase scene she saw, swapping in Arabella's character to run, jump and push past people, ending with her holding Ivy, saying \"it's done\" into the mic, then cutting to the Ivy branding logo.",
       "play_from_ms": 880,
       "confidence": 0.88,
       "energy": 0.65,
@@ -119,7 +119,7 @@
   "loose_ends": [
     {
       "segment_index": 2,
-      "text": "Find the fight scene video seen on Higgs Field AI",
+      "text": "Find the original fight/chase video seen on Higgs Field AI",
       "needs": "link"
     }
   ],
@@ -127,7 +127,7 @@
     {
       "segment_index": 6,
       "kind": "life",
-      "text": "Put a reminder in to get milk"
+      "text": "Put in a reminder to get milk"
     }
   ],
   "style_signals": []

@@ -7,7 +7,7 @@ import type { ClassifyOutput, RecordingSource } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
 import { classify, PROMPT_VERSION, type CreatorContext, type PromptVersion } from './classify'
-import { loadCreatorContext, markDone, markJunk, writeClassification } from './graph'
+import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification } from './graph'
 
 export { claimRecording, markFailed } from './graph'
 
@@ -63,13 +63,29 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   }
 
   await supabase.from('recordings').update({ duration_ms: result.transcript.duration_ms }).eq('id', rec.id)
-  await writeClassification({
+  const { cards } = await writeClassification({
     creatorId: rec.creator_id,
     recordingId: rec.id,
     transcript: result.transcript.utterances,
     out: result.out,
     promptVersion: PROMPT_VERSION,
   })
+
+  // Threading is best-effort: if embedding fails the cards are still saved and show under "New sparks"; the
+  // error is kept on the recording so it can be re-threaded later.
+  try {
+    const threading = await threadNewCards(rec.creator_id, cards)
+    console.log(
+      `[pipeline] ${rec.id}: ${threading.assignments.filter((a) => a.created).length} new thread(s), ` +
+        `${threading.assignments.filter((a) => !a.created).length} attached, ${threading.merges.length} merge(s) proposed`
+    )
+  } catch (err) {
+    console.error(`[pipeline] ${rec.id}: threading failed`, err)
+    await supabase
+      .from('recordings')
+      .update({ processing_error: `threading: ${err instanceof Error ? err.message : String(err)}`.slice(0, 2000) })
+      .eq('id', rec.id)
+  }
   await markDone(rec.id)
   return result
 }

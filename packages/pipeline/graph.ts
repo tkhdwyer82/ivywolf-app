@@ -4,7 +4,18 @@
 
 import { createClient } from '@supabase/supabase-js'
 import type { ClassifyOutput } from '@ivywolf/schema'
+import { randomUUID } from 'node:crypto'
 import type { CreatorContext } from './classify'
+import { cardText, embed } from './embed'
+import {
+  assignCards,
+  mean,
+  MERGE_PROPOSE_MIN,
+  proposeMerges,
+  type Assignment,
+  type MergeProposal,
+  type ThreadState,
+} from './threading'
 
 const db = () =>
   createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -87,14 +98,14 @@ export async function markFailed(recordingId: string, error: string) {
   )
 }
 
-/** Insert segments, then everything that points at a segment. Returns the new card ids. */
+/** Insert segments, then everything that points at a segment. Returns the new cards. */
 export async function writeClassification(args: {
   creatorId: string
   recordingId: string
   transcript: unknown
   out: ClassifyOutput
   promptVersion: string
-}): Promise<{ cardIds: string[] }> {
+}): Promise<{ cards: { id: string; title: string; gist: string }[] }> {
   const { creatorId, recordingId, out } = args
   const supabase = db()
 
@@ -232,5 +243,98 @@ export async function writeClassification(args: {
     )
   }
 
-  return { cardIds: (cards ?? []).map((c) => c.id) }
+  // Insert order is preserved, so cards[i] is out.cards[i].
+  return { cards: (cards ?? []).map((c, i) => ({ id: c.id, title: out.cards[i].title, gist: out.cards[i].gist })) }
+}
+
+/** pgvector columns come back from PostgREST as text: "[0.1,0.2,…]". */
+const parseVector = (v: unknown): number[] | null =>
+  typeof v === 'string' ? (JSON.parse(v) as number[]) : Array.isArray(v) ? (v as number[]) : null
+const toVector = (v: number[]) => `[${v.join(',')}]`
+
+export interface ThreadingResult {
+  assignments: Assignment[]
+  merges: MergeProposal[]
+}
+
+/**
+ * Thread identity for a recording's new cards (CA2): embed, attach to the nearest thread or start one, move the
+ * centroids, and propose merges across threads. Uses the same pure functions as the eval (threading.ts).
+ * Loads the creator's whole card set — fine at pilot scale; move the nearest-thread search into SQL (the HNSW
+ * index on cards.embedding) when creators have thousands of cards.
+ */
+export async function threadNewCards(
+  creatorId: string,
+  cards: { id: string; title: string; gist: string }[]
+): Promise<ThreadingResult> {
+  if (cards.length === 0) return { assignments: [], merges: [] }
+  const supabase = db()
+
+  const vectors = await embed(cards.map(cardText))
+  for (const [i, card] of cards.entries()) {
+    check('card embedding', await supabase.from('cards').update({ embedding: toVector(vectors[i]) }).eq('id', card.id))
+  }
+
+  const existing = need(
+    'threads',
+    await supabase
+      .from('threads')
+      .select('id, title, thread_cards(cards(id, embedding))')
+      .eq('creator_id', creatorId)
+  )
+  const threads: ThreadState[] = existing.map((t) => ({
+    id: t.id,
+    title: t.title,
+    cards: (t.thread_cards as unknown as { cards: { id: string; embedding: unknown } | null }[]).flatMap((tc) => {
+      const e = tc.cards ? parseVector(tc.cards.embedding) : null
+      return tc.cards && e ? [{ id: tc.cards.id, embedding: e }] : []
+    }),
+  })).filter((t) => t.cards.length > 0)
+
+  const assignments = assignCards(
+    cards.map((c, i) => ({ id: c.id, title: c.title, embedding: vectors[i] })),
+    threads,
+    () => randomUUID()
+  )
+
+  const now = new Date().toISOString()
+  for (const a of assignments) {
+    const thread = threads.find((t) => t.id === a.threadId)!
+    if (a.created) {
+      check('thread insert', await supabase.from('threads').insert({ id: a.threadId, creator_id: creatorId, title: thread.title }))
+    } else {
+      const current = need('thread', await supabase.from('threads').select('return_count').eq('id', a.threadId).single())
+      check(
+        'thread bump',
+        await supabase
+          .from('threads')
+          .update({ return_count: current.return_count + 1, last_seen: now })
+          .eq('id', a.threadId)
+      )
+    }
+    check('thread_cards', await supabase.from('thread_cards').insert({ thread_id: a.threadId, card_id: a.cardId }))
+  }
+
+  // Centroids of every thread that gained a card.
+  for (const id of new Set(assignments.map((a) => a.threadId))) {
+    const t = threads.find((x) => x.id === id)!
+    check(
+      'thread centroid',
+      await supabase.from('threads').update({ embedding: toVector(mean(t.cards.map((c) => c.embedding))) }).eq('id', id)
+    )
+  }
+
+  const merges = proposeMerges(new Set(cards.map((c) => c.id)), threads)
+  for (const m of merges) {
+    const { error } = await supabase.from('merge_suggestions').insert({
+      creator_id: creatorId,
+      a_card_id: m.aCardId,
+      b_card_id: m.bCardId,
+      similarity: m.similarity,
+      rationale: `cards in different threads, cosine ${m.similarity.toFixed(3)} ≥ ${MERGE_PROPOSE_MIN}`,
+    })
+    // 23505: this pair was already proposed (merge_suggestions_pair_idx, either order).
+    if (error && error.code !== '23505') throw new Error(`merge_suggestions: ${error.message}`)
+  }
+  return { assignments, merges }
 }
