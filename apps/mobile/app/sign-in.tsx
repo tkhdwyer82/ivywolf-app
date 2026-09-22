@@ -56,11 +56,14 @@ export default function SignIn() {
       if (step.mode === 'sign-in') {
         const done = await signIn.signIn.attemptFirstFactor({ strategy: 'email_code', code: code.trim() })
         if (done.status === 'complete') await signIn.setActive({ session: done.createdSessionId })
-        else setError('That code did not finish signing in')
+        else setError(`That code did not finish signing in (${done.status})`)
       } else {
         const done = await signUp.signUp.attemptEmailAddressVerification({ code: code.trim() })
         if (done.status === 'complete') await signUp.setActive({ session: done.createdSessionId })
-        else setError('That code did not finish creating your account')
+        else if (done.missingFields.length)
+          // The Clerk instance requires fields this screen doesn't collect (e.g. password) — fix it in the dashboard.
+          setError(`Sign-up needs ${done.missingFields.join(', ')}, which this app doesn't collect`)
+        else setError(`That code did not finish creating your account (${done.status})`)
       }
     } catch (e) {
       setError(message(e))
