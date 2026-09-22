@@ -33,7 +33,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#F6F2EC"
         }
-      ]
+      ],
+      "./plugins/withSceneLifecycle"
     ]
   }
 }
