@@ -1,8 +1,7 @@
 // apps/mobile/app/record.tsx
 // Record (Figma 83:5). The ⊕ listens; it never asks — opening this screen starts the mic. Tap to stop: the take
 // uploads, the server queues it, and the screen closes; the card turns up on Home when Ivy is done. Cold start
-// lands here too (Home with no cards). Recordings under 3 s are still uploaded — the pipeline marks them junk
-// (too_short) rather than the app deciding silently.
+// lands here too (Home with no cards). An accidental tap (under 2 s, or silent) isn't uploaded — see MIN_TAKE_MS.
 //
 // ?projectId=… (from "Talk to this project"): the recording carries the project, and the pipeline scopes the
 // classifier's recent threads and the card's placement to it (0016).
@@ -33,8 +32,9 @@ const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled:
 
 // An accidental tap isn't uploaded at all: under MIN_TAKE_MS, or never louder than SILENT_DB (speech on a phone mic
 // peaks around −30 to −15 dBFS; a silent room sits below −50), the take is dropped on the phone with "Nothing to
-// save". Imports are kept whatever — the picture is the idea. The server's junk gate (< 3 s, no speech) still
-// catches anything that gets through.
+// save". Imports are kept whatever — the picture is the idea. A take the mic never reported a level for is kept
+// too: no level data isn't silence, and dropping a real take is worse than uploading a silent one. The server's
+// junk gate (< 3 s, no speech) catches anything that gets through.
 const MIN_TAKE_MS = 2000
 const SILENT_DB = -50
 const NOTHING_CLOSE_MS = 1200
@@ -63,10 +63,10 @@ export default function Record() {
   const { userId, getToken } = useAuth()
   const [phase, setPhase] = useState<Phase>({ kind: 'starting' })
   const startedAt = useRef<Date | null>(null)
-  const peakDb = useRef(-Infinity)
+  const peakDb = useRef<number | null>(null)
   useEffect(() => {
     if (phase.kind === 'recording' && typeof state.metering === 'number') {
-      peakDb.current = Math.max(peakDb.current, state.metering)
+      peakDb.current = Math.max(peakDb.current ?? -Infinity, state.metering)
     }
   }, [phase.kind, state.metering])
 
@@ -92,8 +92,11 @@ export default function Record() {
   /** Stop and keep. Closing mid-take keeps it too — nothing she said is thrown away by a tap. */
   async function stop() {
     if (phase.kind !== 'recording') return close()
+    // The recorder's own clock, or wall time since start if its status never updated — a stalled clock isn't a short take.
     const durationMs = state.durationMillis
-    if (!imported && (durationMs < MIN_TAKE_MS || peakDb.current < SILENT_DB)) {
+    const tookMs = Math.max(durationMs, startedAt.current ? Date.now() - startedAt.current.getTime() : 0)
+    const silent = peakDb.current !== null && peakDb.current < SILENT_DB
+    if (!imported && (tookMs < MIN_TAKE_MS || silent)) {
       await recorder.stop()
       setPhase({ kind: 'nothing' })
       setTimeout(close, NOTHING_CLOSE_MS)
