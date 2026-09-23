@@ -34,6 +34,14 @@
           "backgroundColor": "#F6F2EC"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ivy opens your library only when you add an image or video to your ideas.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
       "./plugins/withSceneLifecycle"
     ]
   }

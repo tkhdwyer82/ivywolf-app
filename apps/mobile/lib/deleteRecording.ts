@@ -6,6 +6,8 @@
 // whereas the other order could leave files behind with nothing pointing at them. The row delete cascades to
 // segments, cards, actions, loose ends and requests, and removes any thread left empty (0007).
 //
+// Imports (0018): an added image or video's original (private `imports`) goes with its card; its poster is the
+// card's frame.
 // Frames (0015): a card's frame is its own and always goes. A to-do's frame is shared by every to-do with the same
 // brief (frames.ts cache), so it goes only when no to-do outside this recording still uses it.
 
@@ -28,8 +30,8 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 export async function deleteRecording(supabase: SupabaseClient, recording: { id: string; storage_path: string }) {
   const cards = need(
     'cards',
-    await supabase.from('cards').select('frame_url').eq('recording_id', recording.id).not('frame_url', 'is', null)
-  ) as { frame_url: string }[]
+    await supabase.from('cards').select('frame_url, media_path').eq('recording_id', recording.id)
+  ) as { frame_url: string | null; media_path: string | null }[]
   const actions = need(
     'actions',
     await supabase.from('actions').select('frame_url').eq('recording_id', recording.id).not('frame_url', 'is', null)
@@ -49,6 +51,11 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
 
   const removed = await supabase.storage.from('recordings').remove([recording.storage_path])
   if (removed.error) throw new Error(`audio: ${removed.error.message}`)
+  const originals = cards.map((c) => c.media_path).filter((p): p is string => !!p)
+  if (originals.length) {
+    const gone = await supabase.storage.from('imports').remove(originals)
+    if (gone.error) throw new Error(`imports: ${gone.error.message}`)
+  }
   if (paths.length) {
     const frames = await supabase.storage.from('frames').remove(paths)
     if (frames.error) throw new Error(`frames: ${frames.error.message}`)

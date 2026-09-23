@@ -145,9 +145,14 @@ export default function Home() {
           <Text style={styles.wordmark}>
             Ivy <Text style={{ color: hero.secondary }}>Wolf</Text>
           </Text>
-          <Pressable onPress={() => router.push('/notes')} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Voice notes">
-            <SymbolView name="person" tintColor={hero.ink} size={18} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => router.push('/add')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Add to ideas">
+              <SymbolView name="plus" tintColor={hero.ink} size={22} weight="regular" />
+            </Pressable>
+            <Pressable onPress={() => router.push('/notes')} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Voice notes">
+              <SymbolView name="person" tintColor={hero.ink} size={18} />
+            </Pressable>
+          </View>
         </View>
 
         {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} />}
@@ -229,6 +234,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: -8 },
   // Figma: SF Pro Bold 34, −1 tracking; "Wolf" in secondary.
   wordmark: { fontSize: 34, fontWeight: '700', letterSpacing: -1, color: hero.ink },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   avatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: hero.ink, alignItems: 'center', justifyContent: 'center' },
   grid: { paddingHorizontal: 20, paddingTop: 16 },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },

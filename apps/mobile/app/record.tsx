@@ -6,6 +6,8 @@
 //
 // ?projectId=… (from "Talk to this project"): the recording carries the project, and the pipeline scopes the
 // classifier's recent threads and the card's placement to it (0016).
+// ?importKind=image|video&original=…&poster=… (from Add to ideas): Ivy asks what it's for; the line rides with the
+// import and the pipeline makes the card (packages/pipeline/imports.ts).
 
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -36,7 +38,13 @@ type Phase =
   | { kind: 'failed'; message: string }
 
 export default function Record() {
-  const { projectId } = useLocalSearchParams<{ projectId?: string }>()
+  const { projectId, importKind, original, poster } = useLocalSearchParams<{
+    projectId?: string
+    importKind?: 'image' | 'video'
+    original?: string
+    poster?: string
+  }>()
+  const imported = importKind && original && poster ? { kind: importKind, original_path: original, poster_path: poster } : null
   const insets = useSafeAreaInsets()
   const recorder = useAudioRecorder(RECORDING_OPTIONS)
   const state = useAudioRecorderState(recorder, 100)
@@ -86,6 +94,7 @@ export default function Record() {
         durationMs,
         recordedAt: startedAt.current ?? new Date(),
         projectId: projectId ?? null,
+        meta: imported ? { import: imported } : undefined,
       })
       close()
     } catch (e) {
@@ -97,10 +106,12 @@ export default function Record() {
     phase.kind === 'saving' ? 'Saving…'
     : phase.kind === 'no_mic' ? 'Ivy can’t hear you'
     : phase.kind === 'failed' ? 'That didn’t save'
+    : imported ? 'What’s it for?'
     : 'Ivy is listening'
   const line =
     phase.kind === 'no_mic' ? 'Allow the microphone in Settings to record ideas.'
     : phase.kind === 'failed' ? phase.message
+    : imported ? `One line is plenty — or just tap stop and the ${imported.kind} is saved as it is.`
     : 'Say it the way you’d say it to a friend. Errands go to My things on their own.'
 
   return (

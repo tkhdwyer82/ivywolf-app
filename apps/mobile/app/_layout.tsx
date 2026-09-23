@@ -25,6 +25,11 @@ function Routes() {
         />
         <Stack.Screen name="record" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen
+          name="add"
+          options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
+        />
+        <Stack.Screen name="connections" options={{ title: 'Connect', headerBackTitle: 'Home', contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen
           name="life"
           options={{ title: 'Life', presentation: 'modal', headerStyle: { backgroundColor: color.paper } }}
         />

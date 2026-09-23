@@ -8,7 +8,8 @@ import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
 import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
 import { frameRecording } from './frames'
-import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification } from './graph'
+import { attachImport, parseImport } from './imports'
+import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification, type NewCard } from './graph'
 
 export { claimRecording, markFailed } from './graph'
 
@@ -25,11 +26,13 @@ export async function analyse(args: {
   creator: CreatorContext
   recorded: RecordedDay | null
   promptVersion?: PromptVersion
+  /** An import's spoken line may be short ("for the reel"): skip the too-short gate (imports.ts). */
+  keepShort?: boolean
 }): Promise<ProcessResult> {
   const transcript = await transcribe(args.audioUrl)
 
   // Junk gates run before the model: never summarise junk.
-  if (transcript.duration_ms > 0 && transcript.duration_ms < MIN_DURATION_MS) {
+  if (!args.keepShort && transcript.duration_ms > 0 && transcript.duration_ms < MIN_DURATION_MS) {
     return { junk: 'too_short', transcript }
   }
   if (transcript.utterances.length === 0) return { junk: 'no_speech', transcript }
@@ -51,7 +54,7 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   })
   const { data: rec, error } = await supabase
     .from('recordings')
-    .select('id, creator_id, source, storage_path, recorded_at, recorded_tz, project_id')
+    .select('id, creator_id, source, storage_path, recorded_at, recorded_tz, project_id, meta')
     .eq('id', recordingId)
     .single()
   if (error || !rec) throw new Error(`recording ${recordingId}: ${error?.message ?? 'not found'}`)
@@ -59,22 +62,41 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   const creator = await loadCreatorContext(rec.creator_id, rec.project_id)
   const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
   const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
-  const result = await analyse({ audioUrl, source: rec.source, creator, recorded })
+  const imported = parseImport(rec.meta, rec.creator_id)
+  const result = await analyse({ audioUrl, source: rec.source, creator, recorded, keepShort: !!imported })
 
-  if (result.junk) {
+  if (result.junk && !imported) {
     await markJunk(rec.id, result.junk, result.transcript.raw)
     return result
   }
 
   await supabase.from('recordings').update({ duration_ms: result.transcript.duration_ms }).eq('id', rec.id)
-  const { cards } = await writeClassification({
-    creatorId: rec.creator_id,
-    recordingId: rec.id,
-    transcript: result.transcript.utterances,
-    out: result.out,
-    promptVersion: PROMPT_VERSION,
-    projectId: rec.project_id,
-  })
+  let cards: NewCard[] = []
+  if (!result.junk) {
+    ;({ cards } = await writeClassification({
+      creatorId: rec.creator_id,
+      recordingId: rec.id,
+      transcript: result.transcript.utterances,
+      out: result.out,
+      promptVersion: PROMPT_VERSION,
+      projectId: rec.project_id,
+    }))
+  }
+  if (imported) {
+    // Silence is fine for an import: the picture is the idea. Keep the (empty) transcript on the recording.
+    if (result.junk) {
+      await supabase.from('recordings').update({ transcript: result.transcript.utterances }).eq('id', rec.id)
+    }
+    cards = await attachImport({
+      creatorId: rec.creator_id,
+      recordingId: rec.id,
+      projectId: rec.project_id,
+      imported,
+      cards,
+      title: result.junk ? null : result.out.title,
+      words: result.transcript.utterances.map((u) => u.text).join(' '),
+    })
+  }
 
   // Threading is best-effort: if embedding fails the cards are still saved and show under "New sparks"; the
   // error is kept on the recording so it can be re-threaded later.
