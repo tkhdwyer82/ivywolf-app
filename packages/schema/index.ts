@@ -62,6 +62,10 @@ export const Card = z.object({
   their_idea: z.string().nullable(),
   her_take: z.string().nullable(),
   candidate_threads: z.array(z.string()),
+  /** classify_v6: one of the creator's project names, or null (the pipeline then files it in My things). */
+  candidate_project: z.string().nullable(),
+  /** classify_v6: one literal, drawable sentence for the card's frame; "" when the idea is abstract. */
+  frame_brief: z.string(),
 })
 
 export const Action = z.object({
@@ -71,6 +75,8 @@ export const Action = z.object({
   priority: z.enum(['low', 'med', 'high']),
   /** YYYY-MM-DD the action is for, resolved against the recording's local date; null when none was said. */
   due_date: z.string().nullable(),
+  /** classify_v6: one literal, drawable sentence for the to-do's frame; "" when there's nothing to draw. */
+  frame_brief: z.string(),
 })
 
 export const Entity = z.object({

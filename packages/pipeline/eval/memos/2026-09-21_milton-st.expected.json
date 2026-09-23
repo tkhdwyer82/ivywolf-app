@@ -1,5 +1,6 @@
 {
   "source": "phone", "duration_ms": 61652, "trigger": "none",
+  "projects": ["My things", "Ivy Mini", "Launch video", "Candle market"],
   "title": "Launch video: the chase - 'it's done'",
   "segments": [
     {"start_ms": 880, "end_ms": 20645, "type": "idea", "text": "Arabella runs a chase scene from a Higgsfield clip"},
@@ -10,9 +11,9 @@
     {"start_ms": 29300, "end_ms": 61652, "type": "idea", "text": "Anyway, back to the idea - swap Arabella in for the original performer; she ends with Ivy in hand: 'it's done'; cut to logo", "boundary_marker": "back to the idea"}
   ],
   "cards": [
-    {"title": "The chase - 'it's done'", "play_from_ms": 880, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_threads": ["Kickstarter video"]}
+    {"title": "The chase - 'it's done'", "play_from_ms": 880, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_threads": ["Kickstarter video"], "candidate_project": "Launch video", "frame_brief": "drawable", "frame_brief_mentions": ["chase", "run", "jump", "leap"]}
   ],
-  "actions": [{"text": "milk", "scope": "personal"}],
+  "actions": [{"text": "milk", "scope": "personal", "frame_brief": "drawable", "frame_brief_mentions": ["milk"]}],
   "entities": [{"name": "Arabella", "kind": "person", "canonical": null, "aliases_seen": ["Arabella"]}],
   "loose_ends": [{"text": "Higgsfield chase clip", "needs": "link"}],
   "requests": [{"kind": "life"}],

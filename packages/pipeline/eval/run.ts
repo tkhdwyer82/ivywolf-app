@@ -36,15 +36,45 @@ interface Expected {
   trigger: 'wake_word' | 'none'
   /** The local day it was recorded. When set, every action's due_date is scored (absent = must be null). */
   recorded?: RecordedDay
+  /** The eval creator's project names (classify_v6 candidate_project). Defaults only, when absent. */
+  projects?: string[]
   title: string
   segments: { start_ms: number; end_ms: number; type: string; text: string; boundary_marker?: string }[]
-  cards: { title: string; play_from_ms: number; format_hint?: string; min_confidence?: number; candidate_threads?: string[] }[]
-  actions: { text: string; scope?: string; due_date?: string | null }[]
+  cards: ({
+    title: string
+    play_from_ms: number
+    format_hint?: string
+    min_confidence?: number
+    candidate_threads?: string[]
+    /** When present, the card's candidate_project must be exactly this (null = none). */
+    candidate_project?: string | null
+  } & FrameExpectation)[]
+  actions: ({ text: string; scope?: string; due_date?: string | null } & FrameExpectation)[]
   entities: { name: string; kind: string; canonical: string | null; aliases_seen: string[] }[]
   loose_ends: { text: string; needs: string }[]
   requests: { kind: string }[]
   must_not?: { cards_from_types?: string[]; cards_contain?: string[]; physical_descriptors_on_cards?: boolean }
   expect_merge_suggestion_with?: string
+}
+
+/**
+ * classify_v6 frame_brief. 'drawable' = non-empty and names at least one of `frame_brief_mentions` (a key noun, so the
+ * brief is about the right thing); 'empty' = "" (an abstract idea). Absent = not scored. Whether it's a good drawing is
+ * judged by hand.
+ */
+interface FrameExpectation {
+  frame_brief?: 'drawable' | 'empty'
+  frame_brief_mentions?: string[]
+}
+
+const DEFAULT_PROJECTS = ['My things', 'Ivy Mini']
+
+function frameCheck(e: FrameExpectation, brief: string): { pass: boolean; detail: string } {
+  const got = `"${brief}"`
+  if (e.frame_brief === 'empty') return { pass: brief.trim() === '', detail: `expected "", got ${got}` }
+  const words = e.frame_brief_mentions ?? []
+  const pass = brief.trim() !== '' && (words.length === 0 || words.some((w) => brief.toLowerCase().includes(w.toLowerCase())))
+  return { pass, detail: `expected drawable${words.length ? ` naming one of ${JSON.stringify(words)}` : ''}, got ${got}` }
 }
 
 type Check = { name: string; pass: boolean | null; detail: string }
@@ -137,6 +167,17 @@ export function diff(
       problems.length === 0,
       `got "${c.title}" @${c.play_from_ms} — ${c.gist}${problems.length ? ` [${problems.join('; ')}]` : ''} (meaning: judge by hand)`
     )
+    if (e.candidate_project !== undefined) {
+      push(
+        `card "${e.title}" candidate_project`,
+        (c.candidate_project ?? null) === e.candidate_project,
+        `expected ${JSON.stringify(e.candidate_project)}, got ${JSON.stringify(c.candidate_project ?? null)}`
+      )
+    }
+    if (e.frame_brief) {
+      const f = frameCheck(e, c.frame_brief ?? '')
+      push(`card "${e.title}" frame_brief`, f.pass, f.detail)
+    }
   }
   const extra = act.cards.filter((_, j) => !used.has(j))
   push(
@@ -195,6 +236,19 @@ export function diff(
       `recorded ${exp.recorded.weekday} ${exp.recorded.local_date}; expected ${JSON.stringify(exp.actions.map((e) => ({ text: e.text, due_date: e.due_date ?? null })))}, got ${JSON.stringify(act.actions.map(({ text, due_date }) => ({ text, due_date })))}`
     )
   }
+  for (const e of exp.actions.filter((x) => x.frame_brief)) {
+    const a = act.actions.find((x) => x.text.toLowerCase().includes(e.text.toLowerCase()))
+    const f = a ? frameCheck(e, a.frame_brief ?? '') : { pass: false, detail: 'no matching action' }
+    push(`action "${e.text}" frame_brief`, f.pass, f.detail)
+  }
+  // Frames are illustrative, never a likeness: no brief names a person, place or brand from the memo.
+  if (exp.cards.some((c) => c.frame_brief) || exp.actions.some((a) => a.frame_brief)) {
+    const names = exp.entities.flatMap((e) => [e.name, ...(e.canonical ? [e.canonical] : []), ...e.aliases_seen])
+    const briefs = [...act.cards.map((c) => c.frame_brief ?? ''), ...act.actions.map((a) => a.frame_brief ?? '')]
+    const named = briefs.filter((b) => names.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(b)))
+    push('frame briefs name no one', named.length === 0, named.length ? named.map((b) => `"${b}"`).join(' | ') : `names checked: ${JSON.stringify(names)}`)
+  }
+
   push(
     'loose_ends',
     act.loose_ends.length === exp.loose_ends.length && exp.loose_ends.every((e) => act.loose_ends.some((l) => l.needs === e.needs)),
@@ -353,6 +407,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       niche: null,
       people: [], // expected.json has Arabella canonical=null: the eval creator has no people list
       recent_thread_titles: recent,
+      projects: expected.projects ?? DEFAULT_PROJECTS,
     },
   })
 

@@ -1,6 +1,6 @@
 {
   "trigger": "wake_word",
-  "title": "Launch video action sequence + office milk",
+  "title": "Launch video idea: rooftop chase",
   "segments": [
     {
       "start_ms": 2960,
@@ -8,7 +8,7 @@
       "type": "filler",
       "text": "Hey, Ivy.",
       "speaker": "0",
-      "confidence": 0.98,
+      "confidence": 0.97,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -28,7 +28,7 @@
       "type": "action",
       "text": "Oh, and by the way, I just forgot. I need to have milk for the office for Thursday.",
       "speaker": "0",
-      "confidence": 0.95,
+      "confidence": 0.94,
       "boundary_marker": "and by the way",
       "retracted_by": null
     },
@@ -46,11 +46,11 @@
   "cards": [
     {
       "segment_index": 1,
-      "title": "Launch film: chase, rooftop, \"I've got it\"",
-      "gist": "A launch video where Arabella runs through a street fending off bad guys, jumps a rooftop, opens the device and radios through \"I've got it.\"",
+      "title": "Launch video: rooftop chase, \"I've got it\"",
+      "gist": "A launch video where the performer runs through a street fending off bad guys, jumps over a roof, opens the device in her hands and radios through \"I've got it.\"",
       "play_from_ms": 5440,
       "confidence": 0.9,
-      "energy": 0.7,
+      "energy": 0.72,
       "format_hint": "launch_video",
       "is_reference": false,
       "their_idea": null,
@@ -59,17 +59,17 @@
         "Launch video"
       ],
       "candidate_project": "Launch video",
-      "frame_brief": "Action-spy sequence for the product launch: street chase, rooftop leap, device reveal, radio line \"I've got it.\""
+      "frame_brief": "a woman mid-leap over a rooftop edge, holding an open small handheld device in one hand, a narrow street below"
     }
   ],
   "actions": [
     {
       "segment_index": 2,
-      "text": "Have milk for the office for Thursday",
+      "text": "Get milk for the office for Thursday",
       "scope": "work",
       "priority": "med",
       "due_date": "2026-09-24",
-      "frame_brief": "Buy milk for the office before Thursday."
+      "frame_brief": "a carton of milk standing on an office kitchen counter beside mugs"
     }
   ],
   "entities": [

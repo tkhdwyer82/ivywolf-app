@@ -9,7 +9,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
 import { ClassifyOutput, type RecordingSource, type Utterance } from '@ivywolf/schema'
 
-export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3' | 'classify_v4' | 'classify_v5'
+export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3' | 'classify_v4' | 'classify_v5' | 'classify_v6'
 /**
  * The version that ships. Change only when the candidate clears the ratchet in CLAUDE.md: it fails no eval check
  * that the current shipping version passes, both scored with the same scorer, expected.json and transcripts.
@@ -19,9 +19,19 @@ export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3' | 'cla
  * classify_v5 — ratcheted over classify_v4, 2026-09-22, on 3 memos (thomas-st, milton-st, rooftop-chase), scorer
  *   now checking action due dates. v4 fails 4 (thomas-st card + recall; milton-st "one second" filler + type
  *   accuracy); v5 fails 0; v5 regresses on none. Single runs — v4 scored 1 fail on the same memos the day before.
+ * classify_v6 — NOT ratcheted, 2026-09-23. Same 3 memos, scorer now checking candidate_project and frame_brief, run
+ *   in dependency order (thomas-st → milton-st → rooftop-chase). v5 fails 2 (thomas-st card precision; milton-st a
+ *   brief naming Arabella); v6 fails 2 (milton-st "one second" filler + segment-type accuracy), both of which v5
+ *   passes. The same filler check went the other way on an earlier out-of-order pass (v5 failed, v6 passed).
  */
 export const PROMPT_VERSION: PromptVersion = 'classify_v5'
 const MODEL = 'claude-opus-5'
+
+/**
+ * Versions whose prompt defines frame_brief and candidate_project. The output schema is shared, so earlier versions
+ * return the fields too, unguided (v5 writes descriptions naming people); graph.ts writes them only for these.
+ */
+export const PROJECT_AND_FRAME_VERSIONS: ReadonlySet<PromptVersion> = new Set(['classify_v6'])
 
 // Static `new URL(…, import.meta.url)` per version so bundlers (Next, for the process route) ship the markdown
 // alongside the code. Keep one entry per prompts/*.md.
@@ -31,6 +41,7 @@ const PROMPT_FILES: Record<PromptVersion, URL> = {
   classify_v3: new URL('./prompts/classify_v3.md', import.meta.url),
   classify_v4: new URL('./prompts/classify_v4.md', import.meta.url),
   classify_v5: new URL('./prompts/classify_v5.md', import.meta.url),
+  classify_v6: new URL('./prompts/classify_v6.md', import.meta.url),
 }
 const loadPrompt = (v: PromptVersion) => readFileSync(fileURLToPath(PROMPT_FILES[v]), 'utf8')
 
@@ -39,6 +50,8 @@ export interface CreatorContext {
   niche: string | null
   people: { canonical: string; aliases: string[] }[]
   recent_thread_titles: string[]
+  /** Names of the creator's projects, defaults included — what candidate_project may name (0011_projects.sql). */
+  projects: string[]
 }
 
 /** The creator's local calendar day when the recording was made — what "Thursday" or "tomorrow" is relative to. */
@@ -104,6 +117,12 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
 const isCalendarDate = (d: string | null) =>
   !!d && /^\d{4}-\d{2}-\d{2}$/.test(d) && new Date(`${d}T00:00:00Z`).toISOString().startsWith(d)
 
+/** A candidate project must be one of hers, spelled as she spelled it; anything else is null (→ My things). */
+function knownProject(candidate: string | null, projects: string[]): string | null {
+  const key = candidate?.trim().toLowerCase()
+  return (key && projects.find((p) => p.trim().toLowerCase() === key)) || null
+}
+
 /** Whatever the model says, these hold before anything reaches the graph. */
 export function enforceInvariants(
   out: ClassifyOutput,
@@ -117,7 +136,13 @@ export function enforceInvariants(
       const seg = segments[c.segment_index]
       return seg !== undefined && !NO_CARD_TYPES.has(seg.type)
     })
-    .map((c) => ({ ...c, confidence: clamp01(c.confidence), energy: clamp01(c.energy) }))
+    .map((c) => ({
+      ...c,
+      confidence: clamp01(c.confidence),
+      energy: clamp01(c.energy),
+      candidate_project: knownProject(c.candidate_project, creator.projects),
+      frame_brief: c.frame_brief.trim(),
+    }))
 
   // Canonicalise against the creator's people list — the model is asked to, but aliases are checked here too.
   const entities = out.entities.map((e) => {
@@ -134,6 +159,7 @@ export function enforceInvariants(
   const actions = out.actions.map((a) => ({
     ...a,
     due_date: recorded && isCalendarDate(a.due_date) && a.due_date! >= recorded.local_date ? a.due_date : null,
+    frame_brief: a.frame_brief.trim(),
   }))
 
   return { ...out, segments, cards, actions, entities }

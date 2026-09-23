@@ -5,7 +5,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { ClassifyOutput } from '@ivywolf/schema'
 import { randomUUID } from 'node:crypto'
-import type { CreatorContext } from './classify'
+import { PROJECT_AND_FRAME_VERSIONS, type CreatorContext, type PromptVersion } from './classify'
 import { cardText, embed } from './embed'
 import {
   assignCards,
@@ -57,11 +57,21 @@ export async function loadCreatorContext(creatorId: string): Promise<CreatorCont
       .order('last_seen', { ascending: false })
       .limit(20)
   )
+  const projects = check(
+    'projects',
+    await supabase
+      .from('projects')
+      .select('name')
+      .eq('creator_id', creatorId)
+      .order('is_default', { ascending: false })
+      .order('created_at')
+  )
   return {
     handle: creator.handle,
     niche: creator.niche,
     people: (people ?? []).map((p) => ({ canonical: p.canonical_name, aliases: p.aliases })),
     recent_thread_titles: (threads ?? []).map((t) => t.title),
+    projects: (projects ?? []).map((p) => p.name),
   }
 }
 
@@ -98,16 +108,41 @@ export async function markFailed(recordingId: string, error: string) {
   )
 }
 
+export interface NewCard {
+  id: string
+  title: string
+  gist: string
+  candidateThreads: string[]
+  projectId: string
+}
+
+/** The classifier's candidate project → the creator's project with that name, else My things (0011). */
+async function resolveProjects(creatorId: string, candidates: (string | null)[]): Promise<Map<string | null, string>> {
+  const supabase = db()
+  const resolved = new Map<string | null, string>()
+  for (const c of new Set(candidates)) {
+    resolved.set(
+      c,
+      need('resolve_project', await supabase.rpc('resolve_project', { p_creator_id: creatorId, p_candidate: c }))
+    )
+  }
+  return resolved
+}
+
 /** Insert segments, then everything that points at a segment. Returns the new cards. */
 export async function writeClassification(args: {
   creatorId: string
   recordingId: string
   transcript: unknown
   out: ClassifyOutput
-  promptVersion: string
-}): Promise<{ cards: { id: string; title: string; gist: string; candidateThreads: string[] }[] }> {
+  promptVersion: PromptVersion
+}): Promise<{ cards: NewCard[] }> {
   const { creatorId, recordingId, out } = args
   const supabase = db()
+  // Before classify_v6 these fields are unguided: no project (→ My things) and no brief (frames.ts decides).
+  const guided = PROJECT_AND_FRAME_VERSIONS.has(args.promptVersion)
+  const candidateProject = (c: ClassifyOutput['cards'][number]) => (guided ? c.candidate_project : null)
+  const frameBrief = (x: { frame_brief: string }) => (guided ? x.frame_brief : null)
 
   check(
     'recording',
@@ -153,6 +188,7 @@ export async function writeClassification(args: {
     }
   }
 
+  const projectOf = await resolveProjects(creatorId, out.cards.map(candidateProject))
   const cards = out.cards.length
     ? check(
         'cards',
@@ -169,9 +205,11 @@ export async function writeClassification(args: {
               confidence: c.confidence,
               energy: c.energy,
               is_reference: c.is_reference,
+              project_id: projectOf.get(candidateProject(c))!,
+              frame_brief: frameBrief(c),
             }))
           )
-          .select('id')
+          .select('id, project_id')
       )
     : []
 
@@ -187,6 +225,7 @@ export async function writeClassification(args: {
           scope: a.scope,
           priority: a.priority,
           due_date: a.due_date,
+          frame_brief: frameBrief(a), // project: My things, by the 0011 trigger
         }))
       )
     )
@@ -251,6 +290,7 @@ export async function writeClassification(args: {
       title: out.cards[i].title,
       gist: out.cards[i].gist,
       candidateThreads: out.cards[i].candidate_threads,
+      projectId: c.project_id,
     })),
   }
 }
@@ -271,10 +311,7 @@ export interface ThreadingResult {
  * Loads the creator's whole card set — fine at pilot scale; move the nearest-thread search into SQL (the HNSW
  * index on cards.embedding) when creators have thousands of cards.
  */
-export async function threadNewCards(
-  creatorId: string,
-  cards: { id: string; title: string; gist: string; candidateThreads: string[] }[]
-): Promise<ThreadingResult> {
+export async function threadNewCards(creatorId: string, cards: NewCard[]): Promise<ThreadingResult> {
   if (cards.length === 0) return { assignments: [], merges: [] }
   const supabase = db()
 
@@ -309,7 +346,12 @@ export async function threadNewCards(
   for (const a of assignments) {
     const thread = threads.find((t) => t.id === a.threadId)!
     if (a.created) {
-      check('thread insert', await supabase.from('threads').insert({ id: a.threadId, creator_id: creatorId, title: thread.title }))
+      // A new thread takes the project of the card that started it.
+      const projectId = cards.find((c) => c.id === a.cardId)!.projectId
+      check(
+        'thread insert',
+        await supabase.from('threads').insert({ id: a.threadId, creator_id: creatorId, title: thread.title, project_id: projectId })
+      )
     } else {
       const current = need('thread', await supabase.from('threads').select('return_count').eq('id', a.threadId).single())
       check(

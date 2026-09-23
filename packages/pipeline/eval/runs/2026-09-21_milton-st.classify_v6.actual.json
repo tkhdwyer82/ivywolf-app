@@ -28,7 +28,7 @@
       "type": "loose_end",
       "text": "It'd be great to find that video",
       "speaker": "0",
-      "confidence": 0.85,
+      "confidence": 0.86,
       "boundary_marker": null,
       "retracted_by": null
     },
@@ -44,32 +44,22 @@
     },
     {
       "start_ms": 21205,
-      "end_ms": 22565,
-      "type": "filler",
-      "text": "Actually, one second.",
+      "end_ms": 28965,
+      "type": "action",
+      "text": "Actually, one second. Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
-      "confidence": 0.8,
+      "confidence": 0.9,
       "boundary_marker": "Actually, one second.",
       "retracted_by": null
     },
     {
-      "start_ms": 23445,
-      "end_ms": 28965,
-      "type": "action",
-      "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
-      "speaker": "0",
-      "confidence": 0.9,
-      "boundary_marker": null,
-      "retracted_by": null
-    },
-    {
-      "start_ms": 23445,
+      "start_ms": 21205,
       "end_ms": 28965,
       "type": "request",
-      "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
+      "text": "Actually, one second. Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
       "speaker": "0",
       "confidence": 0.9,
-      "boundary_marker": null,
+      "boundary_marker": "Actually, one second.",
       "retracted_by": null
     },
     {
@@ -87,10 +77,10 @@
     {
       "segment_index": 1,
       "title": "Arabella runs the AI chase scene",
-      "gist": "Recreate a fight-and-chase scene she saw on Higgs Field AI with Arabella's character in place of the original performer — running, jumping, pushing past people — ending with Arabella holding Ivy, saying \"it's done\" into the mic, then cutting to the Ivy branding logo.",
+      "gist": "Recreate the AI fight-and-chase scene she saw, with Arabella's character running, jumping and pushing past people instead of the original performer, ending with her holding Ivy, saying \"it's done\" into the mic, and a cut to the Ivy branding logo.",
       "play_from_ms": 880,
-      "confidence": 0.89,
-      "energy": 0.65,
+      "confidence": 0.88,
+      "energy": 0.7,
       "format_hint": "launch_video",
       "is_reference": false,
       "their_idea": null,
@@ -99,17 +89,17 @@
         "Launch video"
       ],
       "candidate_project": "Launch video",
-      "frame_brief": "Action-led AI scene: Arabella's character sprints through a chase, vaulting obstacles and pushing past people, landing at the end holding Ivy and delivering \"it's done\" to the mic before the Ivy logo sting."
+      "frame_brief": "a woman mid-leap over a low barrier in a crowded narrow street, a small handheld device gripped in one hand"
     }
   ],
   "actions": [
     {
-      "segment_index": 5,
+      "segment_index": 4,
       "text": "Get milk",
       "scope": "personal",
-      "priority": "low",
+      "priority": "med",
       "due_date": null,
-      "frame_brief": "Simple errand reminder to pick up milk; no day given."
+      "frame_brief": "a carton of milk on a kitchen counter"
     }
   ],
   "entities": [
@@ -125,13 +115,13 @@
   "loose_ends": [
     {
       "segment_index": 2,
-      "text": "Find the fight scene video seen on Higgs Field AI",
+      "text": "Find that fight scene video seen on Higgs Field AI",
       "needs": "link"
     }
   ],
   "requests": [
     {
-      "segment_index": 6,
+      "segment_index": 5,
       "kind": "life",
       "text": "Put a reminder in to get milk"
     }
