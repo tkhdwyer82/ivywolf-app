@@ -6,7 +6,8 @@
 //   frame_status: none → queued → done | typographic | failed
 //
 // A failure sets 'failed' and never blocks the card — the app shows the typographic frame instead.
-// To-dos are cached by (style pack, normalised brief): "a carton of milk" is drawn once per creator.
+// To-dos are cached by (style pack, normalised brief): "a carton of milk" is drawn once per creator, and its file is
+// removed when the last to-do using it is deleted (reference-counted by apps/mobile/lib/deleteRecording.ts).
 // Only the brief, tone words and palette are sent to fal.ai — never a name, the transcript or other creators' data.
 
 import { createHash } from 'node:crypto'
@@ -155,7 +156,12 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (hit) {
+    // A cached frame is only good while some to-do still uses it: deleting the last one removes the file
+    // (apps/mobile/lib/deleteRecording.ts), and the next to-do with this brief is drawn afresh.
+    const live =
+      hit &&
+      (await supabase.from('actions').select('id', { count: 'exact', head: true }).eq('frame_url', hit.frame_url)).count
+    if (hit && live) {
       await setStatus({ frame_url: hit.frame_url, frame_status: 'done' })
       await log({ status: 'done', cached: true, frame_url: hit.frame_url, width: hit.width, height: hit.height })
       console.log(`[frames] action ${s.id}: cached, $0`)
@@ -168,7 +174,9 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise
     const image = await draw(framePrompt(s.brief, pack))
     // Cards: one frame each. To-dos: one per (style pack, brief), shared by every to-do with that brief.
     const path =
-      s.kind === 'card' ? `${creatorId}/${s.id}.jpg` : `${creatorId}/actions/${pack.id}-${hash.slice(0, 32)}.jpg`
+      s.kind === 'card'
+        ? `${creatorId}/${s.id}.jpg`
+        : `${creatorId}/actions/${pack.id}-${hash.slice(0, 32)}-${Date.now()}.jpg` // never reused: see deleteRecording
     const frameUrl = await fetchAndUpload({ bucket: 'frames', sourceUrl: image.url, path, contentType: 'image/jpeg' })
     await setStatus({ frame_url: frameUrl, frame_status: 'done' })
     await log({ status: 'done', frame_url: frameUrl, width: image.width, height: image.height, cost_usd: image.costUsd })

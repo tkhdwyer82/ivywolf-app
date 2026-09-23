@@ -96,17 +96,5 @@ export async function waitForRecording(
   return { status: 'still_processing' }
 }
 
-/**
- * Delete a recording and everything derived from it (privacy promise: "its transcript and derived cards go with
- * it"). Audio first, then the row: if the row delete fails, retrying is safe (removing a missing object is a
- * no-op), whereas the other order could leave audio behind with nothing pointing at it. The row delete cascades to
- * segments, cards, actions, loose ends and requests, and removes any thread left empty (0007).
- */
-export async function deleteRecording(supabase: SupabaseClient, recording: { id: string; storage_path: string }) {
-  const removed = await supabase.storage.from('recordings').remove([recording.storage_path])
-  if (removed.error) throw new Error(`audio: ${removed.error.message}`)
-
-  const { error, count } = await supabase.from('recordings').delete({ count: 'exact' }).eq('id', recording.id)
-  if (error) throw new Error(`recording: ${error.message}`)
-  if (count === 0) throw new Error('recording: not deleted')
-}
+// Deletion (audio, frames, then the row) lives in its own module so the deletion test can run it outside Expo.
+export { deleteRecording } from './deleteRecording'

@@ -1,0 +1,60 @@
+// apps/mobile/lib/deleteRecording.ts
+// Delete a recording and everything derived from it (privacy promise: "its transcript and derived cards go with
+// it"). No Expo imports, so the same code runs in the deletion test (scripts/test-delete-recording.ts).
+//
+// Storage first, then the row: if the row delete fails, retrying is safe (removing a missing object is a no-op),
+// whereas the other order could leave files behind with nothing pointing at them. The row delete cascades to
+// segments, cards, actions, loose ends and requests, and removes any thread left empty (0007).
+//
+// Frames (0015): a card's frame is its own and always goes. A to-do's frame is shared by every to-do with the same
+// brief (frames.ts cache), so it goes only when no to-do outside this recording still uses it.
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+const FRAMES_PREFIX = '/storage/v1/object/public/frames/'
+
+/** Public frame URL → its path in the frames bucket; null for anything else. */
+export function framePath(url: string | null): string | null {
+  if (!url) return null
+  const i = url.indexOf(FRAMES_PREFIX)
+  return i === -1 ? null : decodeURIComponent(url.slice(i + FRAMES_PREFIX.length).split('?')[0])
+}
+
+function need<T>(label: string, r: { data: T; error: { message: string } | null }): T {
+  if (r.error) throw new Error(`${label}: ${r.error.message}`)
+  return r.data
+}
+
+export async function deleteRecording(supabase: SupabaseClient, recording: { id: string; storage_path: string }) {
+  const cards = need(
+    'cards',
+    await supabase.from('cards').select('frame_url').eq('recording_id', recording.id).not('frame_url', 'is', null)
+  ) as { frame_url: string }[]
+  const actions = need(
+    'actions',
+    await supabase.from('actions').select('frame_url').eq('recording_id', recording.id).not('frame_url', 'is', null)
+  ) as { frame_url: string }[]
+
+  const paths = cards.map((c) => framePath(c.frame_url)).filter((p): p is string => p !== null)
+  for (const url of new Set(actions.map((a) => a.frame_url))) {
+    const { count, error } = await supabase
+      .from('actions')
+      .select('id', { count: 'exact', head: true })
+      .eq('frame_url', url)
+      .neq('recording_id', recording.id)
+    if (error) throw new Error(`to-do frame references: ${error.message}`)
+    const path = framePath(url)
+    if (count === 0 && path) paths.push(path)
+  }
+
+  const removed = await supabase.storage.from('recordings').remove([recording.storage_path])
+  if (removed.error) throw new Error(`audio: ${removed.error.message}`)
+  if (paths.length) {
+    const frames = await supabase.storage.from('frames').remove(paths)
+    if (frames.error) throw new Error(`frames: ${frames.error.message}`)
+  }
+
+  const { error, count } = await supabase.from('recordings').delete({ count: 'exact' }).eq('id', recording.id)
+  if (error) throw new Error(`recording: ${error.message}`)
+  if (count === 0) throw new Error('recording: not deleted')
+}
