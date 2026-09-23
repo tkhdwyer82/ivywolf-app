@@ -1,0 +1,140 @@
+{
+  "trigger": "none",
+  "title": "Arabella in the AI chase scene",
+  "segments": [
+    {
+      "start_ms": 0,
+      "end_ms": 400,
+      "type": "junk",
+      "text": "Cord.",
+      "speaker": "0",
+      "confidence": 0.4,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 880,
+      "end_ms": 10960,
+      "type": "idea",
+      "text": "I'm thinking of an idea where we have Arabella in this really interesting fight scene that I saw on Higgs Field AI.",
+      "speaker": "0",
+      "confidence": 0.9,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 11440,
+      "end_ms": 14080,
+      "type": "loose_end",
+      "text": "It'd be great to find that video",
+      "speaker": "0",
+      "confidence": 0.85,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 14485,
+      "end_ms": 20645,
+      "type": "idea",
+      "text": "and use Arabella's character to run that chase, to jump over things.",
+      "speaker": "0",
+      "confidence": 0.88,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 21205,
+      "end_ms": 22565,
+      "type": "filler",
+      "text": "Actually, one second.",
+      "speaker": "0",
+      "confidence": 0.8,
+      "boundary_marker": "Actually, one second.",
+      "retracted_by": null
+    },
+    {
+      "start_ms": 23445,
+      "end_ms": 28965,
+      "type": "action",
+      "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
+      "speaker": "0",
+      "confidence": 0.9,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 23445,
+      "end_ms": 28965,
+      "type": "request",
+      "text": "Ivy, I just realized I need to get milk if you're able to put a little reminder in there.",
+      "speaker": "0",
+      "confidence": 0.9,
+      "boundary_marker": null,
+      "retracted_by": null
+    },
+    {
+      "start_ms": 29300,
+      "end_ms": 61157,
+      "type": "idea",
+      "text": "Anyway, back to the idea. And Arabella runs through that scene. She jumps. She pushes away from people. It's a really cool AI scene, but using Arabella instead of the Chinese guy in the actual video. And when she gets to the end, she has Ivy in her hand and she says into the mic, it's done. And then it goes to the Ivy branding logo.",
+      "speaker": "0",
+      "confidence": 0.9,
+      "boundary_marker": "Anyway, back to the idea.",
+      "retracted_by": null
+    }
+  ],
+  "cards": [
+    {
+      "segment_index": 1,
+      "title": "Arabella runs the AI chase scene",
+      "gist": "Rebuild an AI fight and chase scene found online with Arabella's character in the lead — running, jumping and pushing past people — ending with her holding the device, saying \"it's done\", and cutting to the Ivy logo.",
+      "play_from_ms": 880,
+      "confidence": 0.88,
+      "energy": 0.65,
+      "format_hint": "launch_video",
+      "is_reference": false,
+      "their_idea": null,
+      "her_take": null,
+      "candidate_threads": [
+        "Launch video"
+      ],
+      "candidate_project": "Launch video",
+      "frame_brief": "a woman mid-leap over a low barrier in a crowded street, a small handheld device gripped in one hand"
+    }
+  ],
+  "actions": [
+    {
+      "segment_index": 5,
+      "text": "Get milk",
+      "scope": "personal",
+      "priority": "med",
+      "due_date": null,
+      "frame_brief": "a carton of milk on a kitchen counter"
+    }
+  ],
+  "entities": [
+    {
+      "name": "Arabella",
+      "kind": "person",
+      "canonical": null,
+      "aliases_seen": [
+        "Arabella"
+      ]
+    }
+  ],
+  "loose_ends": [
+    {
+      "segment_index": 2,
+      "text": "Find that fight scene video seen on Higgs Field AI",
+      "needs": "link"
+    }
+  ],
+  "requests": [
+    {
+      "segment_index": 6,
+      "kind": "life",
+      "text": "Put a reminder in for getting milk"
+    }
+  ],
+  "style_signals": []
+}

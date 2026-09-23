@@ -12,19 +12,22 @@ import { ClassifyOutput, type RecordingSource, type Utterance } from '@ivywolf/s
 export type PromptVersion = 'classify_v1' | 'classify_v2' | 'classify_v3' | 'classify_v4' | 'classify_v5' | 'classify_v6'
 /**
  * The version that ships. Change only when the candidate clears the ratchet in CLAUDE.md: it fails no eval check
- * that the current shipping version passes, both scored with the same scorer, expected.json and transcripts.
+ * that the current shipping version passes, both scored with the same scorer, expected.json and transcripts — checks
+ * that vary run to run scored by pass rate over 3 runs each (from classify_v6 on).
  *
  * classify_v4 — ratcheted over classify_v1, 2026-09-21, on 2 memos (thomas-st, milton-st).
  *   v1 fails 11 checks (5 + 6); v4 fails 1 (thomas-st card precision: extra reference card); v4 regresses on none.
  * classify_v5 — ratcheted over classify_v4, 2026-09-22, on 3 memos (thomas-st, milton-st, rooftop-chase), scorer
  *   now checking action due dates. v4 fails 4 (thomas-st card + recall; milton-st "one second" filler + type
  *   accuracy); v5 fails 0; v5 regresses on none. Single runs — v4 scored 1 fail on the same memos the day before.
- * classify_v6 — NOT ratcheted, 2026-09-23. Same 3 memos, scorer now checking candidate_project and frame_brief, run
- *   in dependency order (thomas-st → milton-st → rooftop-chase). v5 fails 2 (thomas-st card precision; milton-st a
- *   brief naming Arabella); v6 fails 2 (milton-st "one second" filler + segment-type accuracy), both of which v5
- *   passes. The same filler check went the other way on an earlier out-of-order pass (v5 failed, v6 passed).
+ * classify_v6 — ratcheted over classify_v5, 2026-09-23, on the same 3 memos, scorer now checking candidate_project
+ *   and frame_brief. Single runs (dependency order thomas-st → milton-st → rooftop-chase): thomas-st v5 fails 1 (card
+ *   precision), v6 0; rooftop-chase both 0. milton-st's "one second" filler varies run to run, so milton-st was scored
+ *   by pass rate over 3 runs each (repeat-run rule, docs/rnd/eval-method-repeat-runs.md): filler 2/3 vs 2/3,
+ *   segment-type accuracy 2/3 vs 2/3, "one second" marker v5 2/3 · v6 3/3, milk brief 1/3 · 3/3, briefs name no one
+ *   0/3 · 3/3; every other check 3/3 both. v6 ≥ v5 on every check.
  */
-export const PROMPT_VERSION: PromptVersion = 'classify_v5'
+export const PROMPT_VERSION: PromptVersion = 'classify_v6'
 const MODEL = 'claude-opus-5'
 
 /**

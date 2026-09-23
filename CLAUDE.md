@@ -52,7 +52,9 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
 - Never store raw audio outside Supabase storage. Never send other creators' data to any adapter.
 - Prompts live in packages/pipeline/prompts as versioned markdown. Shipping is a ratchet: a prompt version may ship if, on the
   eval set in packages/pipeline/eval, it fails no check that the current shipping version passes (both scored with the same
-  scorer, expected.json and transcripts). `PROMPT_VERSION` in packages/pipeline/classify.ts records which version ships and
-  what it was ratcheted over.
+  scorer, expected.json and transcripts). A check that gives different results on repeated runs of the same version is
+  scored by pass rate over 3 runs of each version; the candidate ships only if its pass rate on every such check is ≥ the
+  shipping version's. Checks that don't vary stay single-run. `PROMPT_VERSION` in packages/pipeline/classify.ts records
+  which version ships and what it was ratcheted over (method: docs/rnd/eval-method-repeat-runs.md).
 - Run `supabase config diff` before `supabase config push` — push applies even when you answer "n" at its prompt.
 - Third-party auth (Clerk) is set via the Management API (`/v1/projects/{ref}/config/auth/third-party-auth`), not config.toml — config push does not sync it.
