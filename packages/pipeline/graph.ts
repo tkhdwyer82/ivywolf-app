@@ -34,7 +34,11 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
   return data
 }
 
-export async function loadCreatorContext(creatorId: string): Promise<CreatorContext> {
+/**
+ * What the classifier knows about the creator. With a project (Record opened from "Talk to this project"), the
+ * recent threads are that project's only.
+ */
+export async function loadCreatorContext(creatorId: string, projectId: string | null = null): Promise<CreatorContext> {
   const supabase = db()
   const creator = need(
     'creator',
@@ -48,15 +52,9 @@ export async function loadCreatorContext(creatorId: string): Promise<CreatorCont
       .eq('creator_id', creatorId)
       .eq('kind', 'person')
   )
-  const threads = check(
-    'threads',
-    await supabase
-      .from('threads')
-      .select('title')
-      .eq('creator_id', creatorId)
-      .order('last_seen', { ascending: false })
-      .limit(20)
-  )
+  let threadQuery = supabase.from('threads').select('title').eq('creator_id', creatorId)
+  if (projectId) threadQuery = threadQuery.eq('project_id', projectId)
+  const threads = check('threads', await threadQuery.order('last_seen', { ascending: false }).limit(20))
   const projects = check(
     'projects',
     await supabase
@@ -116,14 +114,24 @@ export interface NewCard {
   projectId: string
 }
 
-/** The classifier's candidate project → the creator's project with that name, else My things (0011). */
-async function resolveProjects(creatorId: string, candidates: (string | null)[]): Promise<Map<string | null, string>> {
+/**
+ * The classifier's candidate project → the creator's project with that name, else the recording's project (0016),
+ * else My things (0011).
+ */
+async function resolveProjects(
+  creatorId: string,
+  candidates: (string | null)[],
+  scope: string | null
+): Promise<Map<string | null, string>> {
   const supabase = db()
   const resolved = new Map<string | null, string>()
   for (const c of new Set(candidates)) {
     resolved.set(
       c,
-      need('resolve_project', await supabase.rpc('resolve_project', { p_creator_id: creatorId, p_candidate: c }))
+      need(
+        'resolve_project',
+        await supabase.rpc('resolve_project', { p_creator_id: creatorId, p_candidate: c, p_scope: scope })
+      )
     )
   }
   return resolved
@@ -136,10 +144,12 @@ export async function writeClassification(args: {
   transcript: unknown
   out: ClassifyOutput
   promptVersion: PromptVersion
+  /** The project the recording was made in ("Talk to this project"), or null. */
+  projectId: string | null
 }): Promise<{ cards: NewCard[] }> {
   const { creatorId, recordingId, out } = args
   const supabase = db()
-  // Before classify_v6 these fields are unguided: no project (→ My things) and no brief (frames.ts decides).
+  // Before classify_v6 these fields are unguided: no named project (→ the recording's project or My things), no brief.
   const guided = PROJECT_AND_FRAME_VERSIONS.has(args.promptVersion)
   const candidateProject = (c: ClassifyOutput['cards'][number]) => (guided ? c.candidate_project : null)
   const frameBrief = (x: { frame_brief: string }) => (guided ? x.frame_brief : null)
@@ -188,7 +198,7 @@ export async function writeClassification(args: {
     }
   }
 
-  const projectOf = await resolveProjects(creatorId, out.cards.map(candidateProject))
+  const projectOf = await resolveProjects(creatorId, out.cards.map(candidateProject), args.projectId)
   const cards = out.cards.length
     ? check(
         'cards',

@@ -41,7 +41,7 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="record"
+        name="capture"
         options={{
           title: 'Record',
           tabBarAccessibilityLabel: 'Record',

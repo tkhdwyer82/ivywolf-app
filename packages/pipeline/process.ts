@@ -51,12 +51,12 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   })
   const { data: rec, error } = await supabase
     .from('recordings')
-    .select('id, creator_id, source, storage_path, recorded_at, recorded_tz')
+    .select('id, creator_id, source, storage_path, recorded_at, recorded_tz, project_id')
     .eq('id', recordingId)
     .single()
   if (error || !rec) throw new Error(`recording ${recordingId}: ${error?.message ?? 'not found'}`)
 
-  const creator = await loadCreatorContext(rec.creator_id)
+  const creator = await loadCreatorContext(rec.creator_id, rec.project_id)
   const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
   const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
   const result = await analyse({ audioUrl, source: rec.source, creator, recorded })
@@ -73,6 +73,7 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
     transcript: result.transcript.utterances,
     out: result.out,
     promptVersion: PROMPT_VERSION,
+    projectId: rec.project_id,
   })
 
   // Threading is best-effort: if embedding fails the cards are still saved and show under "New sparks"; the

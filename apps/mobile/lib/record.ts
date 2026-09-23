@@ -27,6 +27,8 @@ export async function submitRecording(args: {
   fileUri: string
   durationMs: number
   recordedAt: Date
+  /** "Talk to this project": the pipeline scopes recent threads and card placement to it (0016). */
+  projectId?: string | null
 }): Promise<{ recordingId: string }> {
   const { supabase, userId } = args
 
@@ -54,6 +56,7 @@ export async function submitRecording(args: {
     // The device's zone, so the pipeline can resolve "for Thursday" against her local day.
     recorded_tz: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
     trigger: 'button',
+    project_id: args.projectId ?? null,
   })
   if (row.error) throw new Error(`recording row: ${row.error.message}`)
 

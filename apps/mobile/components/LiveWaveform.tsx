@@ -1,16 +1,19 @@
 // apps/mobile/components/LiveWaveform.tsx
 // Ivy listening: a strip of bars driven by the mic's metering level. A new bar is sampled on a fixed clock,
-// so the strip keeps moving left through silence — time passes even when nobody is speaking. Older bars fade
-// in ink; only the newest bar (now) carries the accent. Levels are smoothed so it breathes rather than jitters.
+// so the strip keeps moving left through silence — time passes even when nobody is speaking. Geometry from the
+// Record frame (Figma 83:11): 4 pt bars on an 8.4 pt pitch in ink at 85%; the newest bars — what she's saying
+// now — are lime. Levels are smoothed so it breathes rather than jitters.
 
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { color } from '@/lib/theme'
+import { hero } from '@/lib/theme'
 
-const BARS = 44
+const BARS = 42
+const LIME_BARS = 9
 const SAMPLE_MS = 90
-const MAX_HEIGHT = 56
-const MIN_HEIGHT = 3
+const HEIGHT = 90
+const MAX_BAR = 64
+const MIN_BAR = 6
 // Speech sits roughly between these dBFS values on a phone mic; below the floor reads as silence.
 const FLOOR_DB = -52
 const CEIL_DB = -12
@@ -41,28 +44,23 @@ export function LiveWaveform({ level }: { level: number | undefined }) {
 
   return (
     <View style={styles.strip} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {samples.map((v, i) => {
-        const now = i === BARS - 1
-        return (
-          <View
-            key={i}
-            style={[
-              styles.bar,
-              {
-                height: MIN_HEIGHT + v * (MAX_HEIGHT - MIN_HEIGHT),
-                backgroundColor: now ? color.accent : color.ink,
-                // The past recedes: oldest bars at ~15% ink, recent ones near full.
-                opacity: now ? 1 : 0.15 + 0.6 * (i / (BARS - 1)),
-              },
-            ]}
-          />
-        )
-      })}
+      {samples.map((v, i) => (
+        <View
+          key={i}
+          style={[
+            styles.bar,
+            {
+              height: MIN_BAR + v * (MAX_BAR - MIN_BAR),
+              backgroundColor: i >= BARS - LIME_BARS ? hero.lime : hero.inkSoft,
+            },
+          ]}
+        />
+      ))}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  strip: { height: MAX_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  bar: { width: 3, borderRadius: 1.5 },
+  strip: { height: HEIGHT, width: 353, flexDirection: 'row', alignItems: 'center', gap: 4.4 },
+  bar: { width: 4, borderRadius: 2 },
 })

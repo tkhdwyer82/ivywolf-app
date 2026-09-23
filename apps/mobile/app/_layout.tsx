@@ -17,6 +17,7 @@ function Routes() {
     <Stack screenOptions={{ contentStyle: { backgroundColor: color.paper }, headerShadowVisible: false }}>
       <Stack.Protected guard={isSignedIn}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="record" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen
           name="life"
           options={{ title: 'Life', presentation: 'modal', headerStyle: { backgroundColor: color.paper } }}
