@@ -8,8 +8,8 @@ import { Animated, Easing, LayoutAnimation, StyleSheet, Text, View } from 'react
 import { hero, text } from '@/lib/theme'
 import type { IvySentence } from '@/lib/home'
 
-/** Motion note under P1: "Ivy writes word by word (≈40 wpm)". */
-export const WORDS_PER_MINUTE = 40
+/** Typing pace (Tim, 23 Sep): the motion note's "≈40 wpm" was reading pace. 220 wpm ≈ 270 ms a word. */
+export const WORDS_PER_MINUTE = 220
 export const DISSOLVE_AFTER_MS = 8000
 const DISSOLVE_MS = 400
 
