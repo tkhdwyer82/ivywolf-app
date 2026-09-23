@@ -7,6 +7,7 @@ import type { ClassifyOutput, RecordingSource } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
 import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
+import { frameRecording } from './frames'
 import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification } from './graph'
 
 export { claimRecording, markFailed } from './graph'
@@ -90,5 +91,12 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
       .eq('id', rec.id)
   }
   await markDone(rec.id)
+
+  // Frames after the card is visible: a slow or failed frame never holds it back (frames.ts sets 'failed' per frame).
+  try {
+    await frameRecording(rec.creator_id, rec.id)
+  } catch (err) {
+    console.error(`[pipeline] ${rec.id}: frames failed`, err)
+  }
   return result
 }
