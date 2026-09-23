@@ -63,13 +63,22 @@ export async function submitRecording(args: {
   })
   if (row.error) throw new Error(`recording row: ${row.error.message}`)
 
+  // Once the row exists the take is safe: if the server can't be reached now, Home asks again (requestProcessing).
+  await requestProcessing(recordingId, args.token).catch((e) => console.warn(`[record] ${recordingId}: ${e.message}`))
+  return { recordingId }
+}
+
+/**
+ * Ask apps/web to process a queued recording. Safe to repeat: the route claims the row first, so a second ask gets
+ * 409 (already processing) rather than a second run.
+ */
+export async function requestProcessing(recordingId: string, token: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/recordings/${recordingId}/process`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${args.token}` },
+    headers: { Authorization: `Bearer ${token}` },
   })
-  // 409: already claimed by an earlier submit of this same recording — it is processing, so just watch it.
+  // 409: already claimed — it is processing, so just watch it.
   if (!res.ok && res.status !== 409) throw new Error(`process: ${res.status} ${await res.text()}`)
-  return { recordingId }
 }
 
 /** Poll recordings.status until the pipeline finishes. Leaving the screen is fine — Voice notes keeps watching. */

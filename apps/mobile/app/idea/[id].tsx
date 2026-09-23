@@ -7,7 +7,7 @@
 // No verbs here yet: a verb appears only once the idea has earned it (P13, Later row).
 
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView, type SFSymbol } from 'expo-symbols'
@@ -16,6 +16,7 @@ import { useUser } from '@clerk/clerk-expo'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
 import { byline, loadIdea, setHeart, type Idea } from '@/lib/idea'
+import { deleteCard } from '@/lib/deleteRecording'
 import { hero, text } from '@/lib/theme'
 
 export default function IdeaPage() {
@@ -26,6 +27,7 @@ export default function IdeaPage() {
   const [idea, setIdea] = useState<Idea | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState<string | null>(null)
+  const [menu, setMenu] = useState(false)
   const player = useAudioPlayer(null)
 
   const load = useCallback(() => {
@@ -62,6 +64,37 @@ export default function IdeaPage() {
     }
   }
 
+  async function copy() {
+    if (!idea) return
+    const words = idea.gist ? `${idea.title}\n\n${idea.gist}` : idea.title
+    try {
+      // Loaded on use: builds made before expo-clipboard was added don't have its native module.
+      const Clipboard = await import('expo-clipboard')
+      await Clipboard.setStringAsync(words)
+    } catch {
+      await Share.share({ message: words })
+    }
+  }
+
+  function trash() {
+    if (!idea) return
+    Alert.alert('Move to trash?', 'The idea and its frame are deleted. The recording stays in Voice notes.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Move to trash',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteCard(supabase, idea.id)
+            router.back()
+          } catch (e) {
+            setError(e instanceof Error ? e.message : 'That didn’t delete')
+          }
+        },
+      },
+    ])
+  }
+
   if (idea === undefined || idea === null) {
     return (
       <View style={[styles.screen, styles.centered]}>
@@ -78,93 +111,144 @@ export default function IdeaPage() {
   const unsure = idea.confidence < LOW_CONFIDENCE
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 32 }}>
-      <View style={styles.visual}>
-        {drawn ? (
-          <Image source={{ uri: idea.frameUrl! }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-        ) : (
-          <View style={styles.typographic}>
-            <Text style={[text.titleScreen, { color: hero.ink }]}>{idea.title}</Text>
-          </View>
-        )}
-        <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: 12, top: 12 }} />
-        <Glass icon="ellipsis" label="More" onPress={() => {}} style={{ right: 12, top: 12 }} />
-      </View>
-
-      <View style={styles.body}>
-        <Text style={styles.heading}>{idea.title}</Text>
-        {!!idea.gist && <Text style={styles.gist}>{idea.gist}</Text>}
-        {unsure && <Text style={[text.caption, styles.secondary, { marginTop: 6 }]}>Ivy isn’t sure about this one.</Text>}
-
-        <View style={styles.actions}>
-          <Pressable onPress={heart} hitSlop={10} accessibilityRole="button" accessibilityLabel={idea.heartedAt ? 'Unheart' : 'Heart'}>
-            <SymbolView name={idea.heartedAt ? 'heart.fill' : 'heart'} tintColor={hero.ink} size={24} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push({ pathname: '/record', params: { correctionOf: idea.id } })}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Correct by voice"
-          >
-            <SymbolView name="mic" tintColor={hero.ink} size={24} />
-          </Pressable>
-          <Pressable
-            onPress={() => Share.share({ message: idea.gist ? `${idea.title}\n\n${idea.gist}` : idea.title })}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel="Share"
-          >
-            <SymbolView name="square.and.arrow.up" tintColor={hero.ink} size={24} />
-          </Pressable>
-
-          <View style={styles.project}>
-            <Text style={styles.projectName} numberOfLines={1}>
-              {idea.project?.name ?? 'My things'}
-            </Text>
-            <View style={styles.projectRule} />
-            <Pressable onPress={() => {}} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save to another project" style={styles.chevron}>
-              <SymbolView name="chevron.down" tintColor="#FFFFFF" size={16} weight="semibold" />
-            </Pressable>
-          </View>
+    <View style={styles.screen}>
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 32 }}>
+        <View style={styles.visual}>
+          {drawn ? (
+            <Image source={{ uri: idea.frameUrl! }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <View style={styles.typographic}>
+              <Text style={[text.titleScreen, { color: hero.ink }]}>{idea.title}</Text>
+            </View>
+          )}
+          <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: 12, top: 12 }} />
+          <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: 12, top: 12 }} />
         </View>
 
-        <Pressable
-          onPress={() => play(idea.id, idea.storagePath, idea.playFromMs)}
-          style={styles.byline}
-          accessibilityRole="button"
-          accessibilityLabel={playing === idea.id ? 'Pause' : 'Play from here'}
-        >
-          <View style={styles.avatar} />
-          <Text style={text.bodySmall}>{byline(user?.firstName ?? null, idea)}</Text>
-          {playing === idea.id && <SymbolView name="speaker.wave.2" tintColor={hero.secondary} size={14} />}
-        </Pressable>
+        <View style={styles.body}>
+          <Text style={styles.heading}>{idea.title}</Text>
+          {!!idea.gist && <Text style={styles.gist}>{idea.gist}</Text>}
+          {unsure && <Text style={[text.caption, styles.secondary, { marginTop: 6 }]}>Ivy isn’t sure about this one.</Text>}
 
-        {idea.siblings.length > 0 && (
-          <>
-            <Text style={styles.more}>More in this thread</Text>
-            <View style={styles.siblings}>
-              {idea.siblings.map((s) => (
-                <Pressable key={s.id} onPress={() => router.push(`/idea/${s.id}`)} style={styles.sibling} accessibilityRole="button" accessibilityLabel={s.title}>
-                  {s.frameStatus === 'done' && s.frameUrl ? (
-                    <Image source={{ uri: s.frameUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  ) : null}
-                  <Text style={[styles.siblingTitle, s.frameUrl && styles.siblingTitleOnImage]} numberOfLines={2}>
-                    {s.title}
-                  </Text>
-                  {s.storagePath && (
-                    <Pressable onPress={() => play(s.id, s.storagePath, s.playFromMs)} hitSlop={8} style={styles.siblingPlay} accessibilityLabel="Play from here">
-                      <SymbolView name={playing === s.id ? 'pause.fill' : 'play.fill'} tintColor={hero.ink} size={13} />
-                    </Pressable>
-                  )}
-                </Pressable>
-              ))}
+          <View style={styles.actions}>
+            <Pressable onPress={heart} hitSlop={10} accessibilityRole="button" accessibilityLabel={idea.heartedAt ? 'Unheart' : 'Heart'}>
+              <SymbolView name={idea.heartedAt ? 'heart.fill' : 'heart'} tintColor={hero.ink} size={24} />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push({ pathname: '/record', params: { correctionOf: idea.id } })}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Correct by voice"
+            >
+              <SymbolView name="mic" tintColor={hero.ink} size={24} />
+            </Pressable>
+            <Pressable
+              onPress={() => Share.share({ message: idea.gist ? `${idea.title}\n\n${idea.gist}` : idea.title })}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Share"
+            >
+              <SymbolView name="square.and.arrow.up" tintColor={hero.ink} size={24} />
+            </Pressable>
+
+            <View style={styles.project}>
+              <Text style={styles.projectName} numberOfLines={1}>
+                {idea.project?.name ?? 'My things'}
+              </Text>
+              <View style={styles.projectRule} />
+              <Pressable onPress={() => {}} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save to another project" style={styles.chevron}>
+                <SymbolView name="chevron.down" tintColor="#FFFFFF" size={16} weight="semibold" />
+              </Pressable>
             </View>
-          </>
-        )}
-      </View>
-    </ScrollView>
+          </View>
+
+          <Pressable
+            onPress={() => play(idea.id, idea.storagePath, idea.playFromMs)}
+            style={styles.byline}
+            accessibilityRole="button"
+            accessibilityLabel={playing === idea.id ? 'Pause' : 'Play from here'}
+          >
+            <View style={styles.avatar} />
+            <Text style={text.bodySmall}>{byline(user?.firstName ?? null, idea)}</Text>
+            {playing === idea.id && <SymbolView name="speaker.wave.2" tintColor={hero.secondary} size={14} />}
+          </Pressable>
+
+          {idea.siblings.length > 0 && (
+            <>
+              <Text style={styles.more}>More in this thread</Text>
+              <View style={styles.siblings}>
+                {idea.siblings.map((s) => (
+                  <Pressable key={s.id} onPress={() => router.push(`/idea/${s.id}`)} style={styles.sibling} accessibilityRole="button" accessibilityLabel={s.title}>
+                    {s.frameStatus === 'done' && s.frameUrl ? (
+                      <Image source={{ uri: s.frameUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                    ) : null}
+                    <Text style={[styles.siblingTitle, s.frameUrl && styles.siblingTitleOnImage]} numberOfLines={2}>
+                      {s.title}
+                    </Text>
+                    {s.storagePath && (
+                      <Pressable onPress={() => play(s.id, s.storagePath, s.playFromMs)} hitSlop={8} style={styles.siblingPlay} accessibilityLabel="Play from here">
+                        <SymbolView name={playing === s.id ? 'pause.fill' : 'play.fill'} tintColor={hero.ink} size={13} />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
+      {menu && (
+        <Menu
+          top={insets.top + 10}
+          onClose={() => setMenu(false)}
+          items={[
+            { icon: 'pencil', label: 'Edit idea', onPress: () => router.push(`/idea/edit/${idea.id}`) },
+            { icon: 'text.alignleft', label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) },
+            { icon: 'square.on.square', label: 'Copy', onPress: copy },
+            { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
+          ]}
+        />
+      )}
+    </View>
   )
 }
+
+/** The ••• menu (P6): a 240-pt card at the top right over a light scrim. */
+function Menu({
+  top,
+  items,
+  onClose,
+}: {
+  top: number
+  items: { icon: SFSymbol; label: string; onPress: () => void; destructive?: boolean }[]
+  onClose: () => void
+}) {
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Pressable style={[StyleSheet.absoluteFill, styles.menuScrim]} onPress={onClose} accessibilityLabel="Close menu" />
+      <View style={[styles.menu, { top }]}>
+        {items.map((it) => (
+          <View key={it.label}>
+            {it.destructive && <View style={styles.menuRule} />}
+            <Pressable
+              onPress={() => {
+                onClose()
+                it.onPress()
+              }}
+              style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.5 }]}
+              accessibilityRole="menuitem"
+            >
+              <SymbolView name={it.icon} tintColor={it.destructive ? DESTRUCTIVE : hero.ink} size={20} />
+              <Text style={[styles.menuLabel, it.destructive && { color: DESTRUCTIVE }]}>{it.label}</Text>
+            </Pressable>
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+const DESTRUCTIVE = '#E54033'
 
 function Glass({ icon, label, onPress, style }: { icon: SFSymbol; label: string; onPress: () => void; style: object }) {
   return (
@@ -215,6 +299,22 @@ const styles = StyleSheet.create({
   sibling: { width: 170, height: 150, borderRadius: 16, overflow: 'hidden', backgroundColor: hero.fill, justifyContent: 'flex-end', padding: 14 },
   siblingTitle: { fontSize: 13, fontWeight: '600', color: hero.ink },
   siblingTitleOnImage: { color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 6 },
+  menuScrim: { backgroundColor: 'rgba(250,250,247,0.55)' },
+  menu: {
+    position: 'absolute',
+    right: 20,
+    width: 240,
+    borderRadius: 24,
+    backgroundColor: hero.room,
+    paddingVertical: 10,
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 48, paddingHorizontal: 22 },
+  menuLabel: { fontSize: 17, color: hero.ink },
+  menuRule: { height: StyleSheet.hairlineWidth, backgroundColor: '#E6E6E6', marginHorizontal: 20, marginVertical: 8 },
   siblingPlay: {
     position: 'absolute',
     right: 10,

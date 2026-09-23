@@ -65,3 +65,26 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
   if (error) throw new Error(`recording: ${error.message}`)
   if (count === 0) throw new Error('recording: not deleted')
 }
+
+/**
+ * Move one idea to the trash (P6): the card, its own frame, and an import's original. The recording stays — it
+ * may hold other ideas, and it's still in Voice notes. The row goes last, as above.
+ */
+export async function deleteCard(supabase: SupabaseClient, cardId: string) {
+  const card = need(
+    'card',
+    await supabase.from('cards').select('frame_url, media_path').eq('id', cardId).maybeSingle()
+  ) as { frame_url: string | null; media_path: string | null } | null
+  if (!card) return
+  const frame = framePath(card.frame_url)
+  if (frame) {
+    const r = await supabase.storage.from('frames').remove([frame])
+    if (r.error) throw new Error(`frame: ${r.error.message}`)
+  }
+  if (card.media_path) {
+    const r = await supabase.storage.from('imports').remove([card.media_path])
+    if (r.error) throw new Error(`import: ${r.error.message}`)
+  }
+  const { error } = await supabase.from('cards').delete().eq('id', cardId)
+  if (error) throw new Error(`card: ${error.message}`)
+}

@@ -14,6 +14,7 @@ import { SymbolView } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
+import { requestProcessing } from '@/lib/record'
 import {
   groupByDay,
   ivyOnOpen,
@@ -35,7 +36,8 @@ const FRAME_WAIT_MS = 5 * 60 * 1000 // keep polling for a frame this long after 
 
 export default function Home() {
   const supabase = useSupabase()
-  const { userId } = useAuth()
+  const { userId, getToken } = useAuth()
+  const asked = useRef(new Set<string>())
   const insets = useSafeAreaInsets()
   const [data, setData] = useState<HomeData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +70,16 @@ export default function Home() {
     setIvy(data.items.some((i) => i.kind === 'card') ? ivyOnOpen(data) : [])
     markOpened(supabase, userId)
   }, [data, ivy, supabase, userId])
+
+  // A recording whose process request never arrived (server down, no signal): ask again, once per open.
+  useEffect(() => {
+    const again = (data?.stuck ?? []).filter((id) => !asked.current.has(id))
+    if (!again.length) return
+    again.forEach((id) => asked.current.add(id))
+    getToken().then((token) => {
+      if (token) again.forEach((id) => requestProcessing(id, token).catch(() => asked.current.delete(id)))
+    })
+  }, [data, getToken])
 
   const waiting = useMemo(() => {
     if (!data) return false

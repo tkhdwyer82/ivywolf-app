@@ -52,6 +52,8 @@ export interface HomeData {
   threads: Thread[]
   /** Recordings Ivy is still working on — Home keeps polling while there are any. */
   inFlight: number
+  /** Queued > 30 s and never claimed: the process request didn't arrive. Home asks again. */
+  stuck: string[]
   lastOpenedAt: string | null
 }
 
@@ -61,6 +63,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 }
 
 const LIMIT = 300
+const STUCK_MS = 30_000
 
 export async function loadHome(supabase: SupabaseClient, userId: string): Promise<HomeData> {
   const [projects, cards, actions, threads, inFlight, creator] = await Promise.all([
@@ -76,7 +79,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
       .order('created_at', { ascending: false })
       .limit(LIMIT),
     supabase.from('threads').select('id, title, return_count, thread_cards(card_id)'),
-    supabase.from('recordings').select('id', { count: 'exact', head: true }).in('status', ['queued', 'processing']),
+    supabase.from('recordings').select('id, status, received_at').in('status', ['queued', 'processing']),
     supabase.from('creators').select('last_opened_at').eq('id', userId).maybeSingle(),
   ])
 
@@ -136,7 +139,10 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
     projects: need('projects', projects) as Project[],
     items,
     threads: threadRows.map((t) => ({ id: t.id, title: t.title, returnCount: t.return_count, cardIds: t.thread_cards.map((tc) => tc.card_id) })),
-    inFlight: inFlight.count ?? 0,
+    inFlight: (need('recordings', inFlight) ?? []).length,
+    stuck: ((need('recordings', inFlight) ?? []) as { id: string; status: string; received_at: string }[])
+      .filter((r) => r.status === 'queued' && Date.now() - new Date(r.received_at).getTime() > STUCK_MS)
+      .map((r) => r.id),
     lastOpenedAt: (need('creator', creator) as { last_opened_at: string | null } | null)?.last_opened_at ?? null,
   }
 }
