@@ -9,6 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "au.com.ivywolf.app",
+      "appleTeamId": "PPC35J44SP",
       "buildNumber": "1",
       "supportsTablet": false,
       "config": {
