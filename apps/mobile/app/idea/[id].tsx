@@ -156,7 +156,10 @@ export default function IdeaPage() {
                 {idea.project?.name ?? 'My things'}
               </Text>
               <View style={styles.projectRule} />
-              <Pressable onPress={() => {}} hitSlop={8} accessibilityRole="button" accessibilityLabel="Save to another project" style={styles.chevron}>
+              <Pressable
+                onPress={() => router.push({ pathname: '/idea/save/[id]', params: { id: idea.id, projectId: idea.project?.id } })}
+                hitSlop={8}
+                accessibilityRole="button" accessibilityLabel="Save to another project" style={styles.chevron}>
                 <SymbolView name="chevron.down" tintColor="#FFFFFF" size={16} weight="semibold" />
               </Pressable>
             </View>
