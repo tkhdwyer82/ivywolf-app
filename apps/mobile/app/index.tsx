@@ -6,7 +6,7 @@
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -16,6 +16,8 @@ import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { requestProcessing } from '@/lib/record'
 import {
+  retryRecording,
+  type FailedRecording,
   groupByDay,
   ivyOnOpen,
   loadHome,
@@ -30,6 +32,8 @@ import { hero, text } from '@/lib/theme'
 import { IvyNote } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
 import { FloatingTrio, ProjectChips } from '@/components/HomeChrome'
+import { FailedRecordings } from '@/components/FailedRecordings'
+import { deleteRecording } from '@/lib/deleteRecording'
 
 const POLL_MS = 4000
 const FRAME_WAIT_MS = 5 * 60 * 1000 // keep polling for a frame this long after a card lands
@@ -131,6 +135,26 @@ export default function Home() {
     }
   }
 
+  async function retry(r: FailedRecording) {
+    const token = await getToken()
+    if (!token) return
+    try {
+      await retryRecording(supabase, r.id, token)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That didn’t retry')
+    }
+    await load()
+  }
+  async function remove(r: FailedRecording) {
+    try {
+      await deleteRecording(supabase, r)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That didn’t delete')
+    }
+    await load()
+  }
+  const failed = data ? <FailedRecordings items={data.failed} onRetry={retry} onDelete={remove} /> : null
+
   if (!data) {
     return (
       <View style={[styles.screen, styles.centered]}>
@@ -141,7 +165,7 @@ export default function Home() {
 
   // Cold start: no card yet → only the record prompt.
   if (!data.items.some((i) => i.kind === 'card')) {
-    return <RecordPrompt listening={data.inFlight > 0} />
+    return <RecordPrompt listening={data.inFlight > 0} failed={failed} />
   }
 
   return (
@@ -172,6 +196,7 @@ export default function Home() {
         <ProjectChips projects={chips} selected={project} onSelect={setProject} onCreate={createProject} />
 
         {error && <Text style={[text.bodySmall, styles.error]}>{error}</Text>}
+        {failed}
 
         <View style={styles.grid}>
           {groups.map((g) => {
@@ -216,9 +241,10 @@ export default function Home() {
 }
 
 /** Before the first card: one thing on screen, the mic. */
-function RecordPrompt({ listening }: { listening: boolean }) {
+function RecordPrompt({ listening, failed }: { listening: boolean; failed: ReactNode }) {
   return (
     <View style={[styles.screen, styles.centered]}>
+      <View style={styles.promptFailed}>{failed}</View>
       <Text style={[text.titleSection, styles.promptTitle]}>{listening ? 'Ivy is listening to it' : 'Tell Ivy an idea'}</Text>
       <Text style={[text.bodySmall, styles.secondary, styles.promptLine]}>
         {listening ? 'Your first card will be here in a moment.' : 'Say it the way you’d say it to a friend.'}
@@ -256,6 +282,7 @@ const styles = StyleSheet.create({
   dividerLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.6, color: hero.secondary },
   dividerRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#E6E6E6' },
   promptTitle: { textAlign: 'center' },
+  promptFailed: { position: 'absolute', top: 60, left: 0, right: 0 },
   promptLine: { marginTop: 10, width: 300 },
   promptButton: { marginTop: 48, width: 84, height: 84, borderRadius: 42, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center' },
 })

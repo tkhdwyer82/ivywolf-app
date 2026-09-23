@@ -5,6 +5,7 @@
 // Pure functions below the loader so the grouping and wording can be tested without a device.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { requestProcessing } from './record'
 
 export interface Project {
   id: string
@@ -46,6 +47,13 @@ export interface Thread {
   cardIds: string[]
 }
 
+export interface FailedRecording {
+  id: string
+  storage_path: string
+  received_at: string
+  duration_ms: number | null
+}
+
 export interface HomeData {
   projects: Project[]
   items: Item[]
@@ -54,6 +62,8 @@ export interface HomeData {
   inFlight: number
   /** Queued > 30 s and never claimed: the process request didn't arrive. Home asks again. */
   stuck: string[]
+  /** Recordings Ivy couldn't process (errors, or swept after timing out — 0020): retry or delete, never a spinner. */
+  failed: FailedRecording[]
   lastOpenedAt: string | null
 }
 
@@ -82,6 +92,15 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
     supabase.from('recordings').select('id, status, received_at').in('status', ['queued', 'processing']),
     supabase.from('creators').select('last_opened_at').eq('id', userId).maybeSingle(),
   ])
+  const failed = need(
+    'failed',
+    await supabase
+      .from('recordings')
+      .select('id, storage_path, received_at, duration_ms')
+      .eq('status', 'failed')
+      .order('received_at', { ascending: false })
+      .limit(20)
+  ) as FailedRecording[]
 
   const threadRows = need('threads', threads) as unknown as {
     id: string
@@ -143,6 +162,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
     stuck: ((need('recordings', inFlight) ?? []) as { id: string; status: string; received_at: string }[])
       .filter((r) => r.status === 'queued' && Date.now() - new Date(r.received_at).getTime() > STUCK_MS)
       .map((r) => r.id),
+    failed,
     lastOpenedAt: (need('creator', creator) as { last_opened_at: string | null } | null)?.last_opened_at ?? null,
   }
 }
@@ -292,4 +312,12 @@ export function metaLine(item: Item, projects: Project[]): string {
   const time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
   const where = project && project.kind === 'user' ? project.name : item.threadSize > 1 ? `${item.threadSize} cards` : null
   return [time, where].filter(Boolean).join(' · ')
+}
+
+/** Retry a failed recording: clear the failed run's partial writes and queue it (0020), then ask for processing. */
+export async function retryRecording(supabase: SupabaseClient, recordingId: string, token: string) {
+  const { data, error } = await supabase.rpc('retry_recording', { p_recording_id: recordingId })
+  if (error) throw new Error(`retry: ${error.message}`)
+  if (!data) throw new Error('That recording can’t be retried.')
+  await requestProcessing(recordingId, token)
 }

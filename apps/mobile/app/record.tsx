@@ -31,10 +31,19 @@ import { LiveWaveform } from '@/components/LiveWaveform'
 // Metering drives the live waveform; polling at 100 ms keeps it in step with the voice.
 const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true }
 
+// An accidental tap isn't uploaded at all: under MIN_TAKE_MS, or never louder than SILENT_DB (speech on a phone mic
+// peaks around −30 to −15 dBFS; a silent room sits below −50), the take is dropped on the phone with "Nothing to
+// save". Imports are kept whatever — the picture is the idea. The server's junk gate (< 3 s, no speech) still
+// catches anything that gets through.
+const MIN_TAKE_MS = 2000
+const SILENT_DB = -50
+const NOTHING_CLOSE_MS = 1200
+
 type Phase =
   | { kind: 'starting' }
   | { kind: 'recording' }
   | { kind: 'saving' }
+  | { kind: 'nothing' }
   | { kind: 'no_mic' }
   | { kind: 'failed'; message: string }
 
@@ -54,6 +63,12 @@ export default function Record() {
   const { userId, getToken } = useAuth()
   const [phase, setPhase] = useState<Phase>({ kind: 'starting' })
   const startedAt = useRef<Date | null>(null)
+  const peakDb = useRef(-Infinity)
+  useEffect(() => {
+    if (phase.kind === 'recording' && typeof state.metering === 'number') {
+      peakDb.current = Math.max(peakDb.current, state.metering)
+    }
+  }, [phase.kind, state.metering])
 
   useEffect(() => {
     ;(async () => {
@@ -78,6 +93,12 @@ export default function Record() {
   async function stop() {
     if (phase.kind !== 'recording') return close()
     const durationMs = state.durationMillis
+    if (!imported && (durationMs < MIN_TAKE_MS || peakDb.current < SILENT_DB)) {
+      await recorder.stop()
+      setPhase({ kind: 'nothing' })
+      setTimeout(close, NOTHING_CLOSE_MS)
+      return
+    }
     setPhase({ kind: 'saving' })
     await recorder.stop()
     const uri = recorder.uri
@@ -106,13 +127,15 @@ export default function Record() {
 
   const title =
     phase.kind === 'saving' ? 'Saving…'
+    : phase.kind === 'nothing' ? 'Nothing to save'
     : phase.kind === 'no_mic' ? 'Ivy can’t hear you'
     : phase.kind === 'failed' ? 'That didn’t save'
     : imported ? 'What’s it for?'
     : correctionOf ? 'What should change?'
     : 'Ivy is listening'
   const line =
-    phase.kind === 'no_mic' ? 'Allow the microphone in Settings to record ideas.'
+    phase.kind === 'nothing' ? 'Ivy didn’t hear anything, so nothing was kept.'
+    : phase.kind === 'no_mic' ? 'Allow the microphone in Settings to record ideas.'
     : phase.kind === 'failed' ? phase.message
     : correctionOf ? 'Say what’s wrong or what to add. Ivy keeps it with this idea.'
     : imported ? `One line is plenty — or just tap stop and the ${imported.kind} is saved as it is.`
@@ -138,7 +161,7 @@ export default function Record() {
       <View style={styles.bottom}>
         <Pressable
           onPress={stop}
-          disabled={phase.kind === 'saving' || phase.kind === 'starting'}
+          disabled={phase.kind === 'saving' || phase.kind === 'starting' || phase.kind === 'nothing'}
           accessibilityRole="button"
           accessibilityLabel={phase.kind === 'recording' ? 'Stop recording' : 'Close'}
           style={({ pressed }) => [styles.stop, pressed && { transform: [{ scale: 0.96 }] }]}
