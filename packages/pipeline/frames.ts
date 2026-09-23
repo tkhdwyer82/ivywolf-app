@@ -162,7 +162,7 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise
       hit &&
       (await supabase.from('actions').select('id', { count: 'exact', head: true }).eq('frame_url', hit.frame_url)).count
     if (hit && live) {
-      await setStatus({ frame_url: hit.frame_url, frame_status: 'done' })
+      await setStatus({ frame_url: hit.frame_url, frame_status: 'done', frame_at: new Date().toISOString() })
       await log({ status: 'done', cached: true, frame_url: hit.frame_url, width: hit.width, height: hit.height })
       console.log(`[frames] action ${s.id}: cached, $0`)
       return
@@ -178,7 +178,7 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise
         ? `${creatorId}/${s.id}.jpg`
         : `${creatorId}/actions/${pack.id}-${hash.slice(0, 32)}-${Date.now()}.jpg` // never reused: see deleteRecording
     const frameUrl = await fetchAndUpload({ bucket: 'frames', sourceUrl: image.url, path, contentType: 'image/jpeg' })
-    await setStatus({ frame_url: frameUrl, frame_status: 'done' })
+    await setStatus({ frame_url: frameUrl, frame_status: 'done', frame_at: new Date().toISOString() })
     await log({ status: 'done', frame_url: frameUrl, width: image.width, height: image.height, cost_usd: image.costUsd })
     console.log(`[frames] ${s.kind} ${s.id}: ${image.width}×${image.height}, $${image.costUsd.toFixed(4)}`)
   } catch (err) {

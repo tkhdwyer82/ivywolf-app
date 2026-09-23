@@ -1,5 +1,5 @@
-// apps/mobile/app/(tabs)/notes.tsx
-// Profile = Voice notes: every recording, grouped by the day it was recorded, newest first.
+// apps/mobile/app/notes.tsx
+// Voice notes (the profile avatar on Home): every recording, grouped by the day it was recorded, newest first.
 // While any recording is queued or processing, the list re-polls so "Ivy is listening…" resolves on its own.
 // Long-press a note to delete it and everything Ivy derived from it.
 

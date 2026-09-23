@@ -101,7 +101,7 @@ export default function Record() {
   const line =
     phase.kind === 'no_mic' ? 'Allow the microphone in Settings to record ideas.'
     : phase.kind === 'failed' ? phase.message
-    : 'Say it the way you’d say it to a friend. Errands go to Life on their own.'
+    : 'Say it the way you’d say it to a friend. Errands go to My things on their own.'
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>

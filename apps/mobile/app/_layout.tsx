@@ -1,11 +1,12 @@
 // apps/mobile/app/_layout.tsx
-// Clerk wraps everything; signed-out users only ever see /sign-in.
+// Clerk wraps everything; signed-out users only ever see /sign-in. Signed in: Home (/) and the screens it opens —
+// no tab bar; Home's floating trio is the navigation (Home · ⊕ · Explore).
 
 import { ClerkProvider, useAuth } from '@clerk/clerk-expo'
 import { tokenCache } from '@clerk/clerk-expo/token-cache'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { color } from '@/lib/theme'
+import { color, hero } from '@/lib/theme'
 
 const PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!
 
@@ -16,7 +17,12 @@ function Routes() {
   return (
     <Stack screenOptions={{ contentStyle: { backgroundColor: color.paper }, headerShadowVisible: false }}>
       <Stack.Protected guard={isSignedIn}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="index" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen name="explore" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen
+          name="notes"
+          options={{ title: 'Voice notes', headerBackTitle: 'Home', headerStyle: { backgroundColor: color.paper } }}
+        />
         <Stack.Screen name="record" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen
           name="life"
