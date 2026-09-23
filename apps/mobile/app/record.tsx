@@ -6,6 +6,7 @@
 //
 // ?projectId=… (from "Talk to this project"): the recording carries the project, and the pipeline scopes the
 // classifier's recent threads and the card's placement to it (0016).
+// ?correctionOf=<card id> (the Idea page's mic): a voice correction, kept with the card (pipeline stub for now).
 // ?importKind=image|video&original=…&poster=… (from Add to ideas): Ivy asks what it's for; the line rides with the
 // import and the pipeline makes the card (packages/pipeline/imports.ts).
 
@@ -38,8 +39,9 @@ type Phase =
   | { kind: 'failed'; message: string }
 
 export default function Record() {
-  const { projectId, importKind, original, poster } = useLocalSearchParams<{
+  const { projectId, importKind, original, poster, correctionOf } = useLocalSearchParams<{
     projectId?: string
+    correctionOf?: string
     importKind?: 'image' | 'video'
     original?: string
     poster?: string
@@ -94,7 +96,7 @@ export default function Record() {
         durationMs,
         recordedAt: startedAt.current ?? new Date(),
         projectId: projectId ?? null,
-        meta: imported ? { import: imported } : undefined,
+        meta: imported ? { import: imported } : correctionOf ? { correction_of: correctionOf } : undefined,
       })
       close()
     } catch (e) {
@@ -107,10 +109,12 @@ export default function Record() {
     : phase.kind === 'no_mic' ? 'Ivy can’t hear you'
     : phase.kind === 'failed' ? 'That didn’t save'
     : imported ? 'What’s it for?'
+    : correctionOf ? 'What should change?'
     : 'Ivy is listening'
   const line =
     phase.kind === 'no_mic' ? 'Allow the microphone in Settings to record ideas.'
     : phase.kind === 'failed' ? phase.message
+    : correctionOf ? 'Say what’s wrong or what to add. Ivy keeps it with this idea.'
     : imported ? `One line is plenty — or just tap stop and the ${imported.kind} is saved as it is.`
     : 'Say it the way you’d say it to a friend. Errands go to My things on their own.'
 

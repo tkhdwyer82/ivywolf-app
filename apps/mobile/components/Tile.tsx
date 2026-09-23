@@ -17,11 +17,14 @@ export function Tile({
   meta,
   playing,
   onPlay,
+  onOpen,
 }: {
   item: Item
   meta: string
   playing: boolean
   onPlay: (item: Item) => void
+  /** Opens the idea (P9). To-dos open P17 once it exists. */
+  onOpen?: (item: Item) => void
 }) {
   const title = item.kind === 'card' ? item.title : item.text
   const unsure = item.kind === 'card' && item.confidence < LOW_CONFIDENCE
@@ -29,7 +32,12 @@ export function Tile({
   const drawn = item.frameStatus === 'done' && !!item.frameUrl
 
   return (
-    <View style={[styles.tile, unsure && styles.unsure]}>
+    <Pressable
+      onPress={onOpen ? () => onOpen(item) : undefined}
+      disabled={!onOpen}
+      accessibilityRole={onOpen ? 'button' : undefined}
+      style={[styles.tile, unsure && styles.unsure]}
+    >
       <View style={[styles.frame, { height }]}>
         {drawn ? (
           <Image source={{ uri: item.frameUrl! }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
@@ -63,7 +71,7 @@ export function Tile({
       <Text style={styles.meta} numberOfLines={1}>
         {unsure ? 'Ivy isn’t sure' : meta}
       </Text>
-    </View>
+    </Pressable>
   )
 }
 

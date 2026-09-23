@@ -2,7 +2,7 @@
 // Recording in → graph out. transcribe → junk gates → classify → write → status.
 // Callers claim the recording first (claimRecording) so it is processed at most once.
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { ClassifyOutput, RecordingSource } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
@@ -47,6 +47,17 @@ export async function analyse(args: {
   return { junk: null, transcript, out }
 }
 
+/** meta.correction_of, if it's one of the creator's own cards. */
+async function ownCard(supabase: SupabaseClient, creatorId: string, id: unknown): Promise<string | null> {
+  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return null
+  const { data } = await supabase.from('cards').select('id').eq('id', id).eq('creator_id', creatorId).maybeSingle()
+  return data?.id ?? null
+}
+
+const EMPTY_OUTPUT: ClassifyOutput = {
+  trigger: 'none', title: 'Correction', segments: [], cards: [], actions: [], entities: [], loose_ends: [], requests: [], style_signals: [],
+}
+
 /** Full pipeline for one recordings row the caller has already claimed (status 'processing'). */
 export async function processRecording(recordingId: string): Promise<ProcessResult> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -62,6 +73,20 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   const creator = await loadCreatorContext(rec.creator_id, rec.project_id)
   const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
   const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
+  // Voice correction (P9's mic) — a stub for now: the note is kept, transcribed and tagged to its card, but nothing
+  // in the graph changes and no cards are made from it. Applying corrections comes later.
+  const correctionOf = await ownCard(supabase, rec.creator_id, (rec.meta as { correction_of?: unknown } | null)?.correction_of)
+  if (correctionOf) {
+    const transcript = await transcribe(audioUrl)
+    await supabase
+      .from('recordings')
+      .update({ transcript: transcript.utterances, duration_ms: transcript.duration_ms, title: 'Correction' })
+      .eq('id', rec.id)
+    await markDone(rec.id)
+    console.log(`[pipeline] ${rec.id}: correction note for card ${correctionOf} kept (stub)`)
+    return { junk: null, transcript, out: EMPTY_OUTPUT }
+  }
+
   const imported = parseImport(rec.meta, rec.creator_id)
   const result = await analyse({ audioUrl, source: rec.source, creator, recorded, keepShort: !!imported })
 

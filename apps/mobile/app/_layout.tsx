@@ -18,6 +18,7 @@ function Routes() {
     <Stack screenOptions={{ contentStyle: { backgroundColor: color.paper }, headerShadowVisible: false }}>
       <Stack.Protected guard={isSignedIn}>
         <Stack.Screen name="index" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen name="idea/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="explore" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen
           name="notes"

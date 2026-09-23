@@ -6,6 +6,7 @@
 //
 //   short: an image + "for the restock reel" (< 3 s) → not junk; one import card, frame = the poster
 //   silent: a video poster + 4 s of silence → not junk; a card "A video you added"
+//   correction: a note tagged to the short card (P9's mic) → kept and transcribed, no cards made (stub)
 //   then deleteRecording removes each import's original and poster with it
 
 import { execFileSync } from 'node:child_process'
@@ -109,6 +110,21 @@ async function main() {
   const silent = await run('silent', 'video', 'silence')
   const { data: silentCard } = await db.from('cards').select('title').eq('recording_id', silent.id).single()
   check('silent: card titled for what was added', silentCard?.title === 'A video you added', silentCard?.title)
+
+  const { data: shortCard } = await db.from('cards').select('id').eq('recording_id', short.id).eq('source', 'import').single()
+  const cid = randomUUID()
+  const cpath = `${CREATOR}/${cid}.m4a`
+  await db.storage.from('recordings').upload(cpath, audio('correction', 'say'), { contentType: 'audio/mp4' })
+  await db.from('recordings').insert({ id: cid, creator_id: CREATOR, source: 'phone', storage_path: cpath, meta: { correction_of: shortCard!.id } })
+  if (!(await claimRecording(cid))) throw new Error('claim failed')
+  await processRecording(cid)
+  const { data: corr } = await db.from('recordings').select('status, title, transcript').eq('id', cid).single()
+  const { count: corrCards } = await db.from('cards').select('id', { count: 'exact', head: true }).eq('recording_id', cid)
+  check(
+    'correction: kept, transcribed, no cards',
+    corr?.status === 'done' && corr?.title === 'Correction' && Array.isArray(corr?.transcript) && corr.transcript.length > 0 && corrCards === 0,
+    `${corr?.status} · ${Array.isArray(corr?.transcript) ? corr.transcript.length : 0} utterance(s) · ${corrCards} card(s)`
+  )
 
   for (const r of [short, silent]) {
     await deleteRecording(db, r)
