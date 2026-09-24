@@ -8,7 +8,7 @@
 // stars on tile corners — nothing yet says what they do.
 // Reached from the Idea page's project button and "You keep coming back to this" in My things.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -43,7 +43,6 @@ export default function Project() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
   }, [supabase, id])
   useFocusEffect(load)
-  useEffect(() => () => player.pause(), [player])
 
   async function play(item: Item) {
     if (item.kind !== 'card' || !item.storagePath) return

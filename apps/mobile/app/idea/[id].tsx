@@ -6,7 +6,7 @@
 // The mic is the voice correction: Record, tagged to this card (a stub in the pipeline for now).
 // No verbs here yet: a verb appears only once the idea has earned it (P13, Later row).
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -37,7 +37,6 @@ export default function IdeaPage() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
   }, [supabase, id])
   useFocusEffect(load)
-  useEffect(() => () => player.pause(), [player])
 
   async function play(cardId: string, storagePath: string | null, ms: number) {
     if (!storagePath) return
