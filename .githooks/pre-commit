@@ -1,0 +1,10 @@
+#!/bin/sh
+# Refuse a commit while a temporary fixture or probe is still in what's being committed: the TEMP-FIXTURE /
+# TEMP-PROBE markers, or an `if (1)` short-circuit. Scans every staged file as it will be committed (the index),
+# not the working tree. This hook is the one file allowed to name them.
+hits=$(git grep --cached -nE 'TEMP-FIXTURE|TEMP-PROBE|if \(1\)' -- . ':!.githooks/pre-commit')
+if [ -n "$hits" ]; then
+  echo "pre-commit: temporary fixture or probe still staged — take it out first:" >&2
+  echo "$hits" >&2
+  exit 1
+fi
