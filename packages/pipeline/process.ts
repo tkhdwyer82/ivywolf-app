@@ -47,11 +47,13 @@ export async function analyse(args: {
   return { junk: null, transcript, out }
 }
 
-/** meta.correction_of, if it's one of the creator's own cards. */
-async function ownCard(supabase: SupabaseClient, creatorId: string, id: unknown): Promise<string | null> {
+/** meta.correction_of, if it's one of the creator's own cards (P9's mic) or to-dos (P17's). */
+async function ownTarget(supabase: SupabaseClient, creatorId: string, id: unknown): Promise<{ id: string; kind: 'card' | 'to-do' } | null> {
   if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return null
-  const { data } = await supabase.from('cards').select('id').eq('id', id).eq('creator_id', creatorId).maybeSingle()
-  return data?.id ?? null
+  const card = await supabase.from('cards').select('id').eq('id', id).eq('creator_id', creatorId).maybeSingle()
+  if (card.data) return { id: card.data.id, kind: 'card' }
+  const todo = await supabase.from('actions').select('id').eq('id', id).eq('creator_id', creatorId).maybeSingle()
+  return todo.data ? { id: todo.data.id, kind: 'to-do' } : null
 }
 
 const EMPTY_OUTPUT: ClassifyOutput = {
@@ -73,9 +75,9 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   const creator = await loadCreatorContext(rec.creator_id, rec.project_id)
   const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
   const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
-  // Voice correction (P9's mic) — a stub for now: the note is kept, transcribed and tagged to its card, but nothing
-  // in the graph changes and no cards are made from it. Applying corrections comes later.
-  const correctionOf = await ownCard(supabase, rec.creator_id, (rec.meta as { correction_of?: unknown } | null)?.correction_of)
+  // Voice correction (the mic on P9 or P17) — a stub for now: the note is kept, transcribed and tagged to its card
+  // or to-do, but nothing in the graph changes and nothing is made from it. Applying corrections comes later.
+  const correctionOf = await ownTarget(supabase, rec.creator_id, (rec.meta as { correction_of?: unknown } | null)?.correction_of)
   if (correctionOf) {
     const transcript = await transcribe(audioUrl)
     await supabase
@@ -83,7 +85,7 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
       .update({ transcript: transcript.utterances, duration_ms: transcript.duration_ms, title: 'Correction' })
       .eq('id', rec.id)
     await markDone(rec.id)
-    console.log(`[pipeline] ${rec.id}: correction note for card ${correctionOf} kept (stub)`)
+    console.log(`[pipeline] ${rec.id}: correction note for ${correctionOf.kind} ${correctionOf.id} kept (stub)`)
     return { junk: null, transcript, out: EMPTY_OUTPUT }
   }
 

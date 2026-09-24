@@ -10,7 +10,8 @@ import { router, useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
 import { useSupabase } from '@/lib/supabase'
-import { acceptMerge, doneLabel, dueLabel, keepSeparate, loadThings, setDone, type FromIvy, type Things, type Todo } from '@/lib/things'
+import { acceptMerge, doneLabel, dueLabel, keepSeparate, loadThings, type FromIvy, type Things, type Todo } from '@/lib/things'
+import { setTodoDone } from '@/lib/todo'
 import { FloatingTrio } from '@/components/HomeChrome'
 import { hero, text } from '@/lib/theme'
 
@@ -52,7 +53,7 @@ export default function MyThings() {
     // Show it straight away; the reload brings the real done_at.
     setThings((t) => t && { ...t, todo: t.todo.map((x) => (x.id === todo.id ? { ...x, done, doneAt: done ? new Date().toISOString() : null } : x)) })
     try {
-      await setDone(supabase, todo.id, done)
+      await setTodoDone(supabase, todo.id, done)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That didn’t save')
     }
@@ -71,7 +72,7 @@ export default function MyThings() {
     const todo = undoable
     setUndoable(null)
     try {
-      await setDone(supabase, todo.id, false)
+      await setTodoDone(supabase, todo.id, false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That didn’t undo')
     }
@@ -172,12 +173,12 @@ export default function MyThings() {
                 >
                   {todo.done && <SymbolView name="checkmark" tintColor="#FFFFFF" size={12} weight="bold" />}
                 </Pressable>
-                <View style={styles.todoText}>
+                <Pressable onPress={() => router.push(`/todo/${todo.id}`)} style={styles.todoText} accessibilityRole="button">
                   <Text style={[styles.todoTitle, todo.done && styles.secondary]}>{todo.text}</Text>
                   <Text style={[styles.todoSub, !todo.done && todo.dueDate ? styles.due : styles.secondary]}>
                     {todo.done ? doneLabel(todo.doneAt) : [todo.dueDate && dueLabel(todo.dueDate), todo.scope].filter(Boolean).join(' · ')}
                   </Text>
-                </View>
+                </Pressable>
               </View>
             ))}
           </>

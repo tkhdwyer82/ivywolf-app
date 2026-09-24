@@ -220,7 +220,7 @@ export default function Home() {
                           meta={metaLine(item, data.projects)}
                           playing={playing === item.id}
                           onPlay={play}
-                          onOpen={item.kind === 'card' ? (i) => router.push(`/idea/${i.id}`) : undefined}
+                          onOpen={(i) => router.push(i.kind === 'card' ? `/idea/${i.id}` : `/todo/${i.id}`)}
                         />
                       ))}
                     </View>

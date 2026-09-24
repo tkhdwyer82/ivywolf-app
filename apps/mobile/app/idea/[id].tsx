@@ -10,13 +10,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { SymbolView, type SFSymbol } from 'expo-symbols'
+import { SymbolView } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
 import { useUser } from '@clerk/clerk-expo'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
 import { byline, loadIdea, setHeart, type Idea } from '@/lib/idea'
 import { deleteCard } from '@/lib/deleteRecording'
+import { Glass, Menu } from '@/components/PinChrome'
 import { hero, text } from '@/lib/theme'
 
 export default function IdeaPage() {
@@ -216,51 +217,6 @@ export default function IdeaPage() {
   )
 }
 
-/** The ••• menu (P6): a 240-pt card at the top right over a light scrim. */
-function Menu({
-  top,
-  items,
-  onClose,
-}: {
-  top: number
-  items: { icon: SFSymbol; label: string; onPress: () => void; destructive?: boolean }[]
-  onClose: () => void
-}) {
-  return (
-    <View style={StyleSheet.absoluteFill}>
-      <Pressable style={[StyleSheet.absoluteFill, styles.menuScrim]} onPress={onClose} accessibilityLabel="Close menu" />
-      <View style={[styles.menu, { top }]}>
-        {items.map((it) => (
-          <View key={it.label}>
-            {it.destructive && <View style={styles.menuRule} />}
-            <Pressable
-              onPress={() => {
-                onClose()
-                it.onPress()
-              }}
-              style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.5 }]}
-              accessibilityRole="menuitem"
-            >
-              <SymbolView name={it.icon} tintColor={it.destructive ? DESTRUCTIVE : hero.ink} size={20} />
-              <Text style={[styles.menuLabel, it.destructive && { color: DESTRUCTIVE }]}>{it.label}</Text>
-            </Pressable>
-          </View>
-        ))}
-      </View>
-    </View>
-  )
-}
-
-const DESTRUCTIVE = '#E54033'
-
-function Glass({ icon, label, onPress, style }: { icon: SFSymbol; label: string; onPress: () => void; style: object }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={[styles.glass, style]}>
-      <SymbolView name={icon} tintColor={hero.ink} size={18} weight="semibold" />
-    </Pressable>
-  )
-}
-
 // Figma 83:201 — visual 377 × 470 at 8 pt margins, radius 28; heading Bold 22; gist Regular 14 secondary; project
 // button #333330, 190 × 44, radius 14.
 const styles = StyleSheet.create({
@@ -269,15 +225,6 @@ const styles = StyleSheet.create({
   secondary: { color: hero.secondary },
   visual: { marginHorizontal: 8, height: 470, borderRadius: 28, overflow: 'hidden', backgroundColor: hero.fill },
   typographic: { flex: 1, justifyContent: 'flex-end', padding: 24, borderLeftWidth: 6, borderLeftColor: hero.lime },
-  glass: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.92)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   body: { paddingHorizontal: 20, paddingTop: 16 },
   heading: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: hero.ink },
   gist: { fontSize: 14, lineHeight: 19, color: hero.secondary, marginTop: 6 },
@@ -302,22 +249,6 @@ const styles = StyleSheet.create({
   sibling: { width: 170, height: 150, borderRadius: 16, overflow: 'hidden', backgroundColor: hero.fill, justifyContent: 'flex-end', padding: 14 },
   siblingTitle: { fontSize: 13, fontWeight: '600', color: hero.ink },
   siblingTitleOnImage: { color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 6 },
-  menuScrim: { backgroundColor: 'rgba(250,250,247,0.55)' },
-  menu: {
-    position: 'absolute',
-    right: 20,
-    width: 240,
-    borderRadius: 24,
-    backgroundColor: hero.room,
-    paddingVertical: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 10 },
-  },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 48, paddingHorizontal: 22 },
-  menuLabel: { fontSize: 17, color: hero.ink },
-  menuRule: { height: StyleSheet.hairlineWidth, backgroundColor: '#E6E6E6', marginHorizontal: 20, marginVertical: 8 },
   siblingPlay: {
     position: 'absolute',
     right: 10,

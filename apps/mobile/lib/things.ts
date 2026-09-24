@@ -96,11 +96,6 @@ export async function loadThings(supabase: SupabaseClient): Promise<Things> {
   return { fromIvy, todo }
 }
 
-export async function setDone(supabase: SupabaseClient, id: string, done: boolean) {
-  const { error } = await supabase.from('actions').update({ done }).eq('id', id)
-  if (error) throw new Error(`to-do: ${error.message}`)
-}
-
 /** Her Merge (0021). Returns false if the proposal had already gone. */
 export async function acceptMerge(supabase: SupabaseClient, suggestionId: string): Promise<boolean> {
   const { data, error } = await supabase.rpc('accept_merge', { p_suggestion_id: suggestionId })

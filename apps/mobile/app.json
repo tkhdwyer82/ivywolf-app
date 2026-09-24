@@ -43,7 +43,15 @@
           "microphonePermission": false
         }
       ],
-      "./plugins/withSceneLifecycle"
+      "./plugins/withSceneLifecycle",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Ivy adds ideas with a time, like a shoot, to your calendar when you ask.",
+          "remindersPermission": "Ivy adds to-dos you mention to Reminders when you turn on Add to Reminders."
+        }
+      ],
+      "expo-notifications"
     ]
   }
 }
