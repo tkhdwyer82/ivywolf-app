@@ -1,6 +1,7 @@
 // apps/mobile/app/index.tsx
 // Home (P1). Cards and to-dos in a two-column masonry, newest first, with a divider per local day; project chips
-// filter it; the avatar opens Voice notes; the floating trio is Home · ⊕ · Explore.
+// filter it, except My things, which opens its room (P4); the avatar opens Voice notes; the floating trio is
+// Home · ⊕ · Explore.
 // No blank state (rule 1): before the first card exists the whole screen is one record prompt.
 // Ivy on open: up to three sentences from the graph, written in above the chips, gone after 8 s or on scroll.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
@@ -193,7 +194,7 @@ export default function Home() {
 
         {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} />}
 
-        <ProjectChips projects={chips} selected={project} onSelect={setProject} onCreate={createProject} />
+        <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
 
         {error && <Text style={[text.bodySmall, styles.error]}>{error}</Text>}
         {failed}

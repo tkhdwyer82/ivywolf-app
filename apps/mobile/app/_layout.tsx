@@ -33,10 +33,7 @@ function Routes() {
           options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
         />
         <Stack.Screen name="connections" options={{ title: 'Connect', headerBackTitle: 'Home', contentStyle: { backgroundColor: hero.room } }} />
-        <Stack.Screen
-          name="life"
-          options={{ title: 'Life', presentation: 'modal', headerStyle: { backgroundColor: color.paper } }}
-        />
+        <Stack.Screen name="things" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
       </Stack.Protected>
       <Stack.Protected guard={!isSignedIn}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />

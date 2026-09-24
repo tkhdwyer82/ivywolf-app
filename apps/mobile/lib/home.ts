@@ -67,6 +67,9 @@ export interface HomeData {
   lastOpenedAt: string | null
 }
 
+/** A thread she's come back to this many times is worth a line from Ivy (Ivy on open, My things). */
+export const COMEBACK = 3
+
 function need<T>(label: string, r: { data: T; error: { message: string } | null }): T {
   if (r.error) throw new Error(`${label}: ${r.error.message}`)
   return r.data
@@ -277,7 +280,7 @@ export function ivyOnOpen(data: HomeData, now = new Date()): IvySentence[] {
   const since = data.lastOpenedAt
   const framed = [...cardOf.values()].filter((c) => c.frameStatus === 'done' && c.frameAt && (!since || c.frameAt > since))
 
-  const returning = [...data.threads].filter((t) => t.returnCount >= 3).sort((a, b) => b.returnCount - a.returnCount)[0]
+  const returning = [...data.threads].filter((t) => t.returnCount >= COMEBACK).sort((a, b) => b.returnCount - a.returnCount)[0]
   if (returning) {
     const cards = returning.cardIds.map((id) => cardOf.get(id)).filter((c): c is CardItem => !!c)
     const newFrame = framed.find((c) => returning.cardIds.includes(c.id))
