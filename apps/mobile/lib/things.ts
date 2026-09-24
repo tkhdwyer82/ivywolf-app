@@ -8,7 +8,7 @@ import { COMEBACK } from '@/lib/home'
 
 export type FromIvy =
   | { kind: 'merge'; id: string; a: string; b: string }
-  | { kind: 'comeback'; id: string; cards: number; place: string; openCardId: string | null }
+  | { kind: 'comeback'; id: string; cards: number; place: string; openCardId: string | null; openProjectId: string | null }
 
 export interface Todo {
   id: string
@@ -37,7 +37,7 @@ type ThreadRow = {
   id: string
   title: string
   return_count: number
-  projects: { name: string } | null
+  projects: { id: string; name: string; kind: string } | null
   thread_cards: { cards: { id: string; created_at: string } | null }[]
 }
 type ActionRow = { id: string; text: string; scope: Todo['scope']; due_date: string | null; done: boolean; done_at: string | null; created_at: string }
@@ -52,7 +52,7 @@ export async function loadThings(supabase: SupabaseClient): Promise<Things> {
       .order('created_at', { ascending: false }),
     supabase
       .from('threads')
-      .select('id, title, return_count, projects(name), thread_cards(cards(id, created_at))')
+      .select('id, title, return_count, projects(id, name, kind), thread_cards(cards(id, created_at))')
       .gte('return_count', COMEBACK)
       .order('last_seen', { ascending: false }),
     supabase.from('actions').select('id, text, scope, due_date, done, done_at, created_at').eq('done', false),
@@ -77,6 +77,8 @@ export async function loadThings(supabase: SupabaseClient): Promise<Things> {
         cards: cards.length,
         place: t.projects?.name ?? `“${t.title}”`,
         openCardId: newest?.id ?? null,
+        // Open goes to its project page (P11); a thread still in My things opens its newest idea instead.
+        openProjectId: t.projects && t.projects.kind !== 'things' ? t.projects.id : null,
       }
     }),
   ]

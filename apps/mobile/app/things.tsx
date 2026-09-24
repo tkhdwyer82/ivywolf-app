@@ -151,7 +151,9 @@ export default function MyThings() {
                   title={`${item.cards} ${item.cards === 1 ? 'card' : 'cards'} now in ${item.place}`}
                   sub="You keep coming back to this"
                   button="Open"
-                  onPress={() => item.openCardId && router.push(`/idea/${item.openCardId}`)}
+                  onPress={() =>
+                    item.openProjectId ? router.push(`/project/${item.openProjectId}`) : item.openCardId && router.push(`/idea/${item.openCardId}`)
+                  }
                 />
               )
             )}

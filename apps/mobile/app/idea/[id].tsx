@@ -1,8 +1,8 @@
 // apps/mobile/app/idea/[id].tsx
 // Idea (P9, the pin page). The visual on top — her frame, her imported picture, or the title set in the palette —
 // with back and •••; the summary is the heading (the transcript is behind •••, P6/P7); heart · mic · share; the dark
-// project button (⌄ = save it elsewhere, P10); the byline (who · when · where in the recording, tap to hear it);
-// and More in this thread.
+// project button (its name opens the project, P11 — or My things, P4; ⌄ = save it elsewhere, P10); the byline
+// (who · when · where in the recording, tap to hear it); and More in this thread.
 // The mic is the voice correction: Record, tagged to this card (a stub in the pipeline for now).
 // No verbs here yet: a verb appears only once the idea has earned it (P13, Later row).
 
@@ -153,9 +153,18 @@ export default function IdeaPage() {
             </Pressable>
 
             <View style={styles.project}>
-              <Text style={styles.projectName} numberOfLines={1}>
-                {idea.project?.name ?? 'My things'}
-              </Text>
+              <Pressable
+                onPress={() =>
+                  !idea.project || idea.project.kind === 'things' ? router.push('/things') : router.push(`/project/${idea.project.id}`)
+                }
+                style={styles.projectOpen}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${idea.project?.name ?? 'My things'}`}
+              >
+                <Text style={styles.projectName} numberOfLines={1}>
+                  {idea.project?.name ?? 'My things'}
+                </Text>
+              </Pressable>
               <View style={styles.projectRule} />
               <Pressable
                 onPress={() => router.push({ pathname: '/idea/save/[id]', params: { id: idea.id, projectId: idea.project?.id } })}
@@ -239,7 +248,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  projectName: { flex: 1, paddingLeft: 16, fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  projectOpen: { flex: 1, height: 44, justifyContent: 'center' },
+  projectName: { paddingLeft: 16, fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
   projectRule: { width: StyleSheet.hairlineWidth * 2, height: 44, backgroundColor: 'rgba(255,255,255,0.25)' },
   chevron: { width: 43, height: 44, alignItems: 'center', justifyContent: 'center' },
   byline: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },

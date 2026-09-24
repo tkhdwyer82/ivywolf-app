@@ -234,16 +234,30 @@ export function frameHeight(item: Item): number {
   return 166 + jitter(item.id, 14)
 }
 
-const CAPTION = 60 // title (up to two lines) + meta line + spacing under a tile
+/**
+ * A project page's tiles (P11) carry the title inside the frame, so they run taller and vary more: drawn ideas
+ * 180–260, typographic 140–180.
+ */
+export function projectFrameHeight(item: Item): number {
+  if (item.frameStatus === 'done' && item.frameUrl) return 220 + jitter(item.id, 40)
+  return 160 + jitter(item.id, 20)
+}
 
-/** Two columns, each tile into the shorter one — the Pinterest fill. Order within a day is kept top-down. */
-export function masonry(items: Item[]): [Item[], Item[]] {
-  const cols: [Item[], Item[]] = [[], []]
+const CAPTION = 60 // title (up to two lines) + meta line + spacing under a tile
+/** Home's tiles: the frame, then the caption under it. */
+const homeTileHeight = (item: Item) => frameHeight(item) + CAPTION
+
+/**
+ * Two columns, each tile into the shorter one — the Pinterest fill. Order within a day is kept top-down.
+ * `height` is a tile's full height in the column, caption and gap included (Home's by default).
+ */
+export function masonry<T extends Item>(items: T[], height: (item: T) => number = homeTileHeight): [T[], T[]] {
+  const cols: [T[], T[]] = [[], []]
   const heights = [0, 0]
   for (const item of items) {
     const c = heights[0] <= heights[1] ? 0 : 1
     cols[c].push(item)
-    heights[c] += frameHeight(item) + CAPTION
+    heights[c] += height(item)
   }
   return cols
 }
