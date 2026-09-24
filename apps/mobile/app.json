@@ -51,6 +51,7 @@
           "remindersPermission": "Ivy adds to-dos you mention to Reminders when you turn on Add to Reminders."
         }
       ],
+      "./plugins/withoutPush",
       "expo-notifications",
       "@bacons/apple-targets",
       "./plugins/withRecordShortcut"
