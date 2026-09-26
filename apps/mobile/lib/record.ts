@@ -25,12 +25,15 @@ export async function submitRecording(args: {
   userId: string
   token: string
   fileUri: string
-  durationMs: number
-  recordedAt: Date
+  durationMs: number | null
+  /** When it was said. Null for an import whose file carries no date we trust (DJI test, 0001). */
+  recordedAt: Date | null
   /** "Talk to this project": the pipeline scopes recent threads and card placement to it (0016). */
   projectId?: string | null
   /** Add to ideas: { import: { kind, original_path, poster_path } } — the pipeline makes the card (imports.ts). */
   meta?: Record<string, unknown>
+  /** A DJI import from the Mini tab: its source, a long-recording kind, and the file's own container. */
+  session?: { source: 'dji_import'; extension: string; contentType: string }
 }): Promise<{ recordingId: string }> {
   const { supabase, userId } = args
 
@@ -39,25 +42,26 @@ export async function submitRecording(args: {
   if (creator.error) throw new Error(`creator: ${creator.error.message}`)
 
   const recordingId = randomUUID()
-  const storagePath = `${userId}/${recordingId}.m4a`
+  const storagePath = `${userId}/${recordingId}.${args.session?.extension ?? 'm4a'}`
   const bytes = await new File(args.fileUri).arrayBuffer()
 
   // Raw audio exactly as recorded — never transcoded (CLAUDE.md working agreements).
   const upload = await supabase.storage
     .from('recordings')
-    .upload(storagePath, bytes, { contentType: 'audio/mp4', upsert: false })
+    .upload(storagePath, bytes, { contentType: args.session?.contentType ?? 'audio/mp4', upsert: false })
   if (upload.error) throw new Error(`upload: ${upload.error.message}`)
 
   const row = await supabase.from('recordings').insert({
     id: recordingId,
     creator_id: userId,
-    source: 'phone',
+    source: args.session?.source ?? 'phone',
+    kind: args.session ? 'session' : 'memo',
     storage_path: storagePath,
     duration_ms: args.durationMs,
-    recorded_at: args.recordedAt.toISOString(),
+    recorded_at: args.recordedAt?.toISOString() ?? null,
     // The device's zone, so the pipeline can resolve "for Thursday" against her local day.
     recorded_tz: Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
-    trigger: args.meta?.import ? 'import' : 'button',
+    trigger: args.meta?.import || args.session ? 'import' : 'button',
     project_id: args.projectId ?? null,
     meta: args.meta ?? {},
   })

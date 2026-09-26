@@ -54,7 +54,8 @@
       "./plugins/withoutPush",
       "expo-notifications",
       "@bacons/apple-targets",
-      "./plugins/withRecordShortcut"
+      "./plugins/withRecordShortcut",
+      "expo-image"
     ]
   }
 }

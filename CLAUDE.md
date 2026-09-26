@@ -37,8 +37,10 @@ The object is for thinking. The platform is for what you thought.
 - Entity names are canonicalised against the creator's people list (transcripts drift: Arabella → "Abela").
 - A `request` segment is addressed to Ivy. Life-type requests route to the phone (Reminders); idea-type requests draft a board.
 
-## Nav (Instagram layout)
-Home=Threads · Explore=Rising · +=Record · Reels=Boards · Profile=Voice notes · top-right=Life (inbox).
+## Nav (launch UI, handover v3.2 · Figma 170:2, states 145:5)
+Home · ⊕ · Mini — three squircle tiles (components/Nav.tsx). Tap ⊕ = record; long-press = Talk / Import / Project.
+Search and the avatar (Voice notes) live in Home's header. My things and Ivy Mini are default projects, not tabs.
+Explore, Boards and Life are retired; later rooms and verbs appear only when she has earned them (handover §3).
 
 ## Stack
 Expo (iOS first, web via RN Web later) · Next.js for marketing, admin, MCP server · Supabase (Postgres, storage, RLS) ·

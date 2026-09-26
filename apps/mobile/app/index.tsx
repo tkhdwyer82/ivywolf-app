@@ -1,17 +1,18 @@
 // apps/mobile/app/index.tsx
 // Home (P1). Cards and to-dos in a two-column masonry, newest first, with a divider per local day; project chips
-// filter it, except My things, which opens its room (P4); the avatar opens Voice notes; the floating trio is
-// Home · ⊕ · Explore.
-// No blank state (rule 1): before the first card exists the whole screen is one record prompt.
+// filter it, except My things, which opens its room (P4); the header has search and the avatar (Voice notes); the
+// nav trio is Home · ⊕ · Mini (launch UI 170:5, 145:5).
+// No blank state (rule 1): before the first card exists Home is First open (L1, 170:5) — Ivy's one line, "Say an
+// idea out loud.", and a lime arrow down to the ⊕. No grid, no setup.
 // Ivy on open: up to three sentences from the graph, written in above the chips, gone after 8 s or on scroll.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { SymbolView } from 'expo-symbols'
+import { Image } from 'expo-image'
 import { useAudioPlayer } from 'expo-audio'
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
@@ -32,7 +33,8 @@ import {
 import { hero, text } from '@/lib/theme'
 import { IvyNote } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
-import { FloatingTrio, ProjectChips } from '@/components/HomeChrome'
+import { ProjectChips } from '@/components/HomeChrome'
+import { Nav } from '@/components/Nav'
 import { FailedRecordings } from '@/components/FailedRecordings'
 import { deleteRecording } from '@/lib/deleteRecording'
 
@@ -164,9 +166,9 @@ export default function Home() {
     )
   }
 
-  // Cold start: no card yet → only the record prompt.
+  // Cold start: no card yet → First open (L1).
   if (!data.items.some((i) => i.kind === 'card')) {
-    return <RecordPrompt listening={data.inFlight > 0} failed={failed} />
+    return <FirstOpen writing={data.inFlight > 0} failed={failed} />
   }
 
   return (
@@ -178,19 +180,7 @@ export default function Home() {
         onScrollBeginDrag={() => setDissolve(true)}
         scrollEventThrottle={16}
       >
-        <View style={styles.header}>
-          <Text style={styles.wordmark}>
-            Ivy <Text style={{ color: hero.secondary }}>Wolf</Text>
-          </Text>
-          <View style={styles.headerActions}>
-            <Pressable onPress={() => router.push('/add')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Add to ideas">
-              <SymbolView name="plus" tintColor={hero.ink} size={22} weight="regular" />
-            </Pressable>
-            <Pressable onPress={() => router.push('/notes')} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Voice notes">
-              <SymbolView name="person" tintColor={hero.ink} size={18} />
-            </Pressable>
-          </View>
-        </View>
+        <Header />
 
         {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} />}
 
@@ -232,36 +222,59 @@ export default function Home() {
         </View>
       </ScrollView>
 
-      <FloatingTrio
-        onHome={() => scroll.current?.scrollTo({ y: 0, animated: true })}
-        onRecord={() => router.push('/record')}
-        onExplore={() => router.push('/explore')}
-      />
+      <Nav room="home" listening={data.inFlight > 0} onHome={() => scroll.current?.scrollTo({ y: 0, animated: true })} />
     </View>
   )
 }
 
-/** Before the first card: one thing on screen, the mic. */
-function RecordPrompt({ listening, failed }: { listening: boolean; failed: ReactNode }) {
+/** Wordmark, then search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
+function Header() {
   return (
-    <View style={[styles.screen, styles.centered]}>
-      <View style={styles.promptFailed}>{failed}</View>
-      <Text style={[text.titleSection, styles.promptTitle]}>{listening ? 'Ivy is listening to it' : 'Tell Ivy an idea'}</Text>
-      <Text style={[text.bodySmall, styles.secondary, styles.promptLine]}>
-        {listening ? 'Your first card will be here in a moment.' : 'Say it the way you’d say it to a friend.'}
+    <View style={styles.header}>
+      <Text style={styles.wordmark}>
+        Ivy <Text style={{ color: hero.secondary }}>Wolf</Text>
       </Text>
-      {listening ? (
-        <ActivityIndicator color={hero.ink} style={{ marginTop: 40 }} />
-      ) : (
-        <Pressable
-          onPress={() => router.push('/record')}
-          style={({ pressed }) => [styles.promptButton, pressed && { transform: [{ scale: 0.96 }] }]}
-          accessibilityRole="button"
-          accessibilityLabel="Record"
-        >
-          <SymbolView name="mic" tintColor={hero.ink} size={30} />
+      <View style={styles.headerActions}>
+        <Pressable onPress={() => router.push('/search')} hitSlop={10} accessibilityRole="button" accessibilityLabel="Search">
+          <Image source={require('@/assets/figma/l1-search.svg')} style={styles.search} />
         </Pressable>
-      )}
+        <Pressable onPress={() => router.push('/notes')} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Voice notes">
+          <Image source={require('@/assets/figma/l1-profile.svg')} style={StyleSheet.absoluteFill} />
+          <Image source={require('@/assets/figma/l1-profile-glyph.svg')} style={styles.avatarGlyph} />
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+// Not from the graph (there is none yet), so no cite: the one line Ivy says before the first card.
+const FIRST_LINE: IvySentence[] = [{ text: 'Tap the lime mic and talk. Ideas land here; errands go to My things.', cites: [] }]
+
+/**
+ * First open (L1). Ivy's one line, the instruction, and a lime arrow down to the ⊕ — nothing to set up, no empty
+ * grid. Positions follow the 393 × 852 frame: headline at 330, arrow 660–720 over the nav at 756. Once the first take
+ * is in (writing), the arrow goes and the ⊕ shows its listening halo until the card lands.
+ */
+function FirstOpen({ writing, failed }: { writing: boolean; failed: ReactNode }) {
+  const insets = useSafeAreaInsets()
+  const { height } = useWindowDimensions()
+  return (
+    <View style={styles.screen}>
+      <View style={{ paddingTop: insets.top }}>
+        <Header />
+        <IvyNote sentences={FIRST_LINE} dissolve={false} onGone={() => {}} />
+        {failed}
+      </View>
+      <View style={[styles.firstHero, { top: (height * 330) / 852 }]}>
+        <Text style={styles.firstTitle}>{writing ? 'Ivy is writing it up.' : 'Say an idea out loud.'}</Text>
+        <Text style={styles.firstBody}>
+          {writing
+            ? 'Your first card lands here in a moment, with a frame.'
+            : 'In the car, on a walk, between takes. Ramble — Ivy writes it up, gives it a frame, and files the errands.'}
+        </Text>
+      </View>
+      {!writing && <Image source={require('@/assets/figma/l1-arrow.svg')} style={styles.arrow} accessibilityElementsHidden />}
+      <Nav room="home" listening={writing} />
     </View>
   )
 }
@@ -274,16 +287,20 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: -8 },
   // Figma: SF Pro Bold 34, −1 tracking; "Wolf" in secondary.
   wordmark: { fontSize: 34, fontWeight: '700', letterSpacing: -1, color: hero.ink },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  avatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: hero.ink, alignItems: 'center', justifyContent: 'center' },
+  // Figma 170:128 / 170:103: search 22 at x 297, avatar 34 at x 339.
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  search: { width: 22, height: 22 },
+  avatar: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  avatarGlyph: { width: 18, height: 18 },
   grid: { paddingHorizontal: 20, paddingTop: 16 },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },
   column: { width: 170 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 14 },
   dividerLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.6, color: hero.secondary },
   dividerRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#E6E6E6' },
-  promptTitle: { textAlign: 'center' },
-  promptFailed: { position: 'absolute', top: 60, left: 0, right: 0 },
-  promptLine: { marginTop: 10, width: 300 },
-  promptButton: { marginTop: 48, width: 84, height: 84, borderRadius: 42, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center' },
+  // L1: headline SF Pro Bold 28 at y 330; body Regular 16 secondary, 330 wide, at 374; arrow 28 × 60 at y 660.
+  firstHero: { position: 'absolute', left: 20, right: 20 },
+  firstTitle: { fontSize: 28, fontWeight: '700', color: hero.ink },
+  firstBody: { fontSize: 16, lineHeight: 19, color: hero.secondary, width: 330, marginTop: 10 },
+  arrow: { position: 'absolute', bottom: 132, alignSelf: 'center', width: 28, height: 60 },
 })

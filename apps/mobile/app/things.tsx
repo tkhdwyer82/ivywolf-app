@@ -12,7 +12,7 @@ import { SymbolView } from 'expo-symbols'
 import { useSupabase } from '@/lib/supabase'
 import { acceptMerge, doneLabel, dueLabel, keepSeparate, loadThings, type FromIvy, type Things, type Todo } from '@/lib/things'
 import { setTodoDone } from '@/lib/todo'
-import { FloatingTrio } from '@/components/HomeChrome'
+import { Nav } from '@/components/Nav'
 import { hero, text } from '@/lib/theme'
 
 const UNDO_MS = 5000
@@ -204,7 +204,7 @@ export default function MyThings() {
         </View>
       )}
 
-      <FloatingTrio onHome={() => router.dismissTo('/')} onRecord={() => router.push('/record')} onExplore={() => router.push('/explore')} />
+      <Nav room="home" onHome={() => router.dismissTo('/')} />
     </View>
   )
 }

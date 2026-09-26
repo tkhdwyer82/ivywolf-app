@@ -1,8 +1,7 @@
 // apps/mobile/components/HomeChrome.tsx
-// Home's fixed parts (P1): project chips and the floating trio Home · ⊕ · Explore.
+// Home's project chips (P1). The nav trio is components/Nav.tsx.
 
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { SymbolView } from 'expo-symbols'
 import { hero } from '@/lib/theme'
 import type { Project } from '@/lib/home'
 
@@ -41,39 +40,9 @@ export function ProjectChips({
   )
 }
 
-export function FloatingTrio({ onHome, onRecord, onExplore }: { onHome: () => void; onRecord: () => void; onExplore: () => void }) {
-  return (
-    <View style={styles.trio} pointerEvents="box-none">
-      <Pressable onPress={onHome} style={styles.navButton} accessibilityRole="button" accessibilityLabel="Home">
-        <SymbolView name="house" tintColor={hero.ink} size={22} />
-      </Pressable>
-      <Pressable onPress={onRecord} style={[styles.navButton, styles.record]} accessibilityRole="button" accessibilityLabel="Record">
-        <SymbolView name="mic" tintColor={hero.ink} size={22} />
-      </Pressable>
-      <Pressable onPress={onExplore} style={styles.navButton} accessibilityRole="button" accessibilityLabel="Explore">
-        <SymbolView name="magnifyingglass" tintColor={hero.ink} size={22} />
-      </Pressable>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   chips: { paddingHorizontal: 20, gap: 22, paddingTop: 4 },
   chip: { fontSize: 17, lineHeight: 22, color: hero.ink },
   chipOn: { fontWeight: '600' },
   rule: { width: 22, height: 2.5, backgroundColor: hero.ink, marginTop: 4 },
-  trio: { position: 'absolute', left: 0, right: 0, bottom: 40, flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  navButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: hero.room,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  record: { backgroundColor: hero.lime },
 })
