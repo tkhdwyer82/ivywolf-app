@@ -1,0 +1,12 @@
+# Only apps/web and the workspace packages it builds from go to Vercel (project ivywolf-api, root apps/web).
+node_modules
+**/node_modules
+**/.next
+apps/mobile
+docs
+scripts
+supabase
+.env
+.env.local
+**/.env
+**/.env.local

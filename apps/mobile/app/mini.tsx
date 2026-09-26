@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
+import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useAuth } from '@clerk/clerk-expo'
@@ -51,11 +52,7 @@ export default function Mini() {
     <View style={styles.screen}>
       <StatusBar style="light" />
       <Image source={require('@/assets/figma/l7-mini-showroom.png')} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
-      <View style={styles.fade} pointerEvents="none">
-        {FADE.map((a, i) => (
-          <View key={i} style={{ flex: 1, backgroundColor: `rgba(0,0,0,${a})` }} />
-        ))}
-      </View>
+      <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.fade} pointerEvents="none" />
 
       <View style={styles.top}>
         <Text style={styles.title}>Ivy Mini</Text>
@@ -89,13 +86,11 @@ export default function Mini() {
   )
 }
 
-// Figma 172:3: black 0 → 85 % over the bottom 420 pt, as twelve bands (no gradient dependency).
-const FADE = Array.from({ length: 12 }, (_, i) => ((i + 0.5) / 12) * 0.85)
-
 // Positions follow the 393 × 852 frame, anchored to the bottom: headline at 500, sub at 580, Connect 640–696, the
 // DJI line at 712, nav at 756. Title SF Pro Bold 30 white at 54.
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000' },
+  // Figma 172:3: black 0 → 85 % over the bottom 420 pt.
   fade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 420 },
   top: { position: 'absolute', top: 54, left: 20 },
   title: { fontSize: 30, fontWeight: '700', color: '#FFFFFF' },

@@ -10,7 +10,7 @@
     "build": "npm run build --workspace apps/web",
     "dev": "npm run dev --workspace apps/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "prepare": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "overrides": {
     "react": "19.2.3",
