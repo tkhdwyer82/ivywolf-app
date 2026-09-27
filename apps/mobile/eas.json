@@ -11,7 +11,7 @@
     "production": { "environment": "production", "autoIncrement": true }
   },
   "submit": {
-    "preview": {},
+    "preview": { "ios": { "ascAppId": "6816581424" } },
     "production": {}
   }
 }
