@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Ivy Wolf",
-    "slug": "ivywolf",
+    "slug": "ivy-wolf",
     "scheme": "ivywolf",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -56,6 +56,25 @@
       "@bacons/apple-targets",
       "./plugins/withRecordShortcut",
       "expo-image"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "au.com.ivywolf.app.capture",
+                  "targetName": "IvyCapture"
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "e69a1a41-405d-47a6-8cd4-396d9f495919"
+      }
+    },
+    "owner": "ivy-wolf"
   }
 }
