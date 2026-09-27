@@ -55,7 +55,8 @@
       "expo-notifications",
       "@bacons/apple-targets",
       "./plugins/withRecordShortcut",
-      "expo-image"
+      "expo-image",
+      "expo-video"
     ],
     "extra": {
       "router": {},

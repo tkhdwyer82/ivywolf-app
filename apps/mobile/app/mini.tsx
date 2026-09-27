@@ -3,14 +3,15 @@
 // white CTA — Connect your Mini — and a quiet line that keeps DJI owners in. Sessions, chapters and the quote bank
 // stay behind the device (L8, Job E).
 // Connect is a stub: there's no BLE pairing until the Mini ships, so the button says so for a moment and settles.
-// The showroom is a still from the frame until the footage is shot (handover v3.2 §8).
+// The showroom is the footage: muted, looping, playing only while the tab has focus.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
+import { useVideoPlayer, VideoView } from 'expo-video'
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { importSession } from '@/lib/mini'
@@ -25,6 +26,18 @@ export default function Mini() {
   const supabase = useSupabase()
   const { userId, getToken } = useAuth()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
+  const player = useVideoPlayer(require('@/assets/mini-hero.mp4'), (p) => {
+    p.muted = true
+    p.loop = true
+    p.audioMixingMode = 'mixWithOthers'
+  })
+
+  useFocusEffect(
+    useCallback(() => {
+      player.play()
+      return () => player.pause()
+    }, [player]),
+  )
 
   useEffect(() => {
     if (phase.kind !== 'coming' && phase.kind !== 'failed') return
@@ -51,7 +64,7 @@ export default function Mini() {
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
-      <Image source={require('@/assets/figma/l7-mini-showroom.png')} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} accessibilityIgnoresInvertColors />
       <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.fade} pointerEvents="none" />
 
       <View style={styles.top}>
