@@ -6,9 +6,13 @@
 // A key identifies one creator and nothing else — every handler must scope its queries by the returned id.
 
 import { createHash, randomBytes } from 'crypto'
+import type { AuthInfo } from '@modelcontextprotocol/server'
 import { supabaseAdmin } from '../supabase'
 
 export const API_KEY_PREFIX = 'iv_'
+
+/** Job F §2 rule 4: two scopes. Sessions and chapters are part of ideas:read. */
+export type Scope = 'ideas:read' | 'ideas:capture'
 
 export function hashApiKey(raw: string): string {
   return createHash('sha256').update(raw).digest('hex')
@@ -45,3 +49,16 @@ export async function resolveApiKey(apiKey: string): Promise<{ creatorId: string
 
   return { creatorId: data.creator_id }
 }
+
+/**
+ * The MCP route's verifier (mcp-handler withMcpAuth): bearer key → AuthInfo, or undefined → 401.
+ * The creator id rides in `extra`; tools read it from ctx.http.authInfo and never from the request.
+ */
+export async function verifyBearer(_req: Request, bearer?: string): Promise<AuthInfo | undefined> {
+  if (!bearer?.startsWith(API_KEY_PREFIX)) return undefined
+  const key = await resolveApiKey(bearer)
+  if (!key) return undefined
+  return { token: bearer, clientId: 'api_key', scopes: ['ideas:read'], extra: { creatorId: key.creatorId } }
+}
+
+export const scopesOf = (auth: { scopes: string[] } | undefined): string[] => auth?.scopes ?? []

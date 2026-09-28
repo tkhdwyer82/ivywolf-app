@@ -8,7 +8,8 @@
 //
 //   /            marketing home
 //   /sign-in     Clerk catch-all
-//   /api/mcp     bearer-token auth of its own (lib/mcp/auth.ts) — a Clerk session would be wrong here
+//   /mcp         the Muse connector (Job F): bearer-key auth of its own (lib/mcp/auth.ts) — a Clerk session
+//                would be wrong here
 //   /api/health  liveness probe, must answer before auth
 //
 // The mobile redirect to /mobile-gate is dropped: the creator app is Expo, and this Next app is
@@ -23,7 +24,7 @@ const isApiRoute = createRouteMatcher(['/api/(.*)'])
 const isPublicRoute = createRouteMatcher([
   '/',
   '/sign-in(.*)',
-  '/api/mcp(.*)',
+  '/mcp',
   '/api/health',
 ])
 

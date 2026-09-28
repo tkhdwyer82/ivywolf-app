@@ -12,6 +12,9 @@ import { attachImport, parseImport } from './imports'
 import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification, type NewCard } from './graph'
 
 export { claimRecording, markFailed } from './graph'
+// For the MCP server's search_ideas (apps/web/lib/mcp/handlers.ts): the same embedding and similarity threading uses.
+export { embed } from './embed'
+export { cosine } from './threading'
 
 const MIN_DURATION_MS = 3000
 
