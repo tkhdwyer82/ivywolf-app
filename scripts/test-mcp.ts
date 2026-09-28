@@ -478,14 +478,15 @@ async function main() {
   else await oauthSection()
 
   // ── 60 a minute ───────────────────────────────────────────────────────────────────────────────────────────
-  let limited: Out | null = null
-  for (let i = 0; i < 70 && !limited; i++) {
-    const r = await call(readOnly, 'list_actions', {})
-    if (!r.ok) limited = r
-  }
+  // 70 calls in parallel batches of 10, so they land inside one minute however slow the server is, and the
+  // per-creator lock in start_agent_call is what keeps the count at 60.
+  const burst: Out[] = []
+  for (let b = 0; b < 7; b++) burst.push(...(await Promise.all(Array.from({ length: 10 }, () => call(readOnly, 'list_actions', {})))))
+  const limited = burst.find((r) => !r.ok) ?? null
   const windowCalls = (await db.from('agent_calls').select('id', { count: 'exact', head: true })
     .eq('creator_id', CREATOR).gt('created_at', new Date(Date.now() - 60_000).toISOString()).is('error', null)).count
-  check('rate limit: refused in words at 60 a minute', !!limited && limited.text.startsWith("You've asked Ivy a lot"), `${limited?.text}; ${windowCalls} allowed in the last minute`)
+  check('rate limit: refused in words at 60 a minute, never more let through', !!limited && limited.text.startsWith("You've asked Ivy a lot") &&
+    (windowCalls ?? 99) <= 60, `${limited?.text}; ${windowCalls} allowed in the last minute`)
 
   const logged = must('log', await db.from('agent_calls').select('tool, params, ok, latency_ms, source').eq('creator_id', CREATOR))
   check('agent_calls: every call logged as muse, with latency', logged.every((c) => c.source === 'muse' && (c.ok === false || c.latency_ms !== null)), `${logged.length} rows`)

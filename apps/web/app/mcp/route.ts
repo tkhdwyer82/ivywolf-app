@@ -80,6 +80,20 @@ async function mcp(req: Request): Promise<Response> {
   const replay = () => new Request(req.url, { method: req.method, headers: req.headers, body: req.method === 'POST' ? body : undefined })
   const authInfo = (req as Request & { auth?: AuthInfo }).auth
 
+  // A client that names a 2026 revision in MCP-Protocol-Version but sends no per-request _meta envelope is half-way
+  // between eras; the SDK's modern path answers it -32602. Serve it statelessly on the 2025 leg instead, without the
+  // header, so a session-less tools/list works either way (muse-ready MCP005 probes exactly this). Requests that
+  // do carry the envelope still get the strict 2026 path.
+  const m = parsed as { params?: { _meta?: unknown } } | undefined
+  const halfModern =
+    req.method === 'POST' && /^2026-/.test(req.headers.get('mcp-protocol-version') ?? '') &&
+    !!m && typeof m === 'object' && !Array.isArray(m) && m.params?._meta === undefined
+  if (halfModern) {
+    const stripped = new Request(req.url, { method: 'POST', headers: req.headers, body })
+    stripped.headers.delete('mcp-protocol-version')
+    return legacy(stripped, body, parsed, authInfo)
+  }
+
   if (await isLegacyRequest(replay(), parsed)) return legacy(req, body, parsed, authInfo)
   return modern.fetch(replay(), { authInfo, parsedBody: parsed })
 }
