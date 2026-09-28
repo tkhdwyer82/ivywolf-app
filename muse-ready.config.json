@@ -1,0 +1,22 @@
+{
+  "connector": {
+    "name": "Ivy Wolf",
+    "description": "Lets your assistant read the ideas, threads, to-dos and interview chapters you've captured in Ivy Wolf, and add a new idea. Read-only except for adding ideas; every answer links back into the Ivy app.",
+    "company": "Ivy Wolf",
+    "websiteUrl": "https://www.ivywolf.com.au",
+    "supportEmail": "hello@ivywolf.com.au",
+    "docsUrl": "https://ivywolf-api.vercel.app/connector",
+    "examplePrompts": [
+      "What ideas did I have this week?",
+      "What do I keep coming back to?",
+      "What did Mara say about pricing in Tuesday's interview?",
+      "Add an idea: open the restock video on the box, not my face.",
+      "What's on my list from the drive?"
+    ],
+    "privacyPolicyUrl": "https://www.ivywolf.com.au/privacy",
+    "termsUrl": "https://www.ivywolf.com.au/terms",
+    "auth": "bearer",
+    "serverUrl": "https://ivywolf-api.vercel.app/mcp",
+    "iconUrl": "https://ivywolf-api.vercel.app/icon-512.png"
+  }
+}

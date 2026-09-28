@@ -97,7 +97,7 @@ export function registerTools(server: McpServer) {
         since: when.describe('Only ideas from this date or time on (ISO 8601).'),
         project: z.string().max(120).optional().describe('Only ideas in the project with this name.'),
         status: z.enum(['sparked', 'developing', 'ready', 'shipped']).optional().describe("Only ideas whose thread is at this stage."),
-        limit: z.number().int().min(1).max(50).default(20),
+        limit: z.number().int().min(1).max(50).default(20).describe('How many to return, 1–50. Default 20.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -114,7 +114,7 @@ export function registerTools(server: McpServer) {
         DATA_NOTE,
       inputSchema: z.object({
         query: z.string().trim().min(1).max(300).describe('What to look for, in her words.'),
-        limit: z.number().int().min(1).max(20).default(10),
+        limit: z.number().int().min(1).max(20).default(10).describe('How many to return, 1–20. Default 10.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -129,7 +129,7 @@ export function registerTools(server: McpServer) {
         'One idea by id, with the other ideas in its thread, how many times she has come back to that thread, and the ' +
         'to-dos she said in the same recording. ' +
         DATA_NOTE,
-      inputSchema: z.object({ id: uuid('idea') }),
+      inputSchema: z.object({ id: uuid('idea').describe("The idea's id, from list_ideas, search_ideas or list_threads.") }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     tool('get_idea', 'ideas:read', getIdea)
@@ -145,7 +145,7 @@ export function registerTools(server: McpServer) {
         DATA_NOTE,
       inputSchema: z.object({
         min_returns: z.number().int().min(0).optional().describe('Only threads she has come back to at least this many times.'),
-        limit: z.number().int().min(1).max(50).default(20),
+        limit: z.number().int().min(1).max(50).default(20).describe('How many to return, 1–50. Default 20.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -161,9 +161,9 @@ export function registerTools(server: McpServer) {
         'said. Use for "what\'s on my list from the drive?". ' +
         DATA_NOTE,
       inputSchema: z.object({
-        status: z.enum(['open', 'done']).optional(),
+        status: z.enum(['open', 'done']).optional().describe('Only open or only done to-dos. Default: both.'),
         due_before: when.optional().describe('Only to-dos due before this date.'),
-        limit: z.number().int().min(1).max(50).default(30),
+        limit: z.number().int().min(1).max(50).default(30).describe('How many to return, 1–50. Default 30.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -180,7 +180,7 @@ export function registerTools(server: McpServer) {
         DATA_NOTE,
       inputSchema: z.object({
         since: when.describe('Only sessions from this date or time on (ISO 8601).'),
-        limit: z.number().int().min(1).max(20).default(10),
+        limit: z.number().int().min(1).max(20).default(10).describe('How many to return, 1–20. Default 10.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -196,8 +196,8 @@ export function registerTools(server: McpServer) {
         '"what did Mara say about pricing in Tuesday\'s interview?" after list_sessions. ' +
         DATA_NOTE,
       inputSchema: z.object({
-        session_id: uuid('session'),
-        limit: z.number().int().min(1).max(20).default(10),
+        session_id: uuid('session').describe("The session's id, from list_sessions."),
+        limit: z.number().int().min(1).max(20).default(10).describe('How many to return, 1–20. Default 10.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -212,7 +212,7 @@ export function registerTools(server: McpServer) {
         'Every word of one recording, with timestamps. Only when she explicitly asks for the transcript or exact words — ' +
         "for anything else use the gists from the other tools. " +
         DATA_NOTE,
-      inputSchema: z.object({ recording_id: uuid('recording') }),
+      inputSchema: z.object({ recording_id: uuid('recording').describe("A recording's id — the recording_id in any result's cite.") }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     tool('get_transcript', 'ideas:read', getTranscript)
