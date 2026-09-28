@@ -34,8 +34,8 @@ const DATA_NOTE =
 const say = (text: string): Result => ({ content: [{ type: 'text', text }], isError: true })
 
 /**
- * Wraps a handler: scope check, creator id from the verified key, JSON out, errors as plain sentences, and one
- * agent_calls row per call (0025). An unexpected failure is logged and reported without its detail (it could carry
+ * Wraps a handler: rate limit, scope check, creator id from the verified key, JSON out, errors as plain sentences,
+ * and one agent_calls row per call (0025). An unexpected failure is logged and reported without its detail (it could carry
  * SQL or another row's text).
  */
 function tool<A>(name: string, scope: Scope, run: (creatorId: string, args: A) => Promise<unknown>) {
@@ -46,7 +46,15 @@ function tool<A>(name: string, scope: Scope, run: (creatorId: string, args: A) =
     if (typeof creatorId !== 'string') return say('This connector needs your Ivy key. Add it again from Connect your Muse in Ivy.')
 
     const startedAt = performance.now()
-    const call = await startCall(creatorId, keyId, name, args)
+    const { id: call, allowed } = await startCall(creatorId, keyId, name, args)
+    // Refused calls are already closed in agent_calls ('rate_limited'); nothing to finish.
+    if (!allowed) {
+      return say(
+        name === 'capture_idea'
+          ? "That's ten ideas in a minute. Give Ivy a moment, then add the next one."
+          : "You've asked Ivy a lot in the last minute. Give it a moment and ask again."
+      )
+    }
     const fail = async (sentence: string, logged = sentence) => {
       await finishCall(call, startedAt, false, logged)
       return say(sentence)

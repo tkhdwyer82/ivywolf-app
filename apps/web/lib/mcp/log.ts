@@ -1,6 +1,7 @@
 // apps/web/lib/mcp/log.ts
 // agent_calls (0025): every tool call, logged apart from the app with source 'muse' (Job F §2 rule 7).
-// The row is opened when the call starts and closed with how it went. Logging never fails a call.
+// The row is opened when the call starts (and the rate limit checked in the same step) and closed with how it went.
+// Logging never fails a call.
 
 import { supabaseAdmin } from '../supabase'
 
@@ -12,14 +13,25 @@ export function paramsOf(args: unknown): Record<string, unknown> {
   return Object.fromEntries(Object.entries(args).filter(([k, v]) => !FREE_TEXT.has(k) && (typeof v !== 'string' || v.length <= 64)))
 }
 
-export async function startCall(creatorId: string, keyId: string | null, tool: string, args: unknown): Promise<string | null> {
+/**
+ * Rate limit and open the call's row in one step (0025 start_agent_call: 60 a minute per creator, 10 captures).
+ * If the log can't be reached the call goes ahead unlogged and unlimited — the database it would count in is the
+ * one that's failing, and the tool will say so itself.
+ */
+export async function startCall(
+  creatorId: string,
+  keyId: string | null,
+  tool: string,
+  args: unknown
+): Promise<{ id: string | null; allowed: boolean }> {
   const { data, error } = await supabaseAdmin()
-    .from('agent_calls')
-    .insert({ creator_id: creatorId, key_id: keyId, tool, params: paramsOf(args) })
-    .select('id')
-    .single()
-  if (error) console.warn('[mcp] agent_calls start:', error.message)
-  return data?.id ?? null
+    .rpc('start_agent_call', { p_creator: creatorId, p_key: keyId, p_tool: tool, p_params: paramsOf(args) })
+    .single<{ call_id: string; allowed: boolean }>()
+  if (error || !data) {
+    console.warn('[mcp] start_agent_call:', error?.message ?? 'no row')
+    return { id: null, allowed: true }
+  }
+  return { id: data.call_id, allowed: data.allowed }
 }
 
 export async function finishCall(id: string | null, startedAt: number, ok: boolean, error: string | null) {

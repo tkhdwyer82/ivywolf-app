@@ -61,6 +61,10 @@ on conflict (hash) do nothing;
 
 -- The Muse connector's own tables (Job F §2 rules 6 and 7).
 --
+--   agent_calls          every tool call, logged apart (rule 7) — and what the rate limits count (rule 6)
+--   start_agent_call()   rate limit + open the log row, atomically per creator
+--   capture_idempotency  capture_idea's idempotency keys: an agent's retry never files an idea twice
+--
 -- agent_calls — one row per MCP tool call, kept apart from everything the app logs (source 'muse'), so we can see
 -- what creators ask their Muse: the free "questions people ask" study (§7 — the top five become Home's earned
 -- in-feed blocks). What's kept is the shape of the ask, not her words: the tool, its non-text parameters (since,
@@ -76,7 +80,7 @@ create table agent_calls (
   tool text not null,
   params jsonb not null default '{}',            -- non-text arguments only (apps/web/lib/mcp/tools.ts)
   ok boolean,                                    -- null while the call runs
-  error text,                                    -- the sentence she was shown, or 'internal'
+  error text,                                    -- the sentence she was shown, 'internal', or 'rate_limited'
   latency_ms int,
   created_at timestamptz not null default now()
 );
@@ -84,6 +88,59 @@ create index agent_calls_creator_idx on agent_calls (creator_id, created_at desc
 create index agent_calls_tool_idx on agent_calls (tool, created_at desc);
 
 alter table agent_calls enable row level security;
+
+-- ── Rate limits: 60 calls a minute per creator, of which 10 may be captures ─────────────────────────────────────
+-- In Postgres rather than a separate store (Upstash): the count is over agent_calls, which every call writes anyway.
+-- An advisory lock per creator makes count-then-insert atomic, so a burst of parallel calls can't all see room.
+-- A refused call is logged (error 'rate_limited') but doesn't count, so an agent retrying in a loop can't keep her
+-- locked out past the minute. Called by apps/web/lib/mcp/log.ts with the service role.
+
+create function start_agent_call(p_creator text, p_key uuid, p_tool text, p_params jsonb)
+returns table (call_id uuid, allowed boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  total int;
+  captures int;
+  ok_to_run boolean;
+  new_id uuid;
+begin
+  perform pg_advisory_xact_lock(hashtext('agent_calls:' || p_creator));
+  select count(*), count(*) filter (where tool = 'capture_idea')
+    into total, captures
+    from agent_calls
+   where creator_id = p_creator
+     and created_at > now() - interval '1 minute'
+     and error is distinct from 'rate_limited';
+  ok_to_run := total < 60 and (p_tool <> 'capture_idea' or captures < 10);
+  insert into agent_calls (creator_id, key_id, tool, params, ok, error)
+  values (p_creator, p_key, p_tool, coalesce(p_params, '{}'),
+          case when ok_to_run then null else false end,
+          case when ok_to_run then null else 'rate_limited' end)
+  returning id into new_id;
+  return query select new_id, ok_to_run;
+end;
+$$;
+revoke execute on function start_agent_call(text, uuid, text, jsonb) from public, anon, authenticated;
+
+-- ── capture_idempotency ─────────────────────────────────────────────────────────────────────────────────────────
+-- capture_idea claims (creator, key) before it writes the recording, then fills in recording_id. A retry with the
+-- same key gets the first recording back; the same key with different words is refused (text_hash, sha256 — the
+-- words themselves stay on the recording only). The row goes with its recording, so deleting the idea leaves no key
+-- behind. Service role only: RLS on, no policies.
+
+create table capture_idempotency (
+  creator_id text not null references creators(id) on delete cascade,
+  key text not null check (length(key) between 8 and 128),
+  text_hash text not null,
+  recording_id uuid references recordings(id) on delete cascade,  -- null only while the capture is being written
+  created_at timestamptz not null default now(),
+  primary key (creator_id, key)
+);
+
+alter table capture_idempotency enable row level security;
 
 create temp table r(n serial, check_name text, ok boolean, detail text) on commit drop;
 grant all on r to authenticated; grant all on r_n_seq to authenticated;
@@ -96,6 +153,62 @@ begin
   update agent_calls set ok = true, latency_ms = 42 where id = c;
   insert into r (check_name, ok, detail)
     select 'a call is logged as muse', source = 'muse' and ok and latency_ms = 42, source || ' ' || ok::text from agent_calls where id = c;
+end $$;
+
+-- ── Rate limits ───────────────────────────────────────────────────────────────────────────────────────────────
+do $$
+declare me text := 'user_3JfFAEHAdkvURqPjYDQ4BkVd2rb'; other text := 'user_3JfYR4D8eJVCL3yieXStYYoqwaH';
+        ok_to_run boolean; allowed_n int := 0; i int; n int;
+begin
+  delete from agent_calls where creator_id in (me, other);  -- a clean minute (rolled back)
+  for i in 1..10 loop
+    select allowed into ok_to_run from start_agent_call(me, null, 'capture_idea', '{}');
+    allowed_n := allowed_n + ok_to_run::int;
+  end loop;
+  select allowed into ok_to_run from start_agent_call(me, null, 'capture_idea', '{}');
+  insert into r (check_name, ok, detail) values ('10 captures a minute, the 11th refused', allowed_n = 10 and not ok_to_run, allowed_n::text || ' then ' || ok_to_run::text);
+
+  select allowed into ok_to_run from start_agent_call(me, null, 'list_ideas', '{}');
+  insert into r (check_name, ok, detail) values ('reads still allowed after the capture limit', ok_to_run, ok_to_run::text);
+
+  allowed_n := 0;
+  for i in 1..60 loop
+    select allowed into ok_to_run from start_agent_call(me, null, 'list_ideas', '{}');
+    allowed_n := allowed_n + ok_to_run::int;
+  end loop;
+  -- 11 allowed so far (10 captures + 1 read), so 49 more fit in the 60.
+  insert into r (check_name, ok, detail) values ('60 calls a minute in all', allowed_n = 49, allowed_n::text || ' of 60 allowed');
+
+  select count(*) into n from agent_calls where creator_id = me and error = 'rate_limited' and ok = false;
+  insert into r (check_name, ok, detail) values ('refusals are logged, closed', n = 12, n::text);
+
+  select allowed into ok_to_run from start_agent_call(other, null, 'list_ideas', '{}');
+  insert into r (check_name, ok, detail) values ('another creator has her own minute', ok_to_run, ok_to_run::text);
+
+  update agent_calls set created_at = now() - interval '61 seconds' where creator_id = me;
+  select allowed into ok_to_run from start_agent_call(me, null, 'capture_idea', '{}');
+  insert into r (check_name, ok, detail) values ('a minute later she can go again (refusals didn''t count)', ok_to_run, ok_to_run::text);
+end $$;
+
+-- ── capture_idempotency ───────────────────────────────────────────────────────────────────────────────────────
+do $$
+declare me text := 'user_3JfFAEHAdkvURqPjYDQ4BkVd2rb'; rec uuid; n int;
+begin
+  insert into recordings (creator_id, source, storage_path) values (me, 'phone', 'test/0025') returning id into rec;
+  insert into capture_idempotency (creator_id, key, text_hash, recording_id) values (me, 'key-0025-a', 'h', rec);
+  perform set_config('t.rec', rec::text, true);
+  begin
+    insert into capture_idempotency (creator_id, key, text_hash) values (me, 'key-0025-a', 'h2');
+    insert into r (check_name, ok, detail) values ('a key is claimed once', false, 'inserted twice');
+  exception when unique_violation then
+    insert into r (check_name, ok, detail) values ('a key is claimed once', true, sqlerrm);
+  end;
+  insert into capture_idempotency (creator_id, key, text_hash) values ('user_3JfYR4D8eJVCL3yieXStYYoqwaH', 'key-0025-a', 'h');
+  insert into r (check_name, ok, detail) values ('keys are per creator', true, 'same key, other creator: ok');
+
+  delete from recordings where id = rec;
+  select count(*) into n from capture_idempotency where creator_id = me and key = 'key-0025-a';
+  insert into r (check_name, ok, detail) values ('the key goes with its recording', n = 0, n::text);
 end $$;
 
 -- ── She can't read or write the log ───────────────────────────────────────────────────────────────────────────
@@ -111,6 +224,14 @@ begin
     insert into r (check_name, ok, detail) values ('she can''t write agent_calls', false, 'inserted');
   exception when insufficient_privilege then
     insert into r (check_name, ok, detail) values ('she can''t write agent_calls', true, sqlerrm);
+  end;
+  select count(*) into n from capture_idempotency;
+  insert into r (check_name, ok, detail) values ('she can''t read capture_idempotency', n = 0, n::text);
+  begin
+    perform start_agent_call('user_3JfFAEHAdkvURqPjYDQ4BkVd2rb', null, 'list_ideas', '{}');
+    insert into r (check_name, ok, detail) values ('she can''t call start_agent_call', false, 'called');
+  exception when insufficient_privilege then
+    insert into r (check_name, ok, detail) values ('she can''t call start_agent_call', true, sqlerrm);
   end;
 end $$;
 reset role;
