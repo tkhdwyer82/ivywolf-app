@@ -7,14 +7,22 @@
 // refresh_token: rotated on every use; may narrow scope, never widen it; dead once the grant is revoked.
 
 import { authenticateClient, ClientError } from '@/lib/oauth/clients'
-import { json, oauthError, origin, parseScopes, pkceMatches, readParams, resourceOf, sha256 } from '@/lib/oauth/server'
+import { json, logOAuthRequest, oauthError, origin, parseScopes, pkceMatches, readParams, resourceOf, sha256 } from '@/lib/oauth/server'
 import { issueGrant, refreshGrant, revokeGrant } from '@/lib/oauth/tokens'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
+/** Every token request is logged by shape and outcome (never the code, verifier, tokens or secret). */
 export async function POST(req: Request) {
   const params = await readParams(req)
+  const res = await exchange(req, params)
+  const body = res.status === 200 ? null : ((await res.clone().json().catch(() => null)) as { error?: string } | null)
+  logOAuthRequest('token', req, params, { status: res.status, error: body?.error })
+  return res
+}
+
+async function exchange(req: Request, params: Record<string, string>): Promise<Response> {
   let client
   try {
     client = await authenticateClient(req, params)

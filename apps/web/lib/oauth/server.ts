@@ -74,9 +74,13 @@ export const json = (body: unknown, status = 200, headers: Record<string, string
 export const oauthError = (error: string, description: string, status = 400) =>
   json({ error, error_description: description }, status)
 
-/** Token and revocation endpoints take form bodies (the standard) and, leniently, JSON. */
+/** Token and revocation endpoints take form bodies (the standard) and, leniently, JSON or multipart. */
 export async function readParams(req: Request): Promise<Record<string, string>> {
   const type = req.headers.get('content-type') ?? ''
+  if (type.includes('multipart/form-data')) {
+    const form = await req.formData().catch(() => null)
+    return form ? Object.fromEntries([...form.entries()].flatMap(([k, v]) => (typeof v === 'string' ? [[k, v]] : []))) : {}
+  }
   if (type.includes('application/json')) {
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
     return Object.fromEntries(Object.entries(body).flatMap(([k, v]) => (typeof v === 'string' ? [[k, v]] : [])))
@@ -95,4 +99,28 @@ export function parseScopes(scope: string | null | undefined): string[] | null {
 export function pkceMatches(verifier: string, challenge: string): boolean {
   if (!/^[A-Za-z0-9\-._~]{43,128}$/.test(verifier)) return false
   return createHash('sha256').update(verifier).digest('base64url') === challenge
+}
+
+/**
+ * One line per token/revocation request: its shape, never its secrets — content type, how the client authenticated
+ * (basic / post / none), which parameters came (names only), what kind of token (by prefix), the client id, the
+ * user agent, and the outcome. So a failed call from a client (Muse's revoke, 28 Sep) can be read back from the logs.
+ */
+export function logOAuthRequest(endpoint: string, req: Request, params: Record<string, string>, extra: Record<string, unknown>) {
+  const tokenKind = (t: string | undefined) => (t ? (t.match(/^(iv_at_|iv_rt_|iv_ac_|iv_)/)?.[1] ?? 'other') : undefined)
+  const auth = req.headers.get('authorization')
+  console.log(
+    `[oauth/${endpoint}]`,
+    JSON.stringify({
+      content_type: req.headers.get('content-type'),
+      auth_scheme: auth ? auth.split(/\s+/)[0] : null,
+      params: Object.keys(params).sort(),
+      token_kind: tokenKind(params.token ?? params.refresh_token ?? params.code),
+      token_type_hint: params.token_type_hint,
+      grant_type: params.grant_type,
+      client_id: params.client_id,
+      user_agent: req.headers.get('user-agent'),
+      ...extra,
+    })
+  )
 }

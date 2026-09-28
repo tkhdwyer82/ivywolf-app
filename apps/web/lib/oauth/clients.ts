@@ -216,25 +216,37 @@ export async function getClient(clientId: string, opts: { refresh?: boolean } = 
   return client
 }
 
-/**
- * Client authentication at the token and revocation endpoints. Public clients send only client_id; confidential
- * ones their secret by the method they registered. Returns the client or throws invalid_client.
- */
-export async function authenticateClient(req: Request, params: Record<string, string>): Promise<Client> {
-  let id = params.client_id
-  let secret = params.client_secret
+/** What client credentials a request carries, and how: HTTP Basic, or client_id/client_secret in the body. */
+export function presentedCredentials(req: Request, params: Record<string, string>): { id: string | null; secret: string | null; via: 'basic' | 'post' | null } {
   const basic = req.headers.get('authorization')?.match(/^Basic\s+(.+)$/i)
   if (basic) {
-    const [u, p] = Buffer.from(basic[1], 'base64').toString().split(':')
-    id = decodeURIComponent(u ?? '')
-    secret = decodeURIComponent(p ?? '')
+    const decoded = Buffer.from(basic[1], 'base64').toString()
+    const colon = decoded.indexOf(':')
+    const u = colon < 0 ? decoded : decoded.slice(0, colon)
+    const p = colon < 0 ? '' : decoded.slice(colon + 1)
+    const dec = (x: string) => {
+      try {
+        return decodeURIComponent(x.replace(/\+/g, ' '))
+      } catch {
+        return x
+      }
+    }
+    return { id: dec(u) || null, secret: dec(p) || null, via: 'basic' }
   }
+  if (params.client_id) return { id: params.client_id, secret: params.client_secret || null, via: 'post' }
+  return { id: null, secret: null, via: null }
+}
+
+/**
+ * Client authentication at the token and revocation endpoints. Public clients send only client_id (in the body or
+ * as a Basic username with an empty password); confidential ones their secret, by either method — the secret is
+ * what's checked, not which of the two standard places it came in. Returns the client or throws invalid_client.
+ */
+export async function authenticateClient(req: Request, params: Record<string, string>): Promise<Client> {
+  const { id, secret } = presentedCredentials(req, params)
   const client = id ? await getClient(id).catch(() => null) : null
   if (!client) throw new ClientError('invalid_client', 'Unknown client.')
   if (client.token_endpoint_auth_method === 'none') return client
-  const sentBy = basic ? 'client_secret_basic' : 'client_secret_post'
-  if (!secret || sentBy !== client.token_endpoint_auth_method || sha256(secret) !== client.secret_hash) {
-    throw new ClientError('invalid_client', 'Client authentication failed.')
-  }
+  if (!secret || sha256(secret) !== client.secret_hash) throw new ClientError('invalid_client', 'Client authentication failed.')
   return client
 }

@@ -78,13 +78,32 @@ export async function refreshGrant(client: Client, refreshToken: string, scope: 
   return rotated?.length ? t.response : null
 }
 
-/** RFC 7009: revoke the grant an access or refresh token belongs to, if it's this client's. Silent either way. */
-export async function revokeToken(client: Client, raw: string): Promise<void> {
+export type RevokeOutcome = 'revoked' | 'already_revoked' | 'unknown_token' | 'other_client' | 'client_auth_required'
+
+/**
+ * RFC 7009: revoke the grant an access or refresh token belongs to. Either token ends the whole grant.
+ *
+ * With client credentials (already verified), only that client's own grants are touched. Without any — a public
+ * client may revoke with just the token, which is itself the proof (RFC 7009 §2.1 requires authentication only of
+ * clients that have credentials) — the token's own client must be public; a confidential client's grant still
+ * needs its secret. The endpoint answers 200 for every outcome but client_auth_required.
+ */
+export async function revokeToken(client: Client | null, raw: string): Promise<RevokeOutcome> {
   const h = sha256(raw)
   const db = supabaseAdmin()
-  const now = new Date().toISOString()
-  await db.from('creator_api_keys').update({ revoked_at: now }).eq('client_id', client.client_id).eq('hash', h).is('revoked_at', null)
-  await db.from('creator_api_keys').update({ revoked_at: now }).eq('client_id', client.client_id).eq('refresh_hash', h).is('revoked_at', null)
+  const { data } = await db
+    .from('creator_api_keys')
+    .select('id, client_id, revoked_at, oauth_clients(token_endpoint_auth_method)')
+    .or(`hash.eq.${h},refresh_hash.eq.${h}`)
+    .not('client_id', 'is', null)
+    .maybeSingle()
+  const grant = data as unknown as { id: string; client_id: string; revoked_at: string | null; oauth_clients: { token_endpoint_auth_method: string } | null } | null
+  if (!grant) return 'unknown_token'
+  if (client && grant.client_id !== client.client_id) return 'other_client'
+  if (!client && grant.oauth_clients?.token_endpoint_auth_method !== 'none') return 'client_auth_required'
+  if (grant.revoked_at) return 'already_revoked'
+  await revokeGrant(grant.id)
+  return 'revoked'
 }
 
 /** A code used twice is a stolen code: the grant it was exchanged for is revoked (OAuth 2.1 §4.1.3). */
