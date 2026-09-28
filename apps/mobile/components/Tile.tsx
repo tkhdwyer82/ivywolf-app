@@ -63,6 +63,11 @@ export function Tile({
             <Text style={text.labelPill}>{item.done ? 'Done' : 'To-do'}</Text>
           </View>
         )}
+        {item.kind === 'card' && item.viaMuse && (
+          <View style={styles.pill}>
+            <Text style={text.labelPill}>via Muse</Text>
+          </View>
+        )}
         {inside && drawn && <Fade />}
         {inside && drawn && (
           <Text style={[text.bodySmall, styles.insideTitle]} numberOfLines={2}>

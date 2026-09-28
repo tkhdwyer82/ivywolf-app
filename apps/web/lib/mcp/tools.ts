@@ -8,7 +8,9 @@
 
 import type { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
+import { MAX_TEXT_CHARS } from '@ivywolf/pipeline'
 import { scopesOf, type Scope } from './auth'
+import { captureIdea } from './capture'
 import {
   getIdea,
   getSessionQuotes,
@@ -193,5 +195,34 @@ export function registerTools(server: McpServer) {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     tool('ideas:read', getTranscript)
+  )
+
+  server.registerTool(
+    'capture_idea',
+    {
+      title: 'Add an idea to Ivy',
+      description:
+        'File a new idea in Ivy, in her words, as if she had said it into Ivy. Use when she says "add an idea: …" or ' +
+        '"tell Ivy …". Ivy sorts it into ideas and to-dos over the next minute; they appear in Home marked "via Muse". ' +
+        'Pass her words as she said them — do not summarise or add to them. Send a new idempotency_key per idea, and ' +
+        'the same one again if you retry.',
+      inputSchema: z.object({
+        text: z
+          .string()
+          .trim()
+          .min(1, "There's nothing in that idea to add.")
+          .max(MAX_TEXT_CHARS, `That's too long for one idea — keep it under ${MAX_TEXT_CHARS} characters.`)
+          .describe('The idea, in her words.'),
+        idempotency_key: z
+          .string()
+          .min(8)
+          .max(128)
+          .regex(/^[A-Za-z0-9._:-]+$/, 'Use letters, digits and . _ : - in the idempotency key.')
+          .describe('Unique per idea (a UUID is fine). Retrying with the same key never files it twice.'),
+        context: z.string().max(120).optional().describe('Where it came from, e.g. "from Charm".'),
+      }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    tool('ideas:capture', captureIdea)
   )
 }

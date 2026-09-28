@@ -7,6 +7,7 @@ import { z } from 'zod'
 // ── SQL enums ────────────────────────────────────────────────────────────────────
 export const RecordingSource = z.enum([
   'phone', 'note_taker', 'mini', 'dji_import', 'file_import', 'reference_clip', 'interview',
+  'muse', // 0026: text captured through the Muse connector
 ])
 export const SegmentType = z.enum([
   'idea', 'action', 'entity', 'loose_end', 'reference', 'request', 'junk', 'retracted', 'filler',

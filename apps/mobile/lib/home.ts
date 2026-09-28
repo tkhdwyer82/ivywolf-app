@@ -31,6 +31,8 @@ export interface CardItem extends Base {
   confidence: number
   storagePath: string | null
   threadSize: number
+  /** Added through the Muse connector (recordings.source 'muse', 0026): the tile says "via Muse". */
+  viaMuse: boolean
 }
 export interface ActionItem extends Base {
   kind: 'action'
@@ -49,7 +51,7 @@ export interface Thread {
 
 export interface FailedRecording {
   id: string
-  storage_path: string
+  storage_path: string | null
   received_at: string
   duration_ms: number | null
 }
@@ -83,7 +85,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
     supabase.from('projects').select('id, name, kind').order('is_default', { ascending: false }).order('created_at'),
     supabase
       .from('cards')
-      .select('id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, recordings(recorded_at, storage_path)')
+      .select('id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, recordings(recorded_at, storage_path, source)')
       .order('created_at', { ascending: false })
       .limit(LIMIT),
     supabase
@@ -114,7 +116,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
   const sizeOf = new Map<string, number>()
   for (const t of threadRows) for (const tc of t.thread_cards) sizeOf.set(tc.card_id, t.thread_cards.length)
 
-  type Rec = { recorded_at: string | null; storage_path?: string } | null
+  type Rec = { recorded_at: string | null; storage_path?: string | null; source?: string } | null
   const cardRows = need('cards', cards) as unknown as ({
     id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
     confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
@@ -141,6 +143,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
       at: c.recordings?.recorded_at ?? c.created_at,
       storagePath: c.recordings?.storage_path ?? null,
       threadSize: sizeOf.get(c.id) ?? 1,
+      viaMuse: c.recordings?.source === 'muse',
     })),
     ...actionRows.map((a): ActionItem => ({
       kind: 'action',

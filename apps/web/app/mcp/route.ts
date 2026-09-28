@@ -12,6 +12,8 @@ import { verifyBearer } from '@/lib/mcp/auth'
 import { registerTools } from '@/lib/mcp/tools'
 
 export const runtime = 'nodejs'
+// capture_idea runs classify after the response (after()), as the recordings process route does.
+export const maxDuration = 300
 
 const mcp = createMcpHandler(registerTools, {
   serverInfo: { name: 'ivy-wolf', version: '1.0.0' },

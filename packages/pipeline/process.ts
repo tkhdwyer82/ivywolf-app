@@ -1,11 +1,13 @@
 // packages/pipeline/process.ts
 // Recording in → graph out. transcribe → junk gates → classify → write → status.
+// A text recording (0026, Muse's capture_idea) skips transcribe: its words are already on the row.
 // Callers claim the recording first (claimRecording) so it is processed at most once.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { ClassifyOutput, RecordingSource } from '@ivywolf/schema'
+import type { ClassifyOutput, RecordingSource, Utterance } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
+import { textUtterances } from './text'
 import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
 import { frameRecording } from './frames'
 import { attachImport, parseImport } from './imports'
@@ -15,6 +17,7 @@ export { claimRecording, markFailed } from './graph'
 // For the MCP server's search_ideas (apps/web/lib/mcp/handlers.ts): the same embedding and similarity threading uses.
 export { embed } from './embed'
 export { cosine } from './threading'
+export { textUtterances, MAX_TEXT_CHARS } from './text'
 
 const MIN_DURATION_MS = 3000
 
@@ -50,6 +53,39 @@ export async function analyse(args: {
   return { junk: null, transcript, out }
 }
 
+/**
+ * The text path: classify_v6 on words that arrived as text, with no Deepgram call. Same junk rule for nothing said;
+ * no too-short gate — a typed line is short by nature, and "< 3 s" is about accidental taps.
+ *
+ * The classifier is told source 'phone': its prompt (classify_v6) knows no 'muse' source, and a Muse capture is what
+ * 'phone' means to it — one speaker, her own words, about her own ideas. The recording row keeps source 'muse'.
+ */
+export async function analyseText(args: {
+  utterances: Utterance[]
+  creator: CreatorContext
+  recorded: RecordedDay | null
+  promptVersion?: PromptVersion
+}): Promise<ProcessResult> {
+  const last = args.utterances[args.utterances.length - 1]
+  const transcript: Transcript = { duration_ms: last?.end_ms ?? 0, utterances: args.utterances, raw: null }
+  if (args.utterances.length === 0) return { junk: 'no_speech', transcript }
+  const out = await classify({
+    utterances: args.utterances,
+    creator: args.creator,
+    source: 'phone',
+    recorded: args.recorded,
+    promptVersion: args.promptVersion,
+  })
+  return { junk: null, transcript, out }
+}
+
+/** A text row's utterances: what the MCP server wrote (textUtterances), or, failing that, its meta.text re-split. */
+function storedUtterances(rec: { transcript: unknown; meta: unknown }): Utterance[] {
+  if (Array.isArray(rec.transcript)) return rec.transcript as Utterance[]
+  const text = (rec.meta as { text?: unknown } | null)?.text
+  return typeof text === 'string' ? textUtterances(text) : []
+}
+
 /** meta.correction_of, if it's one of the creator's own cards (P9's mic) or to-dos (P17's). */
 async function ownTarget(supabase: SupabaseClient, creatorId: string, id: unknown): Promise<{ id: string; kind: 'card' | 'to-do' } | null> {
   if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return null
@@ -70,14 +106,17 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   })
   const { data: rec, error } = await supabase
     .from('recordings')
-    .select('id, creator_id, source, storage_path, recorded_at, recorded_tz, project_id, meta')
+    .select('id, creator_id, source, kind, storage_path, recorded_at, recorded_tz, project_id, meta, transcript')
     .eq('id', recordingId)
     .single()
   if (error || !rec) throw new Error(`recording ${recordingId}: ${error?.message ?? 'not found'}`)
 
   const creator = await loadCreatorContext(rec.creator_id, rec.project_id)
-  const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
   const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
+
+  if (rec.kind === 'text') return processText(supabase, rec, creator, recorded)
+
+  const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
   // Voice correction (the mic on P9 or P17) — a stub for now: the note is kept, transcribed and tagged to its card
   // or to-do, but nothing in the graph changes and nothing is made from it. Applying corrections comes later.
   const correctionOf = await ownTarget(supabase, rec.creator_id, (rec.meta as { correction_of?: unknown } | null)?.correction_of)
@@ -128,6 +167,38 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
     })
   }
 
+  await finish(supabase, rec, cards)
+  return result
+}
+
+type Rec = { id: string; creator_id: string; project_id: string | null; transcript: unknown; meta: unknown }
+
+async function processText(
+  supabase: SupabaseClient,
+  rec: Rec,
+  creator: CreatorContext,
+  recorded: RecordedDay | null
+): Promise<ProcessResult> {
+  const result = await analyseText({ utterances: storedUtterances(rec), creator, recorded })
+  if (result.junk) {
+    await markJunk(rec.id, result.junk, result.transcript.utterances)
+    return result
+  }
+  await supabase.from('recordings').update({ duration_ms: result.transcript.duration_ms }).eq('id', rec.id)
+  const { cards } = await writeClassification({
+    creatorId: rec.creator_id,
+    recordingId: rec.id,
+    transcript: result.transcript.utterances,
+    out: result.out,
+    promptVersion: PROMPT_VERSION,
+    projectId: rec.project_id,
+  })
+  await finish(supabase, rec, cards)
+  return result
+}
+
+/** Thread, mark done, frame — the same for audio and text. */
+async function finish(supabase: SupabaseClient, rec: Pick<Rec, 'id' | 'creator_id'>, cards: NewCard[]) {
   // Threading is best-effort: if embedding fails the cards are still saved and show under "New sparks"; the
   // error is kept on the recording so it can be re-threaded later.
   try {
@@ -151,5 +222,4 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   } catch (err) {
     console.error(`[pipeline] ${rec.id}: frames failed`, err)
   }
-  return result
 }
