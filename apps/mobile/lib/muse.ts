@@ -17,6 +17,8 @@ export interface MuseKey {
   id: string
   label: string
   scopes: MuseScope[]
+  /** Set for an app that connected by signing in (OAuth, 0027); null for a key made here. */
+  client_id: string | null
   created_at: string
   last_used_at: string | null
   revoked_at: string | null

@@ -4,6 +4,8 @@
 //
 // Muse is a window onto her ideas, never the front door: it can read them and, if she lets it, add new ones. The two
 // switches are the two scopes, in the consent words. Reading is what the connector is for, so it's always on.
+//
+// Apps that connected by signing in to Ivy (OAuth, Job F2) are listed with her keys and revoked the same way.
 
 import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native'
@@ -126,11 +128,13 @@ export default function ConnectMuse() {
 
       {live.length > 0 && (
         <View style={styles.group}>
-          <Text style={text.labelOverline}>Your keys</Text>
+          <Text style={text.labelOverline}>Connected</Text>
           {live.map((k) => (
             <View key={k.id} style={styles.row}>
               <View style={styles.flex}>
-                <Text style={text.bodyMedium}>{k.label} · made {day(k.created_at)}</Text>
+                <Text style={text.bodyMedium}>
+                  {k.client_id ? `${k.label} · signed in ${day(k.created_at)}` : `${k.label} · made ${day(k.created_at)}`}
+                </Text>
                 <Text style={[text.caption, styles.secondary]}>
                   {k.scopes.includes('ideas:capture') ? 'Reads and adds ideas' : 'Reads ideas'} ·{' '}
                   {k.last_used_at ? `last used ${day(k.last_used_at)}` : 'not used yet'}

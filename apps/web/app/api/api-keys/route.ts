@@ -2,6 +2,7 @@
 // Lifted from gamesfield-app app/api/api-keys/route.ts per docs/lift-list.md.
 // Changes: `iv_` prefix (via lib/mcp/auth.ts), creator_id not user_id, user-JWT client so RLS applies.
 // Job F: keys live in creator_api_keys (0024) and carry scopes; Connect your Muse in the app makes and lists them.
+// Job F2: OAuth sign-ins are rows here too (0027: client_id set, access token expiring) — listed and revoked alike.
 
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
@@ -18,7 +19,7 @@ export async function GET() {
   const supabase = await supabaseAsUser()
   const { data, error } = await supabase
     .from('creator_api_keys')
-    .select('id, label, scopes, created_at, last_used_at, revoked_at')
+    .select('id, label, scopes, client_id, created_at, last_used_at, revoked_at')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

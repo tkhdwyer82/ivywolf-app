@@ -26,8 +26,15 @@ export function generateApiKey(): { raw: string; hash: string } {
 
 export const SCOPES: readonly Scope[] = ['ideas:read', 'ideas:capture']
 
+/** The consent words (Job F §4), shown wherever she grants a scope: the app's Connect your Muse and the web consent page. */
+export const SCOPE_WORDS: Record<Scope, string> = {
+  'ideas:read': 'Let Muse read your ideas',
+  'ideas:capture': 'Let Muse add ideas to Ivy',
+}
+
 /**
- * Resolve a bearer token to a creator id and the key's scopes, or null.
+ * Resolve a bearer token — a pasted key, or an OAuth access token (0027: a key row with a client_id and an expiry)
+ * — to a creator id and its scopes, or null.
  * Service role by necessity: the caller is an external tool with an API key, not a Clerk session,
  * so there is no user JWT for RLS to act on.
  */
@@ -37,11 +44,12 @@ export async function resolveApiKey(apiKey: string): Promise<{ keyId: string; cr
 
   const { data, error } = await supabase
     .from('creator_api_keys')
-    .select('id, creator_id, scopes, revoked_at')
+    .select('id, creator_id, scopes, revoked_at, expires_at')
     .eq('hash', keyHash)
     .maybeSingle()
 
   if (error || !data || data.revoked_at) return null
+  if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) return null
 
   // Last-used bump; never block the call on it. A supabase-js query only runs once it's awaited or .then()'d —
   // Gamesfield's `void supabase.from(…).update(…)` never sent anything, so last_used_at was never set.

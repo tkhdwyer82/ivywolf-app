@@ -5,7 +5,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 
 const n = process.argv[2]
-const needs = { '0025': ['0024', '0025'] }[n] ?? [n]
+const needs = { '0025': ['0024', '0025'], '0027': ['0027'] }[n] ?? [n]
 const dir = new URL('../supabase/migrations/', import.meta.url)
 const files = readdirSync(dir)
 const migration = (m) => readFileSync(new URL(files.find((f) => f.startsWith(`${m}_`)), dir), 'utf8')
