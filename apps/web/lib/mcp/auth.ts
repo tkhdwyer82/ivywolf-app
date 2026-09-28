@@ -24,30 +24,35 @@ export function generateApiKey(): { raw: string; hash: string } {
   return { raw, hash: hashApiKey(raw) }
 }
 
+export const SCOPES: readonly Scope[] = ['ideas:read', 'ideas:capture']
+
 /**
- * Resolve a bearer token to a creator id, or null.
+ * Resolve a bearer token to a creator id and the key's scopes, or null.
  * Service role by necessity: the caller is an external tool with an API key, not a Clerk session,
  * so there is no user JWT for RLS to act on.
  */
-export async function resolveApiKey(apiKey: string): Promise<{ creatorId: string } | null> {
+export async function resolveApiKey(apiKey: string): Promise<{ keyId: string; creatorId: string; scopes: Scope[] } | null> {
   const supabase = supabaseAdmin()
   const keyHash = hashApiKey(apiKey)
 
   const { data, error } = await supabase
-    .from('api_keys')
-    .select('creator_id, revoked_at')
-    .eq('key_hash', keyHash)
+    .from('creator_api_keys')
+    .select('id, creator_id, scopes, revoked_at')
+    .eq('hash', keyHash)
     .maybeSingle()
 
   if (error || !data || data.revoked_at) return null
 
-  // Fire-and-forget last-used bump; never block the call on it.
-  void supabase
-    .from('api_keys')
+  // Last-used bump; never block the call on it. A supabase-js query only runs once it's awaited or .then()'d —
+  // Gamesfield's `void supabase.from(…).update(…)` never sent anything, so last_used_at was never set.
+  supabase
+    .from('creator_api_keys')
     .update({ last_used_at: new Date().toISOString() })
-    .eq('key_hash', keyHash)
+    .eq('id', data.id)
+    .then(({ error }) => error && console.warn('[mcp] last_used_at:', error.message))
 
-  return { creatorId: data.creator_id }
+  const scopes = (data.scopes as string[]).filter((s): s is Scope => (SCOPES as string[]).includes(s))
+  return { keyId: data.id, creatorId: data.creator_id, scopes }
 }
 
 /**
@@ -58,7 +63,7 @@ export async function verifyBearer(_req: Request, bearer?: string): Promise<Auth
   if (!bearer?.startsWith(API_KEY_PREFIX)) return undefined
   const key = await resolveApiKey(bearer)
   if (!key) return undefined
-  return { token: bearer, clientId: 'api_key', scopes: ['ideas:read'], extra: { creatorId: key.creatorId } }
+  return { token: bearer, clientId: `api_key:${key.keyId}`, scopes: key.scopes, extra: { creatorId: key.creatorId } }
 }
 
 export const scopesOf = (auth: { scopes: string[] } | undefined): string[] => auth?.scopes ?? []
