@@ -14,9 +14,7 @@ import { createHash } from 'crypto'
 import { after } from 'next/server'
 import { claimRecording, markFailed, processRecording, textUtterances } from '@ivywolf/pipeline'
 import { supabaseAdmin } from '../supabase'
-import { clean, McpError, type Link } from './handlers'
-
-const notes = (): Link => ({ link: 'ivywolf://notes', web_link: 'https://app.ivywolf.com.au/notes' })
+import { clean, McpError, recordingLink, type Link } from './handlers'
 
 /** A claim older than this with no recording is from a call that died between claiming and writing. */
 const STALE_CLAIM_MS = 60_000
@@ -51,7 +49,7 @@ export async function captureIdea(
     if (p && p.text_hash !== textHash) {
       throw new McpError('That idempotency key was already used for a different idea. Send a new key for a new idea.')
     }
-    if (p?.recording_id) return { recording_id: p.recording_id, status: p.recordings?.status ?? 'queued', replayed: true, ...notes() }
+    if (p?.recording_id) return { recording_id: p.recording_id, status: p.recordings?.status ?? 'queued', replayed: true, ...recordingLink(p.recording_id) }
     if (attempt > 0) throw new McpError("Ivy is already adding that idea. It'll be in Home in a minute.")
     if (p && Date.now() - new Date(p.created_at).getTime() < STALE_CLAIM_MS) {
       throw new McpError("Ivy is already adding that idea. It'll be in Home in a minute.")
@@ -105,5 +103,5 @@ export async function captureIdea(
     })
   }
 
-  return { recording_id: rec.id, status: 'queued', ...notes() }
+  return { recording_id: rec.id, status: 'queued', ...recordingLink(rec.id) }
 }

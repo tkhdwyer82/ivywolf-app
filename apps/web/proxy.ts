@@ -19,6 +19,7 @@
 //   /api/health       liveness probe, must answer before auth
 //
 // /oauth/consent and /oauth/decision are deliberately not public: she must be signed in to see or answer consent.
+// Nor are /idea, /thread, /todo and /recording (the web views the connector links to): signed out → /sign-in and back.
 //
 // CORS (Job F2): Muse's own origins may call the connector's machine endpoints from a browser. Everything else is
 // same-origin as before. The consent page can't be framed (clickjacking an Allow button).
@@ -93,6 +94,10 @@ export default clerkMiddleware(async (auth, request: NextRequest) => {
     response.headers.set('Content-Security-Policy', "frame-ancestors 'none'")
   }
   return response
+}, {
+  // Signed-out visitors to a page (/idea, /thread, /todo, /recording, /oauth/consent) go to our own /sign-in and come
+  // back to the same URL (redirect_url), not to Clerk's hosted page.
+  signInUrl: '/sign-in',
 })
 
 export const config = {

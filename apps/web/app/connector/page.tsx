@@ -131,9 +131,10 @@ export default function Connector() {
       <h2 style={s.h2}>Tools</h2>
       <p>
         Every idea, thread, to-do, session and quote in a result carries <code style={s.code}>cite</code> (the recording id
-        and the millisecond where it was said) and <code style={s.code}>link</code>, an{' '}
-        <code style={s.code}>ivywolf://</code> address that opens it in the Ivy app, with{' '}
-        <code style={s.code}>web_link</code> as an https fallback. Lists return titles and short gists, never transcripts.
+        and the millisecond where it was said) and <code style={s.code}>link</code>, an https address on
+        app.ivywolf.com.au that shows it to its owner after sign-in, with a button to open it in the Ivy app.{' '}
+        <code style={s.code}>web_link</code> repeats <code style={s.code}>link</code> and will be removed in the next release.
+        Lists return titles and short gists, never transcripts.
         Errors are returned as tool results with <code style={s.code}>isError</code> set and a plain sentence meant to be
         shown to the creator.
       </p>

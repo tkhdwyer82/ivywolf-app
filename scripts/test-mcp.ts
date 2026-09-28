@@ -30,6 +30,8 @@ import { embed } from '../packages/pipeline/embed'
 const MCP_URL = process.env.MCP_URL ?? 'http://localhost:3000/mcp'
 const CREATOR = 'user_test_mcp'
 const ORIGIN = new URL(MCP_URL).origin
+/** Where the web views are checked: the links point at app.ivywolf.com.au; locally, the same server as MCP_URL. */
+const WEB = process.env.WEB_URL ?? ORIGIN
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false },
 })
@@ -157,12 +159,13 @@ async function call(client: Client, name: string, args: Record<string, unknown>)
   return { ok: !r.isError, text, json }
 }
 
-/** Every object that is an Ivy thing (has an id or a cite) carries an ivywolf:// link. Returns the ones that don't. */
+/** Every object that is an Ivy thing (has an id or a cite) carries an https app link (no custom scheme) and web_link
+ * repeating it. Returns the ones that don't. */
 function unlinked(v: unknown, path = '$'): string[] {
   if (Array.isArray(v)) return v.flatMap((x, i) => unlinked(x, `${path}[${i}]`))
   if (!v || typeof v !== 'object') return []
   const o = v as Record<string, unknown>
-  const own = ('id' in o || 'cite' in o || 'recording_id' in o) && !(typeof o.link === 'string' && o.link.startsWith('ivywolf://'))
+  const own = ('id' in o || 'cite' in o || 'recording_id' in o) && !(typeof o.link === 'string' && o.link.startsWith('https://app.ivywolf.com.au/') && o.web_link === o.link)
     && path.split('.').pop() !== 'cite'
   return [...(own ? [path] : []), ...Object.entries(o).flatMap(([k, x]) => unlinked(x, `${path}.${k}`))]
 }
@@ -241,7 +244,7 @@ async function tokenCall(body: Record<string, string>) {
   return { status: r.status, json: (await r.json().catch(() => ({}))) as Record<string, any> }
 }
 
-async function oauthSection() {
+async function oauthSection(testCreatorIdea: string) {
   await signInReviewer()
   const who = reviewer!.userId
   const { count } = await db.from('cards').select('id', { count: 'exact', head: true }).eq('creator_id', who)
@@ -316,8 +319,41 @@ async function oauthSection() {
   const bad = every.filter((_, i) => !results[i].ok).map(([n], i) => `${n}: ${results[i]?.text}`)
   check('oauth: all nine tools answer on the OAuth token', bad.length === 0, bad.join(' | '))
   const unlinkedOAuth = results.flatMap((r) => unlinked(r.json))
-  check('oauth: every object carries an ivywolf:// link', unlinkedOAuth.length === 0, unlinkedOAuth.slice(0, 3).join())
+  check('oauth: every object carries an https app link', unlinkedOAuth.length === 0, unlinkedOAuth.slice(0, 3).join())
   await viaOAuth.close()
+
+  // The pages those links open: hers render, signed in; anyone else's is a 404; signed out → sign-in and back.
+  // Signed out, a browser first does Clerk's development-instance handshake (a hop to accounts.dev and back, which
+  // leaves a dev-browser cookie); the request after it is the one checked, so it carries a fresh, signed-out one.
+  const freshDevBrowser = async () => ((await (await fetch(`${FAPI}/v1/dev_browser`, { method: 'POST' })).json()) as { token: string }).token
+  const page = async (path: string, signedIn = true) =>
+    fetch(`${WEB}${path}`, {
+      redirect: 'manual',
+      headers: {
+        Accept: 'text/html', 'Sec-Fetch-Dest': 'document', 'Sec-Fetch-Mode': 'navigate',
+        ...(signedIn ? { Authorization: `Bearer ${await sessionJwt()}` } : { Cookie: `__clerk_db_jwt=${await freshDevBrowser()}` }),
+      },
+    })
+  const pathOf = (link: string | undefined) => (link ? new URL(link).pathname : '/missing')
+  const ideaLink = results[0].json?.ideas?.[0]?.link
+  const own = await page(pathOf(ideaLink))
+  const ownHtml = await own.text()
+  const ownTitle = results[0].json?.ideas?.[0]?.title as string
+  check('web: her idea renders — heading, gist, cite, open in app', own.status === 200 && ownHtml.includes(ownTitle.replace(/&/g, '&amp;').replace(/'/g, '&#x27;')) &&
+    ownHtml.includes('Open in the Ivy app') && ownHtml.includes(`ivywolf://idea/`) && /Said at \d+:\d\d in|Added via Muse|From /.test(ownHtml), `${own.status} ${pathOf(ideaLink)}`)
+  const others = [
+    ['thread', pathOf(results[3].json?.threads?.[0]?.link)],
+    ['to-do', pathOf(results[4].json?.actions?.[0]?.link)],
+    ['recording', pathOf(results[7].json?.link)],
+  ]
+  const statuses = await Promise.all(others.map(async ([, p]) => (await page(p)).status))
+  check('web: her thread, to-do and recording pages render', statuses.every((x) => x === 200), others.map(([n, p], i) => `${n} ${p} ${statuses[i]}`).join(' | '))
+  const theirs = await page(`/idea/${testCreatorIdea}`)
+  check("web: someone else's idea is a 404", theirs.status === 404, String(theirs.status))
+  const webSignedOut = await page(pathOf(ideaLink), false)
+  const to = webSignedOut.headers.get('location') ?? ''
+  check('web: signed out → /sign-in, then back to the same URL', [302, 303, 307, 308].includes(webSignedOut.status) &&
+    new URL(to, WEB).pathname === '/sign-in' && new URL(new URL(to, WEB).searchParams.get('redirect_url') ?? 'x:/', WEB).pathname === pathOf(ideaLink), `${webSignedOut.status} ${to.slice(0, 140)}`)
 
   // Refresh rotates both tokens
   const refreshed = await tokenCall({ grant_type: 'refresh_token', refresh_token: tok.json.refresh_token, client_id: client.client_id })
@@ -377,7 +413,7 @@ async function main() {
   check('list_ideas: gist, no transcript', ideas.every((i) => typeof i.gist === 'string') && !hasKey(listed.json, 'utterances') && !hasKey(listed.json, 'transcript'))
   const r1 = ideas.find((i) => i.id === s.rooftop1.id)
   check('list_ideas: cite + link + project + status', r1?.cite?.recording_id === s.memoA && r1?.cite?.ms === 0 &&
-    r1?.link === `ivywolf://idea/${s.rooftop1.id}` && r1?.web_link === `https://app.ivywolf.com.au/idea/${s.rooftop1.id}` &&
+    r1?.link === `https://app.ivywolf.com.au/idea/${s.rooftop1.id}` && r1?.web_link === r1?.link &&
     r1?.project === 'Candles' && r1?.status === 'developing', JSON.stringify(r1))
   const inCandles = await call(muse, 'list_ideas', { since, project: 'candles' })
   check('list_ideas: project filter (any case)', inCandles.json?.ideas?.length === 2, `${inCandles.json?.ideas?.length}`)
@@ -396,14 +432,14 @@ async function main() {
   const one = await call(muse, 'get_idea', { id: s.rooftop1.id })
   check('get_idea: thread siblings + returns', one.ok && one.json.returns === 3 && one.json.thread?.name === 'Rooftop chase' &&
     one.json.thread_siblings.length === 1 && one.json.thread_siblings[0].id === s.rooftop2.id)
-  check('get_idea: to-dos from the same recording', one.json?.actions?.[0]?.id === s.action && one.json.actions[0].link === `ivywolf://todo/${s.action}`)
+  check('get_idea: to-dos from the same recording', one.json?.actions?.[0]?.id === s.action && one.json.actions[0].link === `https://app.ivywolf.com.au/todo/${s.action}` && one.json.thread?.link === `https://app.ivywolf.com.au/thread/${s.thread}`)
   const gone = await call(muse, 'get_idea', { id: randomUUID() })
   check('get_idea: missing id is a plain sentence', !gone.ok && gone.text.startsWith("I couldn't find that idea"), gone.text)
 
   const threads = await call(muse, 'list_threads', { min_returns: 2 })
   const t = threads.json?.threads ?? []
   check('list_threads: "what do I keep coming back to?"', t.length === 1 && t[0].name === 'Rooftop chase' && t[0].returns === 3 &&
-    t[0].top_cards.length === 2 && t[0].link === `ivywolf://idea/${s.rooftop2.id}`, JSON.stringify(t.map((x: any) => [x.name, x.returns, x.link])))
+    t[0].top_cards.length === 2 && t[0].link === `https://app.ivywolf.com.au/thread/${s.thread}`, JSON.stringify(t.map((x: any) => [x.name, x.returns, x.link])))
 
   const todo = await call(muse, 'list_actions', { status: 'open' })
   const a = todo.json?.actions?.[0]
@@ -412,7 +448,7 @@ async function main() {
   const sessions = await call(muse, 'list_sessions', { since })
   const sess = sessions.json?.sessions?.[0]
   check('list_sessions: session with chapters in order', sessions.ok && sess?.id === s.session && sess.chapters.length === 2 &&
-    sess.chapters[0].start_ms === 120_000 && sess.chapters[0].title === 'Pricing ladder' && sess.link === `ivywolf://idea/${s.pricing.id}`)
+    sess.chapters[0].start_ms === 120_000 && sess.chapters[0].title === 'Pricing ladder' && sess.link === `https://app.ivywolf.com.au/recording/${s.session}` && sess.chapters[0].link === `https://app.ivywolf.com.au/idea/${s.pricing.id}`)
 
   const quotes = await call(muse, 'get_session_quotes', { session_id: s.session, limit: 5 })
   const q = quotes.json?.quotes ?? []
@@ -423,11 +459,12 @@ async function main() {
 
   const words = await call(muse, 'get_transcript', { recording_id: s.memoA })
   check('get_transcript: words with timestamps, on explicit ask', words.ok && words.json.utterances.length === 3 &&
-    words.json.utterances[1].start_ms === 6000 && words.json.link.startsWith('ivywolf://'))
+    words.json.utterances[1].start_ms === 6000 && words.json.link === `https://app.ivywolf.com.au/recording/${s.memoA}`)
 
   const allResults = [listed, found, one, threads, todo, sessions, quotes, words]
   const missing = allResults.flatMap((r) => unlinked(r.json))
-  check('every object carries an ivywolf:// link', missing.length === 0, missing.slice(0, 5).join(', '))
+  check('no ivywolf:// anywhere in the results', allResults.every((r) => !r.text.includes('ivywolf://')))
+  check('every object carries an https app link, no custom scheme', missing.length === 0, missing.slice(0, 5).join(', '))
 
   // ── Prompt injection: returned as data, unchanged, and nothing else happens ────────────────────────────────
   const before = await counts()
@@ -446,7 +483,7 @@ async function main() {
   const ikey = randomUUID()
   const idea = 'Open the restock video on the box, not my face. The lid comes off and the candle is already lit.'
   const captured = await call(muse, 'capture_idea', { text: idea, idempotency_key: ikey, context: 'from Charm' })
-  check('capture_idea: queued', captured.ok && captured.json.status === 'queued' && !!captured.json.recording_id && captured.json.link === 'ivywolf://notes', captured.text)
+  check('capture_idea: queued', captured.ok && captured.json.status === 'queued' && !!captured.json.recording_id && captured.json.link === `https://app.ivywolf.com.au/recording/${captured.json.recording_id}`, captured.text)
   const again = await call(muse, 'capture_idea', { text: idea, idempotency_key: ikey })
   check('capture_idea: retry with the same key files nothing new', again.ok && again.json.recording_id === captured.json.recording_id && again.json.replayed === true, again.text)
   const other = await call(muse, 'capture_idea', { text: 'Something else entirely.', idempotency_key: ikey })
@@ -475,7 +512,7 @@ async function main() {
 
   // SKIP_OAUTH=1 runs the key-path checks only (e.g. against a local server that can't verify Clerk sessions).
   if (process.env.SKIP_OAUTH === '1') console.log('skip  oauth section (SKIP_OAUTH=1)')
-  else await oauthSection()
+  else await oauthSection(s.rooftop1.id)
 
   // ── 60 a minute ───────────────────────────────────────────────────────────────────────────────────────────
   // 70 calls in parallel batches of 10, so they land inside one minute however slow the server is, and the

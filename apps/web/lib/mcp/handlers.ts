@@ -3,7 +3,7 @@
 // docs/lift-list.md: one function per tool, every query scoped by the creator id the API key resolved to.
 //
 // Rules this file keeps (Job F §2):
-//   1. Read the graph, never rebuild it — every object carries a cite {recording_id, ms} and an ivywolf:// link.
+//   1. Read the graph, never rebuild it — every object carries a cite {recording_id, ms} and a link.
 //   3. Gist, not transcript — list results carry title + gist; words only come from getTranscript, by id.
 //   5. Untrusted both ways — what she said is returned as data (sanitised, capped), never acted on. Errors are
 //      McpError: plain sentences, because Muse shows them to her verbatim.
@@ -18,15 +18,17 @@ import { supabaseAdmin } from '../supabase'
 export class McpError extends Error {}
 
 // ── Links ────────────────────────────────────────────────────────────────────────────────────────────────────
-// ivywolf:// opens the app (apps/mobile app.json "scheme"); the https fallback is for a device without it.
-// Only screens that exist today: idea/[id], todo/[id], notes (every recording), mini.
+// https pages on app.ivywolf.com.au (apps/web app/idea, thread, todo, recording): her own only, sign-in first, each
+// with "Open in the Ivy app". Not ivywolf:// — Muse blocks custom schemes.
+// web_link repeats link for one release, for clients built against the ivywolf:// + web_link pair; drop it after.
 const WEB = 'https://app.ivywolf.com.au'
 export type Link = { link: string; web_link: string }
-const linkTo = (path: string): Link => ({ link: `ivywolf://${path}`, web_link: `${WEB}/${path}` })
+const linkTo = (path: string): Link => ({ link: `${WEB}/${path}`, web_link: `${WEB}/${path}` })
 export const ideaLink = (cardId: string) => linkTo(`idea/${cardId}`)
+const threadLink = (threadId: string) => linkTo(`thread/${threadId}`)
 const todoLink = (actionId: string) => linkTo(`todo/${actionId}`)
-/** A recording with no card (junk, a correction, one still processing) opens Voice notes, which lists them all. */
-const notesLink = () => linkTo('notes')
+/** A recording, and what Ivy made from it: for a capture, a session, a transcript, or a quote with no idea. */
+export const recordingLink = (recordingId: string) => linkTo(`recording/${recordingId}`)
 
 // ── Untrusted text ───────────────────────────────────────────────────────────────────────────────────────────
 // Card text is whatever she said, and the classifier's paraphrase of it. It goes back out as a JSON string value,
@@ -213,8 +215,7 @@ export async function getIdea(creatorId: string, args: { id: string }) {
           stage: thread.stage,
           returns: thread.return_count,
           last_return_at: thread.last_seen,
-          // A thread opens through its newest idea (as list_threads).
-          ...ideaLink(siblings[0] && siblings[0].recorded_at > toCard(row).recorded_at ? siblings[0].id : row.id),
+          ...threadLink(thread.id),
         }
       : null,
     returns: thread?.return_count ?? 0,
@@ -256,7 +257,7 @@ export async function listThreads(creatorId: string, args: { min_returns?: numbe
         last_return_at: t.last_seen,
         top_cards: cards.slice(0, 3).map(toCard),
         cite: latest ? { recording_id: latest.recording_id, ms: latest.play_from_ms } : null,
-        ...(latest ? ideaLink(latest.id) : notesLink()),
+        ...threadLink(t.id),
       }
     }),
   }
@@ -312,7 +313,7 @@ export async function listSessions(creatorId: string, args: { since: string; lim
         recorded_at: s.recorded_at ?? s.received_at,
         chapters,
         cite: { recording_id: s.id, ms: 0 },
-        ...(chapters[0] ? { link: chapters[0].link, web_link: chapters[0].web_link } : linkTo('mini')),
+        ...recordingLink(s.id),
       }
     }),
   }
@@ -351,7 +352,7 @@ export async function getSessionQuotes(creatorId: string, args: { session_id: st
       ms: s.start_ms,
       clip_score: card?.energy ?? null,
       cite: { recording_id: session.id, ms: s.start_ms },
-      ...(card ? ideaLink(card.id) : linkTo('mini')),
+      ...(card ? ideaLink(card.id) : recordingLink(session.id)),
     }
   })
   quotes.sort((a, b) => (b.clip_score ?? -1) - (a.clip_score ?? -1) || a.ms - b.ms)
@@ -403,6 +404,6 @@ export async function getTranscript(creatorId: string, args: { recording_id: str
     recorded_at: rec.recorded_at ?? rec.received_at,
     utterances: utterancesOf(rec.transcript).map((u) => ({ ...u, text: clean(u.text, 4000) })),
     cite: { recording_id: rec.id, ms: 0 },
-    ...(first[0] ? ideaLink(first[0].id) : notesLink()),
+    ...recordingLink(rec.id),
   }
 }
