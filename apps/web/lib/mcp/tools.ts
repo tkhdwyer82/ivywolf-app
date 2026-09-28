@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { MAX_TEXT_CHARS } from '@ivywolf/pipeline'
 import { scopesOf, type Scope } from './auth'
 import { captureIdea } from './capture'
+import { finishCall, startCall } from './log'
 import {
   getIdea,
   getSessionQuotes,
@@ -33,27 +34,39 @@ const DATA_NOTE =
 const say = (text: string): Result => ({ content: [{ type: 'text', text }], isError: true })
 
 /**
- * Wraps a handler: scope check, creator id from the verified key, JSON out, and errors as plain sentences.
- * An unexpected failure is logged and reported without its detail (it could carry SQL or another row's text).
+ * Wraps a handler: scope check, creator id from the verified key, JSON out, errors as plain sentences, and one
+ * agent_calls row per call (0025). An unexpected failure is logged and reported without its detail (it could carry
+ * SQL or another row's text).
  */
-function tool<A>(scope: Scope, run: (creatorId: string, args: A) => Promise<unknown>) {
+function tool<A>(name: string, scope: Scope, run: (creatorId: string, args: A) => Promise<unknown>) {
   return async (args: A, ctx: Ctx): Promise<Result> => {
     const auth = ctx.http?.authInfo
     const creatorId = auth?.extra?.creatorId
+    const keyId = typeof auth?.extra?.keyId === 'string' ? auth.extra.keyId : null
     if (typeof creatorId !== 'string') return say('This connector needs your Ivy key. Add it again from Connect your Muse in Ivy.')
+
+    const startedAt = performance.now()
+    const call = await startCall(creatorId, keyId, name, args)
+    const fail = async (sentence: string, logged = sentence) => {
+      await finishCall(call, startedAt, false, logged)
+      return say(sentence)
+    }
+
     if (!scopesOf(auth).includes(scope)) {
-      return say(
+      return fail(
         scope === 'ideas:capture'
           ? "This key can read your ideas but can't add new ones. Make a new key in Ivy with \"Let Muse add ideas to Ivy\" on."
           : "This key can't read your ideas. Make a new key in Ivy with \"Let Muse read your ideas\" on."
       )
     }
     try {
-      return { content: [{ type: 'text', text: JSON.stringify(await run(creatorId, args)) }] }
+      const out = await run(creatorId, args)
+      await finishCall(call, startedAt, true, null)
+      return { content: [{ type: 'text', text: JSON.stringify(out) }] }
     } catch (err) {
-      if (err instanceof McpError) return say(err.message)
-      console.error('[mcp] tool failed', err)
-      return say('Ivy hit a problem answering that. Try again in a moment.')
+      if (err instanceof McpError) return fail(err.message)
+      console.error(`[mcp] ${name} failed`, err)
+      return fail('Ivy hit a problem answering that. Try again in a moment.', 'internal')
     }
   }
 }
@@ -80,7 +93,7 @@ export function registerTools(server: McpServer) {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', listIdeas)
+    tool('list_ideas', 'ideas:read', listIdeas)
   )
 
   server.registerTool(
@@ -97,7 +110,7 @@ export function registerTools(server: McpServer) {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', searchIdeas)
+    tool('search_ideas', 'ideas:read', searchIdeas)
   )
 
   server.registerTool(
@@ -111,7 +124,7 @@ export function registerTools(server: McpServer) {
       inputSchema: z.object({ id: uuid('idea') }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', getIdea)
+    tool('get_idea', 'ideas:read', getIdea)
   )
 
   server.registerTool(
@@ -128,7 +141,7 @@ export function registerTools(server: McpServer) {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', listThreads)
+    tool('list_threads', 'ideas:read', listThreads)
   )
 
   server.registerTool(
@@ -146,7 +159,7 @@ export function registerTools(server: McpServer) {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', listActions)
+    tool('list_actions', 'ideas:read', listActions)
   )
 
   server.registerTool(
@@ -163,7 +176,7 @@ export function registerTools(server: McpServer) {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', listSessions)
+    tool('list_sessions', 'ideas:read', listSessions)
   )
 
   server.registerTool(
@@ -180,7 +193,7 @@ export function registerTools(server: McpServer) {
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', getSessionQuotes)
+    tool('get_session_quotes', 'ideas:read', getSessionQuotes)
   )
 
   server.registerTool(
@@ -194,7 +207,7 @@ export function registerTools(server: McpServer) {
       inputSchema: z.object({ recording_id: uuid('recording') }),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool('ideas:read', getTranscript)
+    tool('get_transcript', 'ideas:read', getTranscript)
   )
 
   server.registerTool(
@@ -223,6 +236,6 @@ export function registerTools(server: McpServer) {
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
-    tool('ideas:capture', captureIdea)
+    tool('capture_idea', 'ideas:capture', captureIdea)
   )
 }

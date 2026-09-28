@@ -63,7 +63,7 @@ export async function verifyBearer(_req: Request, bearer?: string): Promise<Auth
   if (!bearer?.startsWith(API_KEY_PREFIX)) return undefined
   const key = await resolveApiKey(bearer)
   if (!key) return undefined
-  return { token: bearer, clientId: `api_key:${key.keyId}`, scopes: key.scopes, extra: { creatorId: key.creatorId } }
+  return { token: bearer, clientId: `api_key:${key.keyId}`, scopes: key.scopes, extra: { creatorId: key.creatorId, keyId: key.keyId } }
 }
 
 export const scopesOf = (auth: { scopes: string[] } | undefined): string[] => auth?.scopes ?? []
