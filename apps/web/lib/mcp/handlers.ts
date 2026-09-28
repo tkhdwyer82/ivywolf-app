@@ -207,7 +207,15 @@ export async function getIdea(creatorId: string, args: { id: string }) {
   return {
     idea: toCard(row),
     thread: thread
-      ? { id: thread.id, name: clean(thread.title, 200), stage: thread.stage, returns: thread.return_count, last_return_at: thread.last_seen }
+      ? {
+          id: thread.id,
+          name: clean(thread.title, 200),
+          stage: thread.stage,
+          returns: thread.return_count,
+          last_return_at: thread.last_seen,
+          // A thread opens through its newest idea (as list_threads).
+          ...ideaLink(siblings[0] && siblings[0].recorded_at > toCard(row).recorded_at ? siblings[0].id : row.id),
+        }
       : null,
     returns: thread?.return_count ?? 0,
     thread_siblings: siblings,
