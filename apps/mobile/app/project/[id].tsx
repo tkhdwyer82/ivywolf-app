@@ -1,22 +1,30 @@
 // apps/mobile/app/project/[id].tsx
 // Project (P11). Back; share and ••• (Rename, Delete — her own projects only; the defaults can't be changed); the
-// name; the Private project chip and "4 ideas · 1 board"; All ideas / More ideas; the ideas in a two-column masonry
-// with the title in the frame; one floating pill, Talk to {project}, which opens Record scoped to this project.
-// More ideas is Rising scoped to the project (P12) — a line of placeholder until the cohort exists.
+// name; the Private project chip and "4 ideas · 1 board"; the ideas in a two-column masonry, frames only; the action
+// bar (Talk, scoped to this project).
+// More ideas (Job G, P12b 202:2): a tab only when a thread in the project has come back ≥ 3 times — "Your ideas" (a
+// strip of her thumbs, → All ideas) and "More ideas for this thread" (up to five suggestions, each a frame with a
+// lime pin: tap opens it, long-press hides it). The action bar gains More ideas with the tab. Create joins the bar
+// once there's a Create flow.
 // No blank state (rule 1): a project with no ideas yet is one prompt to talk to it.
 // Left out of the frame: add-people (projects are private in the pilot), the filter icon over the grid, and the
 // stars on tile corners — nothing yet says what they do.
 // Reached from the Idea page's project button and "You keep coming back to this" in My things.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { Image } from 'expo-image'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
 import { useSupabase } from '@/lib/supabase'
-import { masonry } from '@/lib/home'
+import { masonry, tileHeight } from '@/lib/home'
 import { countLine, deleteProject, loadProject, renameProject, type ProjectPage } from '@/lib/project'
 import { Tile, useTileWidth } from '@/components/Tile'
+import { SuggestionTile } from '@/components/SuggestionTile'
+import { ProjectTabs, type ProjectTab } from '@/components/ProjectTabs'
+import { Shimmer } from '@/components/Shimmer'
+import { hideSuggestion, loadMoreIdeas, type Suggestion } from '@/lib/suggestions'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, radius, size, space, type } from '@ivywolf/ui'
 import { ActionBar, BAR_BOTTOM } from '@/components/ActionBar'
@@ -27,18 +35,32 @@ export default function Project() {
   const insets = useSafeAreaInsets()
   const [page, setPage] = useState<ProjectPage | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'all' | 'more'>('all')
+  const [tab, setTab] = useState<ProjectTab>('all')
+  const [more, setMore] = useState<Awaited<ReturnType<typeof loadMoreIdeas>>>(null)
   const [menu, setMenu] = useState(false)
   const tileWidth = useTileWidth()
 
+  // On focus: so a pin or a dismiss on the open screen, or a new card in the thread, is here when she's back.
   const load = useCallback(() => {
-    loadProject(supabase, id)
-      .then((p) => {
+    Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id)])
+      .then(([p, m]) => {
         setPage(p)
+        setMore(m)
+        if (!m) setTab('all')
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
   }, [supabase, id])
+
+  // Long-press: gone at once, no UI. If it didn't take, the next load puts it back.
+  const hide = useCallback(
+    (s: Suggestion) => {
+      setMore((m) => (m ? { ...m, suggestions: m.suggestions.filter((x) => x.id !== s.id) } : m))
+      hideSuggestion(supabase, s.id).catch(load)
+    },
+    [supabase, load]
+  )
+  const [moreLeft, moreRight] = useMemo(() => balance(more?.suggestions ?? []), [more])
   useFocusEffect(load)
 
   function rename() {
@@ -128,12 +150,10 @@ export default function Project() {
           </View>
           {error && <Text style={[type['Caption'], { marginTop: space.gutter }]}>{error}</Text>}
 
-          <View style={styles.tabs} accessibilityRole="tablist">
-            <Tab label="All ideas" on={tab === 'all'} onPress={() => setTab('all')} />
-            <Tab label="More ideas" on={tab === 'more'} onPress={() => setTab('more')} />
-          </View>
+          <ProjectTabs tab={tab} moreIdeas={!!more} onChange={setTab} />
+          {!more && <View style={styles.noTabs} />}
 
-          {tab === 'all' ? (
+          {tab === 'all' || !more ? (
             <View style={styles.columns}>
               {[left, right].map((col, c) => (
                 <View key={c} style={{ width: tileWidth }}>
@@ -146,14 +166,51 @@ export default function Project() {
               ))}
             </View>
           ) : (
-            <Text style={[type['Body'], styles.secondary]}>
-              Ideas from other creators, picked for {project.name} and your style, will show here once Rising opens.
-            </Text>
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={type['Title / Section']}>Your ideas</Text>
+                <Pressable onPress={() => setTab('all')} hitSlop={(size.tap - ARROW) / 2} style={styles.arrow} accessibilityRole="button" accessibilityLabel="All ideas">
+                  <SymbolView name="arrow.right" tintColor={colour.Ink} size={ARROW / 2} weight="semibold" />
+                </Pressable>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.stripRow}>
+                {ideas.map((i) => (
+                  <Pressable key={i.id} onPress={() => router.push(`/idea/${i.id}`)} style={styles.thumb} accessibilityRole="button" accessibilityLabel={i.title}>
+                    <Shimmer style={StyleSheet.absoluteFill} />
+                    {i.frameStatus === 'done' && !!i.frameUrl && (
+                      <Image source={{ uri: i.frameUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              {more.suggestions.length > 0 && (
+                <>
+                  <Text style={[type['Title / Section'], styles.moreTitle]}>More ideas for this thread</Text>
+                  <View style={styles.columns}>
+                    {[moreLeft, moreRight].map((col, c) => (
+                      <View key={c} style={{ width: tileWidth }}>
+                        {col.map((s) => (
+                          <View key={s.id} style={styles.cell}>
+                            <SuggestionTile suggestion={s} width={tileWidth} onOpen={(x) => router.push(`/suggestion/${x.id}`)} onHide={hide} />
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </>
           )}
         </View>
       </ScrollView>
 
-      <ActionBar verbs={[{ key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk }]} />
+      <ActionBar
+        verbs={[
+          ...(more ? [{ key: 'more', label: 'More ideas', icon: 'square.grid.2x2' as const, onPress: () => setTab('more') }] : []),
+          { key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk },
+        ]}
+      />
 
       {menu && <ProjectMenu top={insets.top + MENU_OFFSET} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
     </View>
@@ -195,29 +252,29 @@ function ProjectMenu({ top, onClose, onRename, onDelete }: { top: number; onClos
   )
 }
 
-function Tab({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: on }} style={styles.tabHit}>
-      <Text style={[styles.tab, on && styles.tabOn]}>{label}</Text>
-      <View style={[styles.tabRule, !on && { opacity: 0 }]} />
-    </Pressable>
-  )
+
+/** Two columns of suggestions, each into the shorter one — the same fill as her ideas. */
+function balance(items: Suggestion[]): [Suggestion[], Suggestion[]] {
+  const cols: [Suggestion[], Suggestion[]] = [[], []]
+  const h = [0, 0]
+  for (const s of items) {
+    const c = h[0] <= h[1] ? 0 : 1
+    cols[c].push(s)
+    h[c] += tileHeight(s.id) + space.gutter
+  }
+  return cols
 }
 
 // P12b (Figma 202:2) — measured, not tokens: the chip is 10 under the name, radius 16 (not radius/chip), 12 × 8
-// padding; tabs start 26 under the chip, 24 apart, with a 3-pt rule (radius 2) 6 under the label. P12b sets its text
+// padding (tabs: components/ProjectTabs.tsx). P12b sets its text
 // column at 16 while its tiles sit at 12; both use space/margin here. The empty project (P11, no Job G frame) keeps
 // its 84 lime mic and 32 side padding.
 const CHIP_GAP = 10
 const CHIP_R = 16
 const CHIP_PAD_H = 12
 const CHIP_PAD_V = 8
-const TABS_GAP = 26
-const TAB_GAP = 24
-const RULE_H = 3
-const RULE_R = 2
-const RULE_GAP = 6
 const COLD_MIC = 84
+const ARROW = 36 // the → disc by Your ideas (202:15)
 const COLD_PAD = 32
 const TAP_SLOP = (size.tap - size.icon) / 2
 
@@ -232,11 +289,14 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.stack, marginTop: CHIP_GAP },
   private: { borderRadius: CHIP_R, paddingHorizontal: CHIP_PAD_H, paddingVertical: CHIP_PAD_V, backgroundColor: colour.Chip },
   count: { ...type['Body'], color: colour.Grey },
-  tabs: { flexDirection: 'row', gap: TAB_GAP, marginTop: TABS_GAP, marginBottom: space.stack },
-  tabHit: { minHeight: size.tap, justifyContent: 'center' },
-  tab: { ...type['Heading / Small'], color: colour.Grey },
-  tabOn: { color: colour.Ink },
-  tabRule: { height: RULE_H, borderRadius: RULE_R, backgroundColor: colour.Ink, marginTop: RULE_GAP },
+  noTabs: { height: space.stack },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  arrow: { width: ARROW, height: ARROW, borderRadius: ARROW / 2, backgroundColor: colour.Chip, alignItems: 'center', justifyContent: 'center' },
+  // The strip runs to the screen's edge: out of the body's margin, back in for the first thumb.
+  strip: { marginHorizontal: -space.margin, marginTop: space.stack },
+  stripRow: { paddingHorizontal: space.margin, gap: space.gutter },
+  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Shimmer },
+  moreTitle: { marginTop: space.section, marginBottom: space.stack },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },
   cell: { paddingBottom: space.gutter },
   cold: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: COLD_PAD, paddingBottom: BAR_BOTTOM + size['bar-h'] },

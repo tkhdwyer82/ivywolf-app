@@ -238,9 +238,10 @@ function jitter(id: string, spread: number): number {
  */
 const IDEA_H = 200
 const IDEA_SPREAD = 40
-export function frameHeight(item: Item): number {
-  return IDEA_H + jitter(item.id, IDEA_SPREAD)
+export function tileHeight(id: string): number {
+  return IDEA_H + jitter(id, IDEA_SPREAD)
 }
+export const frameHeight = (item: Item): number => tileHeight(item.id)
 
 /** A tile's height in a column plus the gutter under it — for balancing the two columns. To-dos are estimated. */
 const TODO_ESTIMATE = 100 // L3b 209:17 / 209:24: 96–100 for two lines of title and the meta
