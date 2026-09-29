@@ -1,0 +1,53 @@
+{
+  "//": "FIXTURE DATA — the five P12b tiles for the simulator test account only. Every handle and URL is fake (@example-…, https://example.com/…); no images, so the tiles show the shimmer. Real suggestions arrive with Job H's adapters; pilot creators are seeded from Tim's JSON, never this file.",
+  "threads": [
+    {
+      "creator_id": "user_3JfYR4D8eJVCL3yieXStYYoqwaH",
+      "thread_title": "Rooftop chase ending with Ivy Mini",
+      "suggestions": [
+        {
+          "field": "format",
+          "source": "youtube",
+          "source_url": "https://example.com/youtube/outlier",
+          "source_handle": "@example-cuts",
+          "source_score": 12,
+          "title": "Open on the box, not your face — a 0.8 s cut",
+          "why": "Same cold-open shape as your rooftop chase.",
+          "near_card_title": "Rooftop chase ending with Ivy Mini"
+        },
+        {
+          "field": "sound",
+          "source": "tiktok",
+          "source_url": "https://example.com/tiktok/sound",
+          "source_handle": "@example-sounds",
+          "title": "A slow build into the drop, cut on the jump",
+          "why": "Your chase lands on one beat.",
+          "near_card_title": "Rooftop chase ending with Ivy Mini"
+        },
+        {
+          "field": "topic",
+          "source": "pinterest",
+          "source_url": "https://example.com/pinterest/trend",
+          "source_handle": "@example-boards",
+          "title": "Rooftop chases are trending this week",
+          "near_card_title": "Rooftop chase ending with Ivy Mini"
+        },
+        {
+          "field": "graph",
+          "source": "graph",
+          "title": "The same chase, told from the ground",
+          "why": "You keep coming back to the rooftop.",
+          "near_card_title": "Rooftop chase ending with Ivy Mini"
+        },
+        {
+          "field": "aesthetic",
+          "source": "pinterest",
+          "source_url": "https://example.com/pinterest/aesthetic",
+          "source_handle": "@example-light",
+          "title": "Rooftops at golden hour, shot from the ledge",
+          "near_card_title": "Rooftop chase ending with Ivy Mini"
+        }
+      ]
+    }
+  ]
+}
