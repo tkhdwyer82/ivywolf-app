@@ -3,8 +3,10 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type CardSource = 'voice' | 'import' | 'muse' | 'youtube' | 'tiktok' | 'pinterest'
-const PINNED: Partial<Record<CardSource, string>> = { youtube: 'YouTube', tiktok: 'TikTok', pinterest: 'Pinterest' }
+export type CardSource = 'voice' | 'import' | 'muse' | 'youtube' | 'tiktok' | 'pinterest' | 'graph'
+// A pinned suggestion's source, as its badge names it. 'graph' came from her own notes via More ideas (0031): it
+// sits on her recording, but it wasn't something she said, and the badge says so.
+const PINNED: Partial<Record<CardSource, string>> = { youtube: 'YouTube', tiktok: 'TikTok', pinterest: 'Pinterest', graph: 'More ideas' }
 
 export interface Sibling {
   id: string
@@ -24,7 +26,7 @@ export interface Idea {
   playFromMs: number
   frameUrl: string | null
   frameStatus: string
-  /** voice | import | muse, or — pinned from More ideas (0030) — youtube | tiktok | pinterest. */
+  /** voice | import | muse, or — pinned from More ideas (0030/0031) — youtube | tiktok | pinterest | graph. */
   source: CardSource
   sourceUrl: string | null
   createdAt: string
@@ -129,7 +131,7 @@ const day = (iso: string | null) => (iso ? DAYS[new Date(iso).getDay()] : null)
 /** L4b meta line: "Thu 0:31 · 2 cards · Launch video" — the day it was said and where in the recording (tap to
  *  hear it) or "via Muse", how many cards its thread has, and its project. */
 export function metaLine(idea: Idea): string {
-  const at = !idea.recordingId ? null : idea.viaMuse ? 'via Muse' : idea.source === 'voice' ? clock(idea.playFromMs) : 'added'
+  const at = !idea.recordingId ? null : idea.viaMuse ? 'via Muse' : idea.source === 'voice' || idea.source === 'graph' ? clock(idea.playFromMs) : 'added'
   const n = idea.thread ? idea.siblings.length + 1 : 0
   return [[day(idea.recordedAt), at].filter(Boolean).join(' '), n > 1 ? `${n} cards` : null, idea.project?.name ?? 'My things']
     .filter(Boolean)

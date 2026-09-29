@@ -13,5 +13,6 @@ describe('sourceBadge', () => {
     expect(sourceBadge(idea('youtube', '2026-09-29T11:30:00'), now)).toBe('via YouTube · pinned just now')
     expect(sourceBadge(idea('tiktok', '2026-09-29T08:00:00'), now)).toBe('via TikTok · pinned today')
     expect(sourceBadge(idea('pinterest', '2026-09-22T08:00:00'), now)).toBe('via Pinterest · pinned Tue')
+    expect(sourceBadge(idea('graph', '2026-09-29T11:59:00'), now)).toBe('via More ideas · pinned just now') // never looks rambled
   })
 })
