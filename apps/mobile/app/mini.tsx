@@ -11,7 +11,7 @@ import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router, useFocusEffect } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { useVideoPlayer, VideoView } from 'expo-video'
+import { createVideoPlayer, VideoView, type VideoPlayer } from 'expo-video'
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { importSession } from '@/lib/mini'
@@ -19,6 +19,7 @@ import { hero } from '@/lib/theme'
 import { Nav } from '@/components/Nav'
 
 const COMING_MS = 2600
+const HERO = require('@/assets/mini-hero.mp4')
 
 type Phase = { kind: 'idle' } | { kind: 'coming' } | { kind: 'importing' } | { kind: 'failed'; message: string }
 
@@ -26,17 +27,25 @@ export default function Mini() {
   const supabase = useSupabase()
   const { userId, getToken } = useAuth()
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
-  const player = useVideoPlayer(require('@/assets/mini-hero.mp4'), (p) => {
-    p.muted = true
-    p.loop = true
-    p.audioMixingMode = 'mixWithOthers'
-  })
+  const [player, setPlayer] = useState<VideoPlayer | null>(null)
 
+  // The focus effect owns the player: made on focus, paused then released on blur or unmount, in that order. With
+  // useVideoPlayer the hook released it on unmount before this cleanup's pause() ran, and Home (dismissTo, which
+  // unmounts Mini) crashed the release build on ERR_NATIVE_SHARED_OBJECT_NOT_FOUND.
   useFocusEffect(
     useCallback(() => {
-      player.play()
-      return () => player.pause()
-    }, [player]),
+      const p = createVideoPlayer(HERO)
+      p.muted = true
+      p.loop = true
+      p.audioMixingMode = 'mixWithOthers'
+      p.play()
+      setPlayer(p)
+      return () => {
+        setPlayer(null)
+        p.pause()
+        p.release()
+      }
+    }, []),
   )
 
   useEffect(() => {
@@ -64,7 +73,7 @@ export default function Mini() {
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
-      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} accessibilityIgnoresInvertColors />
+      {player && <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} allowsPictureInPicture={false} accessibilityIgnoresInvertColors />}
       <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.fade} pointerEvents="none" />
 
       <View style={styles.top}>
