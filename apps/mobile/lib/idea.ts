@@ -3,6 +3,9 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+export type CardSource = 'voice' | 'import' | 'muse' | 'youtube' | 'tiktok' | 'pinterest'
+const PINNED: Partial<Record<CardSource, string>> = { youtube: 'YouTube', tiktok: 'TikTok', pinterest: 'Pinterest' }
+
 export interface Sibling {
   id: string
   title: string
@@ -21,11 +24,15 @@ export interface Idea {
   playFromMs: number
   frameUrl: string | null
   frameStatus: string
-  source: 'voice' | 'import'
+  /** voice | import | muse, or — pinned from More ideas (0030) — youtube | tiktok | pinterest. */
+  source: CardSource
+  sourceUrl: string | null
+  createdAt: string
   /** Added through the Muse connector (recordings.source 'muse', 0026). */
   viaMuse: boolean
   heartedAt: string | null
-  recordingId: string
+  /** Null for a pinned suggestion: it was never said. */
+  recordingId: string | null
   storagePath: string | null
   recordedAt: string | null
   project: { id: string; name: string; kind: string } | null
@@ -40,7 +47,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 
 type Row = {
   id: string; title: string; gist: string; confidence: number; play_from_ms: number; frame_url: string | null
-  frame_status: string; source: 'voice' | 'import'; hearted_at: string | null; recording_id: string; created_at: string
+  frame_status: string; source: CardSource; source_url: string | null; hearted_at: string | null; recording_id: string | null; created_at: string
   recordings: { recorded_at: string | null; storage_path: string | null; source: string } | null
   projects: { id: string; name: string; kind: string } | null
   thread_cards: { threads: { id: string; title: string; return_count: number } | null }[]
@@ -52,7 +59,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, title, gist, confidence, play_from_ms, frame_url, frame_status, source, hearted_at, recording_id, created_at, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title, return_count))'
+        'id, title, gist, confidence, play_from_ms, frame_url, frame_status, source, source_url, hearted_at, recording_id, created_at, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title, return_count))'
       )
       .eq('id', id)
       .maybeSingle()
@@ -93,6 +100,8 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     frameUrl: row.frame_url,
     frameStatus: row.frame_status,
     source: row.source,
+    sourceUrl: row.source_url,
+    createdAt: row.created_at,
     viaMuse: row.recordings?.source === 'muse',
     heartedAt: row.hearted_at,
     recordingId: row.recording_id,
@@ -120,7 +129,7 @@ const day = (iso: string | null) => (iso ? DAYS[new Date(iso).getDay()] : null)
 /** L4b meta line: "Thu 0:31 · 2 cards · Launch video" — the day it was said and where in the recording (tap to
  *  hear it) or "via Muse", how many cards its thread has, and its project. */
 export function metaLine(idea: Idea): string {
-  const at = idea.viaMuse ? 'via Muse' : idea.source === 'voice' ? clock(idea.playFromMs) : 'added'
+  const at = !idea.recordingId ? null : idea.viaMuse ? 'via Muse' : idea.source === 'voice' ? clock(idea.playFromMs) : 'added'
   const n = idea.thread ? idea.siblings.length + 1 : 0
   return [[day(idea.recordedAt), at].filter(Boolean).join(' '), n > 1 ? `${n} cards` : null, idea.project?.name ?? 'My things']
     .filter(Boolean)
@@ -134,4 +143,17 @@ export function threadPill(idea: Idea): string | null {
     (a.recordedAt ?? '').localeCompare(b.recordedAt ?? '')
   )[0]
   return [`×${idea.thread.returnCount}`, [day(first.recordedAt), clock(first.playFromMs)].filter(Boolean).join(' ')].join(' · ')
+}
+
+/**
+ * A pinned suggestion's source badge (P12d), on the idea page only — never on a tile: "via YouTube · pinned just
+ * now", "· pinned today", "· pinned Tue". Null for her own ideas.
+ */
+export function sourceBadge(idea: Idea, now = new Date()): string | null {
+  const name = PINNED[idea.source]
+  if (!name) return null
+  const at = new Date(idea.createdAt)
+  const mins = (now.getTime() - at.getTime()) / 60000
+  const when = mins < 60 ? 'just now' : at.toDateString() === now.toDateString() ? 'today' : DAYS[at.getDay()]
+  return `via ${name} · pinned ${when}`
 }

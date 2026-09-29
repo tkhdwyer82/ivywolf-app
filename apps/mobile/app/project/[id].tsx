@@ -24,7 +24,8 @@ import { Tile, useTileWidth } from '@/components/Tile'
 import { SuggestionTile } from '@/components/SuggestionTile'
 import { ProjectTabs, type ProjectTab } from '@/components/ProjectTabs'
 import { Shimmer } from '@/components/Shimmer'
-import { hideSuggestion, loadMoreIdeas, type Suggestion } from '@/lib/suggestions'
+import { hideSuggestion, loadMoreIdeas, takePinNote, type PinNote, type Suggestion } from '@/lib/suggestions'
+import { IvyNote } from '@/components/IvyNote'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, radius, size, space, type } from '@ivywolf/ui'
 import { ActionBar, BAR_BOTTOM } from '@/components/ActionBar'
@@ -37,11 +38,20 @@ export default function Project() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<ProjectTab>('all')
   const [more, setMore] = useState<Awaited<ReturnType<typeof loadMoreIdeas>>>(null)
+  const [pinNote, setPinNote] = useState<PinNote | null>(null)
+  const [dissolve, setDissolve] = useState(false)
   const [menu, setMenu] = useState(false)
   const tileWidth = useTileWidth()
 
   // On focus: so a pin or a dismiss on the open screen, or a new card in the thread, is here when she's back.
   const load = useCallback(() => {
+    // Back from a pin (P12d): All ideas, with Ivy's one cited line; it dissolves on its own or on scroll.
+    const note = takePinNote(id)
+    if (note) {
+      setPinNote(note)
+      setDissolve(false)
+      setTab('all')
+    }
     Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id)])
       .then(([p, m]) => {
         setPage(p)
@@ -138,7 +148,7 @@ export default function Project() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }} onScrollBeginDrag={() => setDissolve(true)}>
         <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onShare={share} />
         <View style={styles.body}>
           <Text style={styles.name}>{project.name}</Text>
@@ -150,6 +160,11 @@ export default function Project() {
           </View>
           {error && <Text style={[type['Caption'], { marginTop: space.gutter }]}>{error}</Text>}
 
+          {pinNote && (
+            <View style={styles.pinNote}>
+              <IvyNote sentences={[{ text: pinNote.text, cites: pinNote.cites }]} dissolve={dissolve} onGone={() => setPinNote(null)} />
+            </View>
+          )}
           <ProjectTabs tab={tab} moreIdeas={!!more} onChange={setTab} />
           {!more && <View style={styles.noTabs} />}
 
@@ -290,6 +305,8 @@ const styles = StyleSheet.create({
   private: { borderRadius: CHIP_R, paddingHorizontal: CHIP_PAD_H, paddingVertical: CHIP_PAD_V, backgroundColor: colour.Chip },
   count: { ...type['Body'], color: colour.Grey },
   noTabs: { height: space.stack },
+  // IvyNote pads itself to the margin; the body already has it.
+  pinNote: { marginHorizontal: -space.margin },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   arrow: { width: ARROW, height: ARROW, borderRadius: ARROW / 2, backgroundColor: colour.Chip, alignItems: 'center', justifyContent: 'center' },
   // The strip runs to the screen's edge: out of the body's margin, back in for the first thumb.

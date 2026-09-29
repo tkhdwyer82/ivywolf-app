@@ -14,7 +14,7 @@ import { SymbolView } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
-import { loadIdea, metaLine, setHeart, threadPill, type Idea } from '@/lib/idea'
+import { loadIdea, metaLine, setHeart, sourceBadge, threadPill, type Idea } from '@/lib/idea'
 import { deleteCard } from '@/lib/deleteRecording'
 import { Glass, Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, radius, size, space, type } from '@ivywolf/ui'
@@ -110,6 +110,7 @@ export default function IdeaPage() {
   const drawn = idea.frameStatus === 'done' && !!idea.frameUrl
   const unsure = idea.confidence < LOW_CONFIDENCE
   const pill = threadPill(idea)
+  const badge = sourceBadge(idea)
 
   return (
     <View style={styles.screen}>
@@ -122,6 +123,11 @@ export default function IdeaPage() {
           )}
           <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: space.margin, top: space.margin }} />
           <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: space.margin, top: space.margin }} />
+          {badge && (
+            <View style={styles.badge} pointerEvents="none">
+              <Text style={type['Label / Pill']}>{badge}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.body}>
@@ -220,7 +226,9 @@ export default function IdeaPage() {
           onClose={() => setMenu(false)}
           items={[
             { icon: 'pencil', label: 'Edit idea', onPress: () => router.push(`/idea/edit/${idea.id}`) },
-            { icon: 'text.alignleft', label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) },
+            ...(idea.recordingId
+              ? [{ icon: 'text.alignleft' as const, label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) }]
+              : []),
             { icon: 'square.on.square', label: 'Copy', onPress: copy },
             { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
           ]}
@@ -245,6 +253,8 @@ const COUNT_R = 16
 const COUNT_PAD_H = 10
 const COUNT_PAD_V = 6
 const THUMBS_GAP = 14
+const BADGE_PAD_H = 8 // P12d 201:98: 8 × 4
+const BADGE_PAD_V = 4
 const TAP_SLOP = (size.tap - size.icon) / 2
 
 const styles = StyleSheet.create({
@@ -270,6 +280,16 @@ const styles = StyleSheet.create({
   projectName: { ...type['Body / Medium'], color: colour.Surface, flexShrink: 1 },
   moreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.section },
   count: { borderRadius: COUNT_R, paddingHorizontal: COUNT_PAD_H, paddingVertical: COUNT_PAD_V, backgroundColor: colour.Chip },
+  // P12d's "via YouTube · pinned just now" — here, never on the tile.
+  badge: {
+    position: 'absolute',
+    left: space.margin,
+    bottom: space.margin,
+    borderRadius: radius.chip,
+    paddingHorizontal: BADGE_PAD_H,
+    paddingVertical: BADGE_PAD_V,
+    backgroundColor: colour.Lime,
+  },
   thumbs: { paddingHorizontal: space.margin, paddingTop: THUMBS_GAP, gap: space.gutter },
   thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Shimmer },
 })

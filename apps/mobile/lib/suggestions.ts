@@ -101,3 +101,100 @@ export async function hideSuggestion(supabase: SupabaseClient, id: string): Prom
   if (error) throw new Error(`hide: ${error.message}`)
   return data === true
 }
+
+// ── One suggestion, open (P12c) ─────────────────────────────────────────────────────────────────────────────────
+
+export interface OpenSuggestion extends Suggestion {
+  status: string
+  project: { id: string; name: string } | null
+  /** "Near: <title>" — the card of hers it's nearest to: where it was said, for Ivy's line after a pin. */
+  near: { title: string; recordingId: string | null; ms: number; recordedAt: string | null } | null
+  /** The recording its why line cites, to play from why_ms. */
+  whyRecording: { storagePath: string | null; recordedAt: string | null } | null
+}
+
+export async function loadSuggestion(supabase: SupabaseClient, id: string): Promise<OpenSuggestion | null> {
+  const row = need(
+    'suggestion',
+    await supabase
+      .from('suggestions')
+      .select(`${COLUMNS}, status, projects(id, name), near:cards!near_card_id(title, recording_id, play_from_ms, created_at, recordings(recorded_at)), why_rec:recordings!why_recording_id(storage_path, recorded_at)`)
+      .eq('id', id)
+      .maybeSingle()
+  ) as unknown as
+    | (Row & {
+        status: string
+        projects: { id: string; name: string } | null
+        near: { title: string; recording_id: string | null; play_from_ms: number; created_at: string; recordings: { recorded_at: string | null } | null } | null
+        why_rec: { storage_path: string | null; recorded_at: string | null } | null
+      })
+    | null
+  if (!row) return null
+  return {
+    ...toSuggestion(row),
+    status: row.status,
+    project: row.projects,
+    near: row.near
+      ? { title: row.near.title, recordingId: row.near.recording_id, ms: row.near.play_from_ms, recordedAt: row.near.recordings?.recorded_at ?? row.near.created_at }
+      : null,
+    whyRecording: row.why_rec ? { storagePath: row.why_rec.storage_path, recordedAt: row.why_rec.recorded_at } : null,
+  }
+}
+
+/** open and play_why change nothing but the log (0028 lets her write those two herself). Best-effort. */
+export async function logSignal(supabase: SupabaseClient, creatorId: string, suggestionId: string, signal: 'open' | 'play_why') {
+  await supabase.from('suggestion_signals').insert({ creator_id: creatorId, suggestion_id: suggestionId, signal })
+}
+
+/** "+ Pin to <project>": the card's id (0030). */
+export async function pinSuggestion(supabase: SupabaseClient, id: string): Promise<string> {
+  const { data, error } = await supabase.rpc('pin_suggestion', { p_suggestion: id })
+  if (error) throw new Error(`pin: ${error.message}`)
+  return data as string
+}
+
+/** "Not for me". Never shown again. */
+export async function dismissSuggestion(supabase: SupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('act_on_suggestion', { p_suggestion: id, p_signal: 'dismiss' })
+  if (error) throw new Error(`dismiss: ${error.message}`)
+  return data === true
+}
+
+// ── After a pin (P12d): Ivy's one cited line on the project page ────────────────────────────────────────────────
+
+export const SOURCE_NAME: Record<string, string> = { youtube: 'YouTube', tiktok: 'TikTok', pinterest: 'Pinterest', graph: 'your notes' }
+const WHAT: Record<Suggestion['field'], string> = { format: 'cut', sound: 'sound', aesthetic: 'look', topic: 'topic', graph: 'idea' }
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const clock = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`
+
+export interface PinNote {
+  projectId: string
+  text: string
+  /** Rule 2: the line cites the card of hers it's near. */
+  cites: { recordingId: string | null; ms: number }[]
+}
+
+/**
+ * "From YouTube: one cut you pinned, near the rooftop chase · Tue 0:00" — the near card's title, the day it was said
+ * and its moment. Kept here until the project page shows it once (then it dissolves, v3.2 rule 4).
+ */
+let pending: PinNote | null = null
+export function notePin(s: OpenSuggestion) {
+  if (!s.project) return
+  const near = s.near
+  const where = near
+    ? `, near ${near.title.charAt(0).toLowerCase()}${near.title.slice(1)}${near.recordedAt ? ` · ${DAYS[new Date(near.recordedAt).getDay()]} ${clock(near.ms)}` : ''}`
+    : ''
+  pending = {
+    projectId: s.project.id,
+    text: `From ${SOURCE_NAME[s.source]}: one ${WHAT[s.field]} you pinned${where}.`,
+    cites: near ? [{ recordingId: near.recordingId, ms: near.ms }] : [],
+  }
+}
+/** The project page takes its note once. */
+export function takePinNote(projectId: string): PinNote | null {
+  if (pending?.projectId !== projectId) return null
+  const n = pending
+  pending = null
+  return n
+}

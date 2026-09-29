@@ -112,6 +112,7 @@ export async function listIdeas(
     .from('cards')
     .select(status ? CARD_COLUMNS.replace('thread_cards(threads(', 'thread_cards!inner(threads!inner(') : CARD_COLUMNS)
     .eq('creator_id', creatorId)
+    .not('recording_id', 'is', null) // her ideas only: a pinned suggestion (Job G) is someone else's cut, with no cite
     .gte('created_at', new Date(args.since).toISOString())
   if (args.project) q = q.eq('project_id', await projectId(creatorId, args.project))
   if (status) q = q.eq('thread_cards.threads.stage', status)
@@ -178,7 +179,7 @@ function toAction(a: ActionRow): Action {
 
 export async function getIdea(creatorId: string, args: { id: string }) {
   const row = check(
-    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).eq('id', args.id).maybeSingle()
+    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).eq('id', args.id).not('recording_id', 'is', null).maybeSingle()
   ) as unknown as CardRow | null
   if (!row) throw new McpError("I couldn't find that idea in your Ivy. It may have been deleted.")
 
