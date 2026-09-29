@@ -13,9 +13,8 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Tex
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
-import { useAudioPlayer } from 'expo-audio'
 import { useSupabase } from '@/lib/supabase'
-import { masonry, projectFrameHeight, type Item } from '@/lib/home'
+import { masonry } from '@/lib/home'
 import { countLine, deleteProject, loadProject, renameProject, type ProjectPage } from '@/lib/project'
 import { Tile, useTileWidth } from '@/components/Tile'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
@@ -30,8 +29,6 @@ export default function Project() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<'all' | 'more'>('all')
   const [menu, setMenu] = useState(false)
-  const [playing, setPlaying] = useState<string | null>(null)
-  const player = useAudioPlayer(null)
   const tileWidth = useTileWidth()
 
   const load = useCallback(() => {
@@ -43,20 +40,6 @@ export default function Project() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
   }, [supabase, id])
   useFocusEffect(load)
-
-  async function play(item: Item) {
-    if (item.kind !== 'card' || !item.storagePath) return
-    if (playing === item.id) {
-      player.pause()
-      return setPlaying(null)
-    }
-    const { data } = await supabase.storage.from('recordings').createSignedUrl(item.storagePath, 3600)
-    if (!data) return
-    player.replace({ uri: data.signedUrl })
-    await player.seekTo(item.playFromMs / 1000)
-    player.play()
-    setPlaying(item.id)
-  }
 
   function rename() {
     if (!page) return
@@ -110,7 +93,7 @@ export default function Project() {
   const { project, ideas, boards } = page
   const talk = () => router.push({ pathname: '/record', params: { projectId: project.id } })
   const own = project.kind === 'user'
-  const [left, right] = masonry(ideas, (i) => projectFrameHeight(i) + space.gutter)
+  const [left, right] = masonry(ideas)
 
   // Rule 1: before the first idea, the whole screen is the prompt to talk to it.
   if (ideas.length === 0) {
@@ -155,15 +138,9 @@ export default function Project() {
               {[left, right].map((col, c) => (
                 <View key={c} style={{ width: tileWidth }}>
                   {col.map((item) => (
-                    <Tile
-                      key={item.id}
-                      item={item}
-                      meta=""
-                      inside
-                      playing={playing === item.id}
-                      onPlay={play}
-                      onOpen={(i) => router.push(`/idea/${i.id}`)}
-                    />
+                    <View key={item.id} style={styles.cell}>
+                      <Tile item={item} width={tileWidth} onOpen={(i) => router.push(`/idea/${i.id}`)} />
+                    </View>
                   ))}
                 </View>
               ))}
@@ -261,6 +238,7 @@ const styles = StyleSheet.create({
   tabOn: { color: colour.Ink },
   tabRule: { height: RULE_H, borderRadius: RULE_R, backgroundColor: colour.Ink, marginTop: RULE_GAP },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },
+  cell: { paddingBottom: space.gutter },
   cold: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: COLD_PAD, paddingBottom: BAR_BOTTOM + size['bar-h'] },
   coldTitle: { ...type['Title / Section'], textAlign: 'center' },
   coldLine: { textAlign: 'center', marginTop: space.gutter },

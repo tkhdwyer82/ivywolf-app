@@ -9,12 +9,12 @@
 // on their own.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { FlashList, type FlashListRef } from '@shopify/flash-list'
 import { router, useFocusEffect } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { SymbolView } from 'expo-symbols'
-import { useAudioPlayer } from 'expo-audio'
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { requestProcessing } from '@/lib/record'
@@ -22,10 +22,10 @@ import {
   retryRecording,
   type FailedRecording,
   groupByDay,
+  type DayGroup,
   ivyOnOpen,
   loadHome,
   markOpened,
-  masonry,
   metaLine,
   type HomeData,
   type Item,
@@ -33,7 +33,7 @@ import {
 } from '@/lib/home'
 import { colour, space, size, type } from '@ivywolf/ui'
 import { IvyNote } from '@/components/IvyNote'
-import { Tile, useTileWidth } from '@/components/Tile'
+import { Tile } from '@/components/Tile'
 import { ProjectChips } from '@/components/HomeChrome'
 import { Nav } from '@/components/Nav'
 import { BAR_BOTTOM } from '@/components/ActionBar'
@@ -53,10 +53,7 @@ export default function Home() {
   const [project, setProject] = useState<string | null>(null)
   const [ivy, setIvy] = useState<IvySentence[] | null>(null)
   const [dissolve, setDissolve] = useState(false)
-  const [playing, setPlaying] = useState<string | null>(null)
-  const scroll = useRef<ScrollView>(null)
-  const player = useAudioPlayer(null)
-  const tileWidth = useTileWidth()
+  const list = useRef<FlashListRef<Row>>(null)
 
   const load = useCallback(async () => {
     if (!userId) return
@@ -109,27 +106,12 @@ export default function Home() {
     () => (data ? data.items.filter((i) => project === null || i.projectId === project) : []),
     [data, project]
   )
-  const groups = useMemo(() => groupByDay(visible), [visible])
+  const rows = useMemo(() => toRows(groupByDay(visible)), [visible])
   // Ivy Mini appears as a chip once it has something in it.
   const chips = useMemo(
     () => (data ? data.projects.filter((p) => p.kind !== 'mini' || data.items.some((i) => i.projectId === p.id)) : []),
     [data]
   )
-
-  async function play(item: Item) {
-    if (item.kind !== 'card' || !item.storagePath) return
-    if (playing === item.id) {
-      player.pause()
-      setPlaying(null)
-      return
-    }
-    const { data: signed, error } = await supabase.storage.from('recordings').createSignedUrl(item.storagePath, 3600)
-    if (error || !signed) return
-    player.replace({ uri: signed.signedUrl })
-    await player.seekTo(item.playFromMs / 1000)
-    player.play()
-    setPlaying(item.id)
-  }
 
   async function createProject(name: string) {
     if (!userId) return
@@ -176,53 +158,58 @@ export default function Home() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView
-        ref={scroll}
-        stickyHeaderIndices={[]}
-        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }}
+      <FlashList
+        ref={list}
+        data={rows}
+        masonry
+        numColumns={2}
+        keyExtractor={(r) => r.key}
+        getItemType={(r) => (r.kind === 'day' ? 'day' : r.item.kind)}
+        overrideItemLayout={(layout, r) => {
+          if (r.kind === 'day') layout.span = 2
+        }}
+        contentContainerStyle={{
+          paddingTop: insets.top,
+          paddingHorizontal: space.margin - space.gutter / 2,
+          paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section,
+        }}
         onScrollBeginDrag={() => setDissolve(true)}
-        scrollEventThrottle={16}
-      >
-        <Header />
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Header />
+            {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} />}
+            <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
+            {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
+            {failed}
+          </View>
+        }
+        renderItem={({ item: r }) =>
+          r.kind === 'day' ? (
+            <Text style={styles.divider}>{r.label}</Text>
+          ) : (
+            <View style={styles.cell}>
+              <Tile
+                item={r.item}
+                meta={r.item.kind === 'action' ? metaLine(r.item, data.projects) : undefined}
+                onOpen={(i) => router.push(i.kind === 'card' ? `/idea/${i.id}` : `/todo/${i.id}`)}
+              />
+            </View>
+          )
+        }
+      />
 
-        {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} />}
-
-        <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
-
-        {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
-        {failed}
-
-        <View style={styles.grid}>
-          {groups.map((g) => {
-            const [left, right] = masonry(g.items)
-            return (
-              <View key={g.day}>
-                {g.label && <Text style={styles.divider}>{g.label}</Text>}
-                <View style={styles.columns}>
-                  {[left, right].map((col, c) => (
-                    <View key={c} style={{ width: tileWidth }}>
-                      {col.map((item) => (
-                        <Tile
-                          key={item.id}
-                          item={item}
-                          meta={metaLine(item, data.projects)}
-                          playing={playing === item.id}
-                          onPlay={play}
-                          onOpen={(i) => router.push(i.kind === 'card' ? `/idea/${i.id}` : `/todo/${i.id}`)}
-                        />
-                      ))}
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )
-          })}
-        </View>
-      </ScrollView>
-
-      <Nav room="home" listening={data.inFlight > 0} onHome={() => scroll.current?.scrollTo({ y: 0, animated: true })} />
+      <Nav room="home" listening={data.inFlight > 0} onHome={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />
     </View>
   )
+}
+
+/** Home's list: each day's overline across both columns, then its tiles in the masonry, newest first. */
+type Row = { kind: 'day'; key: string; label: string } | { kind: 'tile'; key: string; item: Item }
+function toRows(groups: DayGroup[]): Row[] {
+  return groups.flatMap((g) => [
+    ...(g.label ? [{ kind: 'day' as const, key: `day-${g.day}`, label: g.label }] : []),
+    ...g.items.map((item) => ({ kind: 'tile' as const, key: item.id, item })),
+  ])
 }
 
 /** Wordmark, then search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
@@ -295,9 +282,11 @@ const styles = StyleSheet.create({
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.stack },
   avatar: { width: size.icon, height: size.icon, alignItems: 'center', justifyContent: 'center' },
   avatarGlyph: { width: size.icon / 2, height: size.icon / 2 },
-  grid: { paddingHorizontal: space.margin, paddingTop: space.section - space.stack },
-  columns: { flexDirection: 'row', justifyContent: 'space-between' },
-  divider: { ...type['Label / Overline'], color: colour.Grey, textTransform: 'uppercase', marginTop: space.stack, marginBottom: OVERLINE_GAP },
+  // The list is inset by margin − gutter/2 and every cell pads gutter/2, so tiles sit at the margin, a gutter apart;
+  // the header undoes the inset.
+  listHeader: { marginHorizontal: -(space.margin - space.gutter / 2), paddingBottom: space.section - space.stack },
+  cell: { paddingHorizontal: space.gutter / 2, paddingBottom: space.gutter },
+  divider: { ...type['Label / Overline'], color: colour.Grey, textTransform: 'uppercase', marginHorizontal: space.gutter / 2, marginTop: space.stack, marginBottom: OVERLINE_GAP },
   firstHero: { position: 'absolute', left: space.margin, right: space.margin },
   firstTitle: { fontSize: L1.title, fontWeight: '700', color: colour.Ink },
   firstBody: { fontSize: L1.body, lineHeight: L1.bodyLine, color: colour.Grey, width: L1.bodyWidth, marginTop: L1.bodyGap },
