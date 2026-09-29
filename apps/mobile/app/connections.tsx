@@ -1,9 +1,11 @@
 // apps/mobile/app/connections.tsx
 // Connect, from Add to ideas (P2): the connections catalogue (0013), read-only for now. Each tool is shown by its
 // verb (rule 4 — verbs, not tools); connecting comes with P15/P16, once they have images.
+// Muse sits first and apart: it's the one connection that runs the other way — Muse asks Ivy (Job F).
 
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { router } from 'expo-router'
 import { useSupabase } from '@/lib/supabase'
 import { hero, text } from '@/lib/theme'
 
@@ -32,6 +34,15 @@ export default function Connections() {
   }
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.list}>
+      <Pressable onPress={() => router.push('/muse')} style={styles.row} accessibilityRole="button">
+        <View style={styles.tile}>
+          <Text style={styles.initial}>M</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={text.headingSmall}>Connect your Muse</Text>
+          <Text style={[text.caption, styles.secondary]}>ask your Muse about your ideas</Text>
+        </View>
+      </Pressable>
       <Text style={[text.bodySmall, styles.secondary]}>Tools Ivy can hand your ideas to. Connecting them comes next.</Text>
       {rows.map((c) => (
         <View key={c.slug} style={styles.row}>

@@ -1,0 +1,4 @@
+-- Rolled-back test for 0025 (write, test in a rolled-back transaction, dry-run, push).
+-- Applies 0024 (0025 references creator_api_keys) and 0025 inside the transaction, and rolls everything back.
+--
+--   node scripts/build-sql-test.mjs 0025 && supabase db query --linked -f scripts/test-0025.sql

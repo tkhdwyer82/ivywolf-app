@@ -21,6 +21,8 @@ export interface Idea {
   frameUrl: string | null
   frameStatus: string
   source: 'voice' | 'import'
+  /** Added through the Muse connector (recordings.source 'muse', 0026). */
+  viaMuse: boolean
   heartedAt: string | null
   recordingId: string
   storagePath: string | null
@@ -38,7 +40,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 type Row = {
   id: string; title: string; gist: string; confidence: number; play_from_ms: number; frame_url: string | null
   frame_status: string; source: 'voice' | 'import'; hearted_at: string | null; recording_id: string; created_at: string
-  recordings: { recorded_at: string | null; storage_path: string } | null
+  recordings: { recorded_at: string | null; storage_path: string | null; source: string } | null
   projects: { id: string; name: string; kind: string } | null
   thread_cards: { threads: { id: string; title: string } | null }[]
 }
@@ -49,7 +51,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, title, gist, confidence, play_from_ms, frame_url, frame_status, source, hearted_at, recording_id, created_at, recordings(recorded_at, storage_path), projects(id, name, kind), thread_cards(threads(id, title))'
+        'id, title, gist, confidence, play_from_ms, frame_url, frame_status, source, hearted_at, recording_id, created_at, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title))'
       )
       .eq('id', id)
       .maybeSingle()
@@ -88,6 +90,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     frameUrl: row.frame_url,
     frameStatus: row.frame_status,
     source: row.source,
+    viaMuse: row.recordings?.source === 'muse',
     heartedAt: row.hearted_at,
     recordingId: row.recording_id,
     storagePath: row.recordings?.storage_path ?? null,
@@ -109,9 +112,9 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** "Tim · Sun 12:04 · 0:48" — who, when it was said (her local time), where in the recording. */
+/** "Tim · Sun 12:04 · 0:48" — who, when it was said (her local time), where in the recording — or "via Muse". */
 export function byline(name: string | null, idea: Idea): string {
   const at = idea.recordedAt ? new Date(idea.recordedAt) : null
   const when = at ? `${DAYS[at.getDay()]} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : null
-  return [name, when, idea.source === 'voice' ? clock(idea.playFromMs) : 'added'].filter(Boolean).join(' · ')
+  return [name, when, idea.viaMuse ? 'via Muse' : idea.source === 'voice' ? clock(idea.playFromMs) : 'added'].filter(Boolean).join(' · ')
 }

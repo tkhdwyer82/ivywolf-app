@@ -9,7 +9,11 @@ export const EMBEDDING_DIMS = 1024
 /** The text a card is embedded as. Keep in one place: the eval and the pipeline must embed identically. */
 export const cardText = (card: { title: string; gist: string }) => `${card.title}\n${card.gist}`
 
-export async function embed(texts: string[]): Promise<number[][]> {
+/**
+ * inputType: 'document' for what is stored (cards), 'query' for what is searched with (the MCP server's search_ideas).
+ * Voyage embeds the two asymmetrically; cosine between a query and documents is what it's tuned for.
+ */
+export async function embed(texts: string[], inputType: 'document' | 'query' = 'document'): Promise<number[][]> {
   if (texts.length === 0) return []
   const key = process.env.VOYAGE_API_KEY
   if (!key) throw new Error('VOYAGE_API_KEY is not set')
@@ -17,7 +21,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
   const res = await fetch(VOYAGE_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ input: texts, model: EMBEDDING_MODEL, input_type: 'document' }),
+    body: JSON.stringify({ input: texts, model: EMBEDDING_MODEL, input_type: inputType }),
   })
   if (!res.ok) throw new Error(`Voyage failed: ${res.status} ${await res.text()}`)
 

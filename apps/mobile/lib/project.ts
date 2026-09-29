@@ -19,7 +19,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
   confidence: number; frame_url: string | null; frame_status: CardItem['frameStatus']; frame_at: string | null
-  created_at: string; recordings: { recorded_at: string | null; storage_path: string } | null
+  created_at: string; recordings: { recorded_at: string | null; storage_path: string | null; source: string } | null
   thread_cards: { threads: { thread_cards: { card_id: string }[] } | null }[]
 }
 
@@ -29,7 +29,7 @@ export async function loadProject(supabase: SupabaseClient, id: string): Promise
     supabase
       .from('cards')
       .select(
-        'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, recordings(recorded_at, storage_path), thread_cards(threads(thread_cards(card_id)))'
+        'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, recordings(recorded_at, storage_path, source), thread_cards(threads(thread_cards(card_id)))'
       )
       .eq('project_id', id)
       .order('created_at', { ascending: false }),
@@ -54,6 +54,7 @@ export async function loadProject(supabase: SupabaseClient, id: string): Promise
       frameAt: c.frame_at,
       at: c.recordings?.recorded_at ?? c.created_at,
       storagePath: c.recordings?.storage_path ?? null,
+      viaMuse: c.recordings?.source === 'muse',
       threadSize: c.thread_cards[0]?.threads?.thread_cards.length ?? 1,
     }))
     .sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0))

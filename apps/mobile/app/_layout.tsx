@@ -36,6 +36,7 @@ function Routes() {
           options={{ headerShown: false, presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
         />
         <Stack.Screen name="connections" options={{ title: 'Connect', headerBackTitle: 'Home', contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen name="muse" options={{ title: 'Connect your Muse', headerBackTitle: 'Connect', contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="things" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="todo/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="project/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />

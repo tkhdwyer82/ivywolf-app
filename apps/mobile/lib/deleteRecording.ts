@@ -27,7 +27,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
   return r.data
 }
 
-export async function deleteRecording(supabase: SupabaseClient, recording: { id: string; storage_path: string }) {
+export async function deleteRecording(supabase: SupabaseClient, recording: { id: string; storage_path: string | null }) {
   const cards = need(
     'cards',
     await supabase.from('cards').select('frame_url, media_path').eq('recording_id', recording.id)
@@ -49,8 +49,11 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
     if (count === 0 && path) paths.push(path)
   }
 
-  const removed = await supabase.storage.from('recordings').remove([recording.storage_path])
-  if (removed.error) throw new Error(`audio: ${removed.error.message}`)
+  // A text recording (0026: an idea added through Muse) has no audio to remove.
+  if (recording.storage_path) {
+    const removed = await supabase.storage.from('recordings').remove([recording.storage_path])
+    if (removed.error) throw new Error(`audio: ${removed.error.message}`)
+  }
   const originals = cards.map((c) => c.media_path).filter((p): p is string => !!p)
   if (originals.length) {
     const gone = await supabase.storage.from('imports').remove(originals)
