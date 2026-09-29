@@ -10,6 +10,7 @@ export interface Sibling {
   frameStatus: string
   playFromMs: number
   storagePath: string | null
+  recordedAt: string | null
 }
 
 export interface Idea {
@@ -28,7 +29,7 @@ export interface Idea {
   storagePath: string | null
   recordedAt: string | null
   project: { id: string; name: string; kind: string } | null
-  thread: { id: string; title: string } | null
+  thread: { id: string; title: string; returnCount: number } | null
   siblings: Sibling[]
 }
 
@@ -42,7 +43,7 @@ type Row = {
   frame_status: string; source: 'voice' | 'import'; hearted_at: string | null; recording_id: string; created_at: string
   recordings: { recorded_at: string | null; storage_path: string | null; source: string } | null
   projects: { id: string; name: string; kind: string } | null
-  thread_cards: { threads: { id: string; title: string } | null }[]
+  thread_cards: { threads: { id: string; title: string; return_count: number } | null }[]
 }
 
 export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Idea | null> {
@@ -51,23 +52,24 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, title, gist, confidence, play_from_ms, frame_url, frame_status, source, hearted_at, recording_id, created_at, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title))'
+        'id, title, gist, confidence, play_from_ms, frame_url, frame_status, source, hearted_at, recording_id, created_at, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title, return_count))'
       )
       .eq('id', id)
       .maybeSingle()
   ) as unknown as Row | null
   if (!row) return null
 
-  const thread = row.thread_cards[0]?.threads ?? null
+  const t = row.thread_cards[0]?.threads ?? null
+  const thread = t ? { id: t.id, title: t.title, returnCount: t.return_count } : null
   let siblings: Sibling[] = []
   if (thread) {
     const rows = need(
       'thread',
       await supabase
         .from('thread_cards')
-        .select('cards(id, title, frame_url, frame_status, play_from_ms, recordings(storage_path))')
+        .select('cards(id, title, frame_url, frame_status, play_from_ms, created_at, recordings(storage_path, recorded_at))')
         .eq('thread_id', thread.id)
-    ) as unknown as { cards: { id: string; title: string; frame_url: string | null; frame_status: string; play_from_ms: number; recordings: { storage_path: string } | null } | null }[]
+    ) as unknown as { cards: { id: string; title: string; frame_url: string | null; frame_status: string; play_from_ms: number; created_at: string; recordings: { storage_path: string; recorded_at: string | null } | null } | null }[]
     siblings = rows
       .map((r) => r.cards)
       .filter((c): c is NonNullable<typeof c> => !!c && c.id !== id)
@@ -78,6 +80,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
         frameStatus: c.frame_status,
         playFromMs: c.play_from_ms,
         storagePath: c.recordings?.storage_path ?? null,
+        recordedAt: c.recordings?.recorded_at ?? c.created_at,
       }))
   }
 
@@ -112,9 +115,23 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** "Tim · Sun 12:04 · 0:48" — who, when it was said (her local time), where in the recording — or "via Muse". */
-export function byline(name: string | null, idea: Idea): string {
-  const at = idea.recordedAt ? new Date(idea.recordedAt) : null
-  const when = at ? `${DAYS[at.getDay()]} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : null
-  return [name, when, idea.viaMuse ? 'via Muse' : idea.source === 'voice' ? clock(idea.playFromMs) : 'added'].filter(Boolean).join(' · ')
+const day = (iso: string | null) => (iso ? DAYS[new Date(iso).getDay()] : null)
+
+/** L4b meta line: "Thu 0:31 · 2 cards · Launch video" — the day it was said and where in the recording (tap to
+ *  hear it) or "via Muse", how many cards its thread has, and its project. */
+export function metaLine(idea: Idea): string {
+  const at = idea.viaMuse ? 'via Muse' : idea.source === 'voice' ? clock(idea.playFromMs) : 'added'
+  const n = idea.thread ? idea.siblings.length + 1 : 0
+  return [[day(idea.recordedAt), at].filter(Boolean).join(' '), n > 1 ? `${n} cards` : null, idea.project?.name ?? 'My things']
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** L4b thread pill: "×4 · Thu 0:31" — how often she's come back to the thread, and where it started. */
+export function threadPill(idea: Idea): string | null {
+  if (!idea.thread) return null
+  const first = [{ recordedAt: idea.recordedAt, playFromMs: idea.playFromMs }, ...idea.siblings].sort((a, b) =>
+    (a.recordedAt ?? '').localeCompare(b.recordedAt ?? '')
+  )[0]
+  return [`×${idea.thread.returnCount}`, [day(first.recordedAt), clock(first.playFromMs)].filter(Boolean).join(' ')].join(' · ')
 }

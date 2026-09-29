@@ -195,7 +195,7 @@ export function dayLabel(day: string, now = new Date()): string | null {
   const date = new Date(y, m - 1, d)
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const days = Math.round((today.getTime() - date.getTime()) / 86_400_000)
-  if (days <= 0) return null
+  if (days <= 0) return 'TODAY' // L3b (Figma 209:2) labels today too
   if (days === 1) return 'YESTERDAY'
   if (days < 7) return WEEKDAYS[date.getDay()]
   return `${d} ${MONTHS[m - 1]}${y !== now.getFullYear() ? ` ${y}` : ''}`

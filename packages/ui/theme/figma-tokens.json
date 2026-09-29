@@ -1,0 +1,46 @@
+{
+  "file": "H9nRPbwfGDwkho3gacQT53",
+  "dumped": "2026-09-29",
+  "how": "Figma MCP get_variable_defs on 201:2 (section v3.4 — More ideas, pushed) and 209:2 (L3b Home). Entries marked frameOnly are not bound on any screen yet; their values are read off the Launch UI · metrics frame (206:26).",
+  "variables": {
+    "space/margin": { "value": 12, "frameOnly": true },
+    "space/gutter": { "value": 8, "frameOnly": true },
+    "space/stack": { "value": 16, "frameOnly": true },
+    "space/section": { "value": 28, "frameOnly": true },
+    "size/tile-w": { "value": 181 },
+    "size/thumb": { "value": 110 },
+    "size/pin": { "value": 30 },
+    "size/lime-dot": { "value": 36 },
+    "size/icon": { "value": 28, "frameOnly": true },
+    "size/tap": { "value": 44, "frameOnly": true },
+    "size/nav": { "value": 56, "frameOnly": true },
+    "size/bar-h": { "value": 72 },
+    "radius/tile": { "value": 20 },
+    "radius/thumb": { "value": 18 },
+    "radius/chip": { "value": 14, "frameOnly": true },
+    "radius/button": { "value": 26, "frameOnly": true },
+    "radius/bar": { "value": 28 }
+  },
+  "paints": {
+    "Colour / Ink": "#1D1D1F",
+    "Colour / Grey": "#6E6E73",
+    "Colour / Lime": "#D8F27A",
+    "Colour / Chip": "#F0F0F0",
+    "Colour / Surface": "#FFFFFF",
+    "Colour / Shimmer": "#E5E5E8"
+  },
+  "textStyles": {
+    "Title / Screen": { "style": "Bold", "size": 34, "weight": 700, "lineHeight": 36, "letterSpacing": -0.6 },
+    "Title / Section": { "style": "Bold", "size": 22, "weight": 700, "lineHeight": 28, "letterSpacing": -0.4 },
+    "Heading / Small": { "style": "Semibold", "size": 18, "weight": 590, "lineHeight": 22, "letterSpacing": -0.2 },
+    "Heading / Card": { "style": "Semibold", "size": 17, "weight": 590, "lineHeight": 24, "letterSpacing": -0.3 },
+    "Body / Large": { "style": "Regular", "size": 17, "weight": 400, "lineHeight": 24, "letterSpacing": 0 },
+    "Body": { "style": "Regular", "size": 15, "weight": 400, "lineHeight": 21, "letterSpacing": 0 },
+    "Body / Medium": { "style": "Medium", "size": 15, "weight": 510, "lineHeight": 18, "letterSpacing": 0 },
+    "Body / Small": { "style": "Regular", "size": 13, "weight": 400, "lineHeight": 18, "letterSpacing": 0 },
+    "Caption": { "style": "Regular", "size": 13, "weight": 400, "lineHeight": null, "letterSpacing": 0, "colour": "Colour / Grey", "frameOnly": true },
+    "Label / Overline": { "style": "Semibold", "size": 11, "weight": 590, "lineHeight": 14, "letterSpacing": 1.2 },
+    "Label / Tab": { "style": "Medium", "size": 12, "weight": 510, "lineHeight": 13, "letterSpacing": 0.2 },
+    "Label / Pill": { "style": "Medium", "size": 11, "weight": 510, "lineHeight": 12, "letterSpacing": 0.5 }
+  }
+}

@@ -3,6 +3,7 @@
 
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SymbolView, type SFSymbol } from 'expo-symbols'
+import { colour, size } from '@ivywolf/ui'
 import { hero } from '@/lib/theme'
 
 /** The ••• menu (P6): a 240-pt card at the top right over a light scrim. */
@@ -41,23 +42,28 @@ export function Menu({
 }
 
 export const DESTRUCTIVE = '#E54033'
+/** The ••• menu opens this far under the safe area (Figma 83:201). */
+export const MENU_OFFSET = 10
 
 export function Glass({ icon, label, onPress, style }: { icon: SFSymbol; label: string; onPress: () => void; style: object }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={[styles.glass, style]}>
-      <SymbolView name={icon} tintColor={hero.ink} size={18} weight="semibold" />
+    <Pressable onPress={onPress} hitSlop={(size.tap - GLASS) / 2} accessibilityRole="button" accessibilityLabel={label} style={[styles.glass, style]}>
+      <SymbolView name={icon} tintColor={colour.Ink} size={GLASS / 2} weight="semibold" />
     </Pressable>
   )
 }
 
-// Figma 83:201 — glass 44 × 44 radius 14; menu 240 wide, radius 24, rows 48.
+// L4b (Figma 209:38/40) — glass is a 36 white disc, 12 in from the frame's corner (callers place it); its target
+// reaches size/tap with slop. Figma 83:201 — menu 240 wide, radius 24, rows 48.
+const GLASS = 36
+
 const styles = StyleSheet.create({
   glass: {
     position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    width: GLASS,
+    height: GLASS,
+    borderRadius: GLASS / 2,
+    backgroundColor: colour.Surface,
     alignItems: 'center',
     justifyContent: 'center',
   },

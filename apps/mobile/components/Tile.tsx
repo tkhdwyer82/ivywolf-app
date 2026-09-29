@@ -6,13 +6,21 @@
 // `inside` is a project page's pin (P11): the title sits in the frame, the play button at the top right, and
 // there's no caption under it.
 
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { SymbolView } from 'expo-symbols'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
+import { colour, radius, size, space, type } from '@ivywolf/ui'
 import { hero, text } from '@/lib/theme'
 import { frameHeight, projectFrameHeight, type Item } from '@/lib/home'
 
-export const TILE_WIDTH = 170
+/**
+ * Two columns, always (never three): margin + tile + gutter + tile + margin fills the screen. Figma draws size/tile-w
+ * 181 at 393, which adds up to 394; at 393 this gives 180.5, and wider phones grow the tile.
+ */
+export function useTileWidth(): number {
+  const { width } = useWindowDimensions()
+  return (width - space.margin * 2 - space.gutter) / 2
+}
 
 export function Tile({
   item,
@@ -34,13 +42,14 @@ export function Tile({
   const unsure = item.kind === 'card' && item.confidence < LOW_CONFIDENCE
   const height = inside ? projectFrameHeight(item) : frameHeight(item)
   const drawn = item.frameStatus === 'done' && !!item.frameUrl
+  const width = useTileWidth()
 
   return (
     <Pressable
       onPress={onOpen ? () => onOpen(item) : undefined}
       disabled={!onOpen}
       accessibilityRole={onOpen ? 'button' : undefined}
-      style={[styles.tile, unsure && styles.unsure]}
+      style={[styles.tile, { width }, unsure && styles.unsure]}
     >
       <View style={[styles.frame, { height }]}>
         {drawn ? (
@@ -115,9 +124,9 @@ function Fade() {
 const FADE = [0, 0.04, 0.08, 0.13, 0.18, 0.24, 0.3, 0.36]
 
 const styles = StyleSheet.create({
-  tile: { width: TILE_WIDTH, marginBottom: 16 },
+  tile: { marginBottom: space.gutter },
   unsure: { opacity: 0.5 },
-  frame: { borderRadius: 16, overflow: 'hidden', backgroundColor: hero.fill },
+  frame: { borderRadius: radius.tile, overflow: 'hidden', backgroundColor: colour.Chip },
   typographic: { flex: 1, padding: 14, justifyContent: 'flex-end', backgroundColor: hero.fill, borderLeftWidth: 4, borderLeftColor: hero.lime },
   typographicTitle: { color: hero.ink },
   pill: { position: 'absolute', left: 10, top: 10, backgroundColor: hero.lime, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },

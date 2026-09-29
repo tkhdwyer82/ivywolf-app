@@ -12,7 +12,7 @@ import { useAudioPlayer } from 'expo-audio'
 import { useSupabase } from '@/lib/supabase'
 import { masonry, metaLine, type CardItem, type Item, type Project } from '@/lib/home'
 import { searchIdeas } from '@/lib/search'
-import { Tile, TILE_WIDTH } from '@/components/Tile'
+import { Tile, useTileWidth } from '@/components/Tile'
 import { hero, text } from '@/lib/theme'
 
 const SEARCH_WAIT_MS = 250
@@ -129,6 +129,7 @@ function Results({
   playing: string | null
   onPlay: (item: Item) => void
 }) {
+  const tileWidth = useTileWidth()
   if (!results || results.q !== q) return <ActivityIndicator color={hero.ink} style={{ marginTop: 40 }} />
   if (results.failed) return null // the error line above says why
   if (results.ideas.length === 0) {
@@ -138,7 +139,7 @@ function Results({
   return (
     <View style={[styles.columns, { marginTop: 20 }]}>
       {[left, right].map((col, c) => (
-        <View key={c} style={{ width: TILE_WIDTH }}>
+        <View key={c} style={{ width: tileWidth }}>
           {col.map((item) => (
             <Tile key={item.id} item={item} meta={metaLine(item, projects)} playing={playing === item.id} onPlay={onPlay} onOpen={(i) => router.push(`/idea/${i.id}`)} />
           ))}
