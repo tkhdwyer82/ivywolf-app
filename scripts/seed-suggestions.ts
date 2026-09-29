@@ -8,7 +8,8 @@
 // Pilot creators are seeded from Tim's JSON.
 //
 // The file: { "threads": [ { "creator_id", "thread_id" | "thread_title", "suggestions": [five of
-//   { field, source, source_url?, source_handle?, source_score?, title, why?, near_card_title?, frame_url? }] } ] }
+//   { field, source, source_url?, source_handle?, source_score?, title, why?, near_card_title?, frame_url? | frame_file? }] } ] }
+// frame_file is an image beside the JSON: uploaded to the frames bucket under <creator>/fixture/, its public URL used.
 // Rank is the order in the file. A thread is found by id, or by its exact title for that creator; the project is
 // the thread's. near_card_title names a card in that thread: it becomes near_card_id, and the why line's recording
 // and moment are that card's (why_recording_id, why_ms), so "…you said 'box tips over first' on Thu 0:31" plays from
@@ -16,6 +17,7 @@
 // a dismissed suggestion never comes back). Makes no network calls but Supabase: no adapters here (Job H).
 
 import { readFileSync } from 'node:fs'
+import { basename, dirname, resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
@@ -31,6 +33,7 @@ const Suggestion = z.object({
   why: z.string().optional(),
   near_card_title: z.string().optional(),
   frame_url: z.string().url().optional(),
+  frame_file: z.string().optional(),
 })
 const Seed = z.object({
   threads: z.array(
@@ -74,6 +77,14 @@ async function main() {
       return c
     }
 
+    const frameOf = async (s: z.infer<typeof Suggestion>) => {
+      if (!s.frame_file) return s.frame_url ?? null
+      const path = `${t.creator_id}/fixture/${basename(s.frame_file)}`
+      if (!write) return `(upload ${path})`
+      need('frame', await db.storage.from('frames').upload(path, readFileSync(resolve(dirname(file), s.frame_file)), { contentType: 'image/png', upsert: true }))
+      return db.storage.from('frames').getPublicUrl(path).data.publicUrl
+    }
+    const frames = await Promise.all(t.suggestions.map(frameOf))
     const rows = t.suggestions.map((s, i) => {
       const c = near(s.near_card_title)
       return {
@@ -90,7 +101,7 @@ async function main() {
         why: s.why ?? null,
         why_recording_id: s.why ? (c?.recording_id ?? null) : null,
         why_ms: s.why ? (c?.play_from_ms ?? null) : null,
-        frame_url: s.frame_url ?? null,
+        frame_url: frames[i],
         rank: i + 1,
       }
     })

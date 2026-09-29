@@ -1,5 +1,5 @@
 {
-  "//": "FIXTURE DATA — the five P12b tiles for the simulator test account only. Every handle and URL is fake (@example-…, https://example.com/…); no images, so the tiles show the shimmer. Real suggestions arrive with Job H's adapters; pilot creators are seeded from Tim's JSON, never this file.",
+  "//": "FIXTURE DATA — the five P12b tiles for the simulator test account only. Every handle and URL is fake (@example-…, https://example.com/…); the frames are solid-colour placeholders (frames/fixture-*.png, no photos) — the tile's accessibility label is its title. Real suggestions arrive with Job H's adapters; pilot creators are seeded from Tim's JSON, never this file.",
   "threads": [
     {
       "creator_id": "user_3JfYR4D8eJVCL3yieXStYYoqwaH",
@@ -13,7 +13,8 @@
           "source_score": 12,
           "title": "Open on the box, not your face — a 0.8 s cut",
           "why": "Same cold-open shape as your rooftop chase.",
-          "near_card_title": "Rooftop chase ending with Ivy Mini"
+          "near_card_title": "Rooftop chase ending with Ivy Mini",
+          "frame_file": "frames/fixture-1-youtube-outlier.png"
         },
         {
           "field": "sound",
@@ -22,7 +23,8 @@
           "source_handle": "@example-sounds",
           "title": "A slow build into the drop, cut on the jump",
           "why": "Your chase lands on one beat.",
-          "near_card_title": "Rooftop chase ending with Ivy Mini"
+          "near_card_title": "Rooftop chase ending with Ivy Mini",
+          "frame_file": "frames/fixture-2-tiktok-sound.png"
         },
         {
           "field": "topic",
@@ -30,14 +32,16 @@
           "source_url": "https://example.com/pinterest/trend",
           "source_handle": "@example-boards",
           "title": "Rooftop chases are trending this week",
-          "near_card_title": "Rooftop chase ending with Ivy Mini"
+          "near_card_title": "Rooftop chase ending with Ivy Mini",
+          "frame_file": "frames/fixture-3-pinterest-trend.png"
         },
         {
           "field": "graph",
           "source": "graph",
           "title": "The same chase, told from the ground",
           "why": "You keep coming back to the rooftop.",
-          "near_card_title": "Rooftop chase ending with Ivy Mini"
+          "near_card_title": "Rooftop chase ending with Ivy Mini",
+          "frame_file": "frames/fixture-4-own-graph.png"
         },
         {
           "field": "aesthetic",
@@ -45,7 +49,8 @@
           "source_url": "https://example.com/pinterest/aesthetic",
           "source_handle": "@example-light",
           "title": "Rooftops at golden hour, shot from the ledge",
-          "near_card_title": "Rooftop chase ending with Ivy Mini"
+          "near_card_title": "Rooftop chase ending with Ivy Mini",
+          "frame_file": "frames/fixture-5-aesthetic.png"
         }
       ]
     }
