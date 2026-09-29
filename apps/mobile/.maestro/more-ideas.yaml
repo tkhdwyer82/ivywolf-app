@@ -1,0 +1,32 @@
+# Smoke (Job G): the DoD path without changing anything — Home → an idea in Launch video → the project → More ideas
+# (five tiles) → open one (P12c: pin and Not for me) → back. Doesn't pin or dismiss, so the fixture stays as seeded.
+# Needs the signed-in test account with scripts/seed/suggestions.fixture.json seeded.
+#   maestro test apps/mobile/.maestro/more-ideas.yaml
+appId: au.com.ivywolf.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: nav-home
+    timeout: 60000
+- tapOn: "Rooftop chase ending with Ivy Mini"
+- tapOn: "Open Launch video"
+- extendedWaitUntil:
+    visible: "More ideas for this thread|Launch video"
+    timeout: 10000
+- tapOn:
+    text: "More ideas"
+    index: 0
+- extendedWaitUntil:
+    visible: "More ideas for this thread"
+    timeout: 10000
+- assertVisible:
+    id: "suggestion-.*"
+- tapOn: "Open on the box, not your face — a 0.8 s cut"
+- assertVisible:
+    id: "pin"
+- assertVisible:
+    id: "not-for-me"
+- assertVisible: "Near: Rooftop chase ending with Ivy Mini"
+- tapOn: "Back"
+- assertVisible: "More ideas for this thread"

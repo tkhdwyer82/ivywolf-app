@@ -1,11 +1,12 @@
 // apps/mobile/components/IvyNote.tsx
-// Ivy on open (P1 / P1a / P1c). Writes word by word at WORDS_PER_MINUTE with a lime caret, pushing the chips and
-// grid down as each line lands; the last sentence fades. DISSOLVE_AFTER_MS after the last word — or as soon as
+// Ivy on open (P1 / P1a / P1c). Writes word by word at WORDS_PER_MINUTE with a caret, pushing the chips and grid
+// down as each line lands; the last sentence fades. L3b (Figma 209:2) sets it as plain Body / Large at the margin:
+// no dot, and the caret is ink — the ⊕ is Home's one lime thing. DISSOLVE_AFTER_MS after the last word — or as soon as
 // she scrolls — the note fades and collapses, and the grid slides back up (≈400 ms, ease-out). Nothing is stored.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Easing, LayoutAnimation, StyleSheet, Text, View } from 'react-native'
-import { hero, text } from '@/lib/theme'
+import { colour, space, type } from '@ivywolf/ui'
 import type { IvySentence } from '@/lib/home'
 
 /** Typing pace (Tim, 23 Sep): the motion note's "≈40 wpm" was reading pace. 220 wpm ≈ 270 ms a word. */
@@ -67,8 +68,7 @@ export function IvyNote({ sentences, dissolve, onGone }: { sentences: IvySentenc
 
   return (
     <Animated.View style={[styles.note, { opacity }]} accessibilityLiveRegion="polite">
-      <View style={styles.dot} />
-      <Text style={[text.bodyLarge, styles.words]} accessibilityLabel={sentences.map((s) => s.text).join(' ')}>
+      <Text style={styles.words} accessibilityLabel={sentences.map((s) => s.text).join(' ')}>
         {words.slice(0, shown).map(({ w, si }, i) => (
           <Text key={i} style={{ color: tone(si, sentences.length) }}>
             {i > 0 ? ' ' : ''}
@@ -82,9 +82,7 @@ export function IvyNote({ sentences, dissolve, onGone }: { sentences: IvySentenc
 }
 
 const styles = StyleSheet.create({
-  note: { flexDirection: 'row', paddingLeft: 24, paddingRight: 20, paddingTop: 12, paddingBottom: 14 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: hero.lime, marginTop: 6, marginRight: 14 },
-  // Body / Large at the note's weight (Figma: SF Pro Medium 17 / 24).
-  words: { flex: 1, fontWeight: '500' },
-  caret: { color: hero.lime, fontWeight: '700' },
+  note: { paddingHorizontal: space.margin, paddingTop: space.stack },
+  words: type['Body / Large'],
+  caret: { color: colour.Ink },
 })

@@ -1,0 +1,9 @@
+{
+  "name": "@ivywolf/ui",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "tokens": "npx tsx theme/generate.ts"
+  }
+}

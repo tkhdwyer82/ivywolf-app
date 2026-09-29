@@ -1,0 +1,3 @@
+-- Rolled-back test for 0029 (write, test in a rolled-back transaction, dry-run, push).
+--
+--   node scripts/build-sql-test.mjs 0029 && supabase db query --linked -f scripts/test-0029.sql

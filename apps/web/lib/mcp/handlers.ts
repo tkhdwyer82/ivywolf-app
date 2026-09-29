@@ -55,6 +55,9 @@ export type Card = {
   cite: Cite
 } & Link
 
+/** Cards pinned from More ideas (0030/0031) — not hers to cite by recording, so not in these reads yet. */
+const PINNED_SOURCES = '(youtube,tiktok,pinterest,graph)'
+
 const CARD_COLUMNS =
   'id, title, gist, play_from_ms, recording_id, created_at, energy, projects(name), recordings(recorded_at), thread_cards(threads(id, stage))'
 
@@ -112,6 +115,7 @@ export async function listIdeas(
     .from('cards')
     .select(status ? CARD_COLUMNS.replace('thread_cards(threads(', 'thread_cards!inner(threads!inner(') : CARD_COLUMNS)
     .eq('creator_id', creatorId)
+    .not('source', 'in', PINNED_SOURCES) // her ideas only: a pinned suggestion (Job G) has no cite of hers (follow-up: cite source_url)
     .gte('created_at', new Date(args.since).toISOString())
   if (args.project) q = q.eq('project_id', await projectId(creatorId, args.project))
   if (status) q = q.eq('thread_cards.threads.stage', status)
@@ -178,7 +182,7 @@ function toAction(a: ActionRow): Action {
 
 export async function getIdea(creatorId: string, args: { id: string }) {
   const row = check(
-    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).eq('id', args.id).maybeSingle()
+    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).eq('id', args.id).not('source', 'in', PINNED_SOURCES).maybeSingle()
   ) as unknown as CardRow | null
   if (!row) throw new McpError("I couldn't find that idea in your Ivy. It may have been deleted.")
 

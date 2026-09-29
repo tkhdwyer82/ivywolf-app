@@ -5,6 +5,7 @@
 // Pure functions below the loader so the grouping and wording can be tested without a device.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { space } from '@ivywolf/ui'
 import { requestProcessing } from './record'
 
 export interface Project {
@@ -195,7 +196,7 @@ export function dayLabel(day: string, now = new Date()): string | null {
   const date = new Date(y, m - 1, d)
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const days = Math.round((today.getTime() - date.getTime()) / 86_400_000)
-  if (days <= 0) return null
+  if (days <= 0) return 'TODAY' // L3b (Figma 209:2) labels today too
   if (days === 1) return 'YESTERDAY'
   if (days < 7) return WEEKDAYS[date.getDay()]
   return `${d} ${MONTHS[m - 1]}${y !== now.getFullYear() ? ` ${y}` : ''}`
@@ -230,31 +231,27 @@ function jitter(id: string, spread: number): number {
   return (Math.abs(h) % (2 * spread + 1)) - spread
 }
 
-/** Visual height of a tile's frame, per the P1 frame: ideas 190–214 tall, to-dos 120–150, typographic 150–180. */
-export function frameHeight(item: Item): number {
-  if (item.kind === 'action') return 136 + jitter(item.id, 14)
-  if (item.frameStatus === 'done' && item.frameUrl) return 202 + jitter(item.id, 12)
-  return 166 + jitter(item.id, 14)
-}
-
 /**
- * A project page's tiles (P11) carry the title inside the frame, so they run taller and vary more: drawn ideas
- * 180–260, typographic 140–180.
+ * An idea tile's height (v3.4b: the frame is the whole tile). L3b (Figma 209:2) runs 160–240 tall at size/tile-w;
+ * a stable jitter per id gives the Pinterest rhythm, whether the frame has landed or it's still the shimmer.
+ * To-do tiles size to their words.
  */
-export function projectFrameHeight(item: Item): number {
-  if (item.frameStatus === 'done' && item.frameUrl) return 220 + jitter(item.id, 40)
-  return 160 + jitter(item.id, 20)
+const IDEA_H = 200
+const IDEA_SPREAD = 40
+export function tileHeight(id: string): number {
+  return IDEA_H + jitter(id, IDEA_SPREAD)
 }
+export const frameHeight = (item: Item): number => tileHeight(item.id)
 
-const CAPTION = 60 // title (up to two lines) + meta line + spacing under a tile
-/** Home's tiles: the frame, then the caption under it. */
-const homeTileHeight = (item: Item) => frameHeight(item) + CAPTION
+/** A tile's height in a column plus the gutter under it — for balancing the two columns. To-dos are estimated. */
+const TODO_ESTIMATE = 100 // L3b 209:17 / 209:24: 96–100 for two lines of title and the meta
+const columnHeight = (item: Item) => (item.kind === 'action' ? TODO_ESTIMATE : frameHeight(item)) + space.gutter
 
 /**
  * Two columns, each tile into the shorter one — the Pinterest fill. Order within a day is kept top-down.
- * `height` is a tile's full height in the column, caption and gap included (Home's by default).
+ * `height` is a tile's full height in the column, gutter included.
  */
-export function masonry<T extends Item>(items: T[], height: (item: T) => number = homeTileHeight): [T[], T[]] {
+export function masonry<T extends Item>(items: T[], height: (item: T) => number = columnHeight): [T[], T[]] {
   const cols: [T[], T[]] = [[], []]
   const heights = [0, 0]
   for (const item of items) {

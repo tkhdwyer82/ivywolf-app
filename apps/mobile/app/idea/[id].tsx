@@ -12,18 +12,18 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
-import { useUser } from '@clerk/clerk-expo'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
-import { byline, loadIdea, setHeart, type Idea } from '@/lib/idea'
+import { loadIdea, metaLine, setHeart, sourceBadge, threadPill, type Idea } from '@/lib/idea'
 import { deleteCard } from '@/lib/deleteRecording'
-import { Glass, Menu } from '@/components/PinChrome'
-import { hero, text } from '@/lib/theme'
+import { Glass, Menu, MENU_OFFSET } from '@/components/PinChrome'
+import { colour, radius, size, space, type } from '@ivywolf/ui'
+import { Shimmer } from '@/components/Shimmer'
+import { ActionBar, BAR_BOTTOM } from '@/components/ActionBar'
 
 export default function IdeaPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const supabase = useSupabase()
-  const { user } = useUser()
   const insets = useSafeAreaInsets()
   const [idea, setIdea] = useState<Idea | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
@@ -99,9 +99,9 @@ export default function IdeaPage() {
     return (
       <View style={[styles.screen, styles.centered]}>
         {idea === null || error ? (
-          <Text style={[text.body, styles.secondary]}>{error ?? 'This idea has gone.'}</Text>
+          <Text style={[type['Body'], styles.secondary]}>{error ?? 'This idea has gone.'}</Text>
         ) : (
-          <ActivityIndicator color={hero.ink} />
+          <ActivityIndicator color={colour.Ink} />
         )}
       </View>
     )
@@ -109,46 +109,51 @@ export default function IdeaPage() {
 
   const drawn = idea.frameStatus === 'done' && !!idea.frameUrl
   const unsure = idea.confidence < LOW_CONFIDENCE
+  const pill = threadPill(idea)
+  const badge = sourceBadge(idea)
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 32 }}>
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }}>
         <View style={styles.visual}>
           {drawn ? (
-            <Image source={{ uri: idea.frameUrl! }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <Image source={{ uri: idea.frameUrl! }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
           ) : (
-            <View style={styles.typographic}>
-              <Text style={[text.titleScreen, { color: hero.ink }]}>{idea.title}</Text>
+            <Shimmer style={StyleSheet.absoluteFill} />
+          )}
+          <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: space.margin, top: space.margin }} />
+          <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: space.margin, top: space.margin }} />
+          {badge && (
+            <View style={styles.badge} pointerEvents="none">
+              <Text style={type['Label / Pill']}>{badge}</Text>
             </View>
           )}
-          <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: 12, top: 12 }} />
-          <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: 12, top: 12 }} />
         </View>
 
         <View style={styles.body}>
           <Text style={styles.heading}>{idea.title}</Text>
-          {!!idea.gist && <Text style={styles.gist}>{idea.gist}</Text>}
-          {unsure && <Text style={[text.caption, styles.secondary, { marginTop: 6 }]}>Ivy isn’t sure about this one.</Text>}
+          <Pressable
+            onPress={() => play(idea.id, idea.storagePath, idea.playFromMs)}
+            style={styles.meta}
+            accessibilityRole="button"
+            accessibilityLabel={playing === idea.id ? 'Pause' : 'Play from here'}
+          >
+            <Text style={type['Caption']}>{metaLine(idea)}</Text>
+            {playing === idea.id && <SymbolView name="speaker.wave.2" tintColor={colour.Grey} size={type['Caption'].fontSize} />}
+          </Pressable>
+          {unsure && <Text style={type['Caption']}>Ivy isn’t sure about this one.</Text>}
 
           <View style={styles.actions}>
-            <Pressable onPress={heart} hitSlop={10} accessibilityRole="button" accessibilityLabel={idea.heartedAt ? 'Unheart' : 'Heart'}>
-              <SymbolView name={idea.heartedAt ? 'heart.fill' : 'heart'} tintColor={hero.ink} size={24} />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push({ pathname: '/record', params: { correctionOf: idea.id } })}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Correct by voice"
-            >
-              <SymbolView name="mic" tintColor={hero.ink} size={24} />
+            <Pressable onPress={heart} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel={idea.heartedAt ? 'Unheart' : 'Heart'}>
+              <SymbolView name={idea.heartedAt ? 'heart.fill' : 'heart'} tintColor={colour.Ink} size={size.icon} />
             </Pressable>
             <Pressable
               onPress={() => Share.share({ message: idea.gist ? `${idea.title}\n\n${idea.gist}` : idea.title })}
-              hitSlop={10}
+              hitSlop={TAP_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Share"
             >
-              <SymbolView name="square.and.arrow.up" tintColor={hero.ink} size={24} />
+              <SymbolView name="square.and.arrow.up" tintColor={colour.Ink} size={size.icon} />
             </Pressable>
 
             <View style={styles.project}>
@@ -156,7 +161,7 @@ export default function IdeaPage() {
                 onPress={() =>
                   !idea.project || idea.project.kind === 'things' ? router.push('/things') : router.push(`/project/${idea.project.id}`)
                 }
-                style={styles.projectOpen}
+                hitSlop={PILL_SLOP}
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${idea.project?.name ?? 'My things'}`}
               >
@@ -164,58 +169,66 @@ export default function IdeaPage() {
                   {idea.project?.name ?? 'My things'}
                 </Text>
               </Pressable>
-              <View style={styles.projectRule} />
               <Pressable
                 onPress={() => router.push({ pathname: '/idea/save/[id]', params: { id: idea.id, projectId: idea.project?.id } })}
-                hitSlop={8}
-                accessibilityRole="button" accessibilityLabel="Save to another project" style={styles.chevron}>
-                <SymbolView name="chevron.down" tintColor="#FFFFFF" size={16} weight="semibold" />
+                hitSlop={PILL_SLOP}
+                accessibilityRole="button"
+                accessibilityLabel="Save to another project"
+              >
+                <SymbolView name="chevron.down" tintColor={colour.Surface} size={type['Body / Medium'].fontSize} weight="semibold" />
               </Pressable>
             </View>
           </View>
 
-          <Pressable
-            onPress={() => play(idea.id, idea.storagePath, idea.playFromMs)}
-            style={styles.byline}
-            accessibilityRole="button"
-            accessibilityLabel={playing === idea.id ? 'Pause' : 'Play from here'}
-          >
-            <View style={styles.avatar} />
-            <Text style={text.bodySmall}>{byline(user?.firstName ?? null, idea)}</Text>
-            {playing === idea.id && <SymbolView name="speaker.wave.2" tintColor={hero.secondary} size={14} />}
-          </Pressable>
-
           {idea.siblings.length > 0 && (
             <>
-              <Text style={styles.more}>More in this thread</Text>
-              <View style={styles.siblings}>
-                {idea.siblings.map((s) => (
-                  <Pressable key={s.id} onPress={() => router.push(`/idea/${s.id}`)} style={styles.sibling} accessibilityRole="button" accessibilityLabel={s.title}>
-                    {s.frameStatus === 'done' && s.frameUrl ? (
-                      <Image source={{ uri: s.frameUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                    ) : null}
-                    <Text style={[styles.siblingTitle, s.frameUrl && styles.siblingTitleOnImage]} numberOfLines={2}>
-                      {s.title}
-                    </Text>
-                    {s.storagePath && (
-                      <Pressable onPress={() => play(s.id, s.storagePath, s.playFromMs)} hitSlop={8} style={styles.siblingPlay} accessibilityLabel="Play from here">
-                        <SymbolView name={playing === s.id ? 'pause.fill' : 'play.fill'} tintColor={hero.ink} size={13} />
-                      </Pressable>
-                    )}
-                  </Pressable>
-                ))}
+              <View style={styles.moreRow}>
+                <Text style={type['Title / Section']}>More in this thread</Text>
+                {pill && (
+                  <View style={styles.count}>
+                    <Text style={type['Label / Overline']}>{pill}</Text>
+                  </View>
+                )}
               </View>
             </>
           )}
         </View>
+
+        {idea.siblings.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
+            {idea.siblings.map((s) => (
+              <Pressable key={s.id} onPress={() => router.push(`/idea/${s.id}`)} style={styles.thumb} accessibilityRole="button" accessibilityLabel={s.title}>
+                {s.frameStatus === 'done' && s.frameUrl ? (
+                  <Image source={{ uri: s.frameUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+                ) : (
+                  <Shimmer style={StyleSheet.absoluteFill} />
+                )}
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
       </ScrollView>
+      <ActionBar
+        verbs={[
+          {
+            key: 'talk',
+            label: 'Talk',
+            icon: 'mic.fill',
+            lime: true,
+            accessibilityLabel: 'Correct by voice',
+            onPress: () => router.push({ pathname: '/record', params: { correctionOf: idea.id } }),
+          },
+        ]}
+      />
       {menu && (
         <Menu
-          top={insets.top + 10}
+          top={insets.top + MENU_OFFSET}
           onClose={() => setMenu(false)}
           items={[
             { icon: 'pencil', label: 'Edit idea', onPress: () => router.push(`/idea/edit/${idea.id}`) },
-            { icon: 'text.alignleft', label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) },
+            ...(idea.recordingId
+              ? [{ icon: 'text.alignleft' as const, label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) }]
+              : []),
             { icon: 'square.on.square', label: 'Copy', onPress: copy },
             { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
           ]}
@@ -225,48 +238,58 @@ export default function IdeaPage() {
   )
 }
 
-// Figma 83:201 — visual 377 × 470 at 8 pt margins, radius 28; heading Bold 22; gist Regular 14 secondary; project
-// button #333330, 190 × 44, radius 14.
+// L4b Idea (Figma 209:36) — measured, not tokens: the frame is 400 tall; the heading starts 20 under it; the meta
+// line 18 under the heading, the ♥ · Share row 12 under that; the thread pill has radius 16 (not radius/chip) and
+// 10 × 6 padding; the thumbs start 14 under "More in this thread". The project pill is 38 tall, so its targets
+// reach size/tap with slop.
+const FRAME_H = 400
+const HEADING_GAP = 20
+const META_GAP = 18
+const ROW_GAP = 12
+const PILL_PAD_H = 16
+const PILL_PAD_V = 10
+const PILL_SLOP = (size.tap - (type['Body / Medium'].lineHeight + PILL_PAD_V * 2)) / 2
+const COUNT_R = 16
+const COUNT_PAD_H = 10
+const COUNT_PAD_V = 6
+const THUMBS_GAP = 14
+const BADGE_PAD_H = 8 // P12d 201:98: 8 × 4
+const BADGE_PAD_V = 4
+const TAP_SLOP = (size.tap - size.icon) / 2
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: hero.room },
-  centered: { alignItems: 'center', justifyContent: 'center', padding: 20 },
-  secondary: { color: hero.secondary },
-  visual: { marginHorizontal: 8, height: 470, borderRadius: 28, overflow: 'hidden', backgroundColor: hero.fill },
-  typographic: { flex: 1, justifyContent: 'flex-end', padding: 24, borderLeftWidth: 6, borderLeftColor: hero.lime },
-  body: { paddingHorizontal: 20, paddingTop: 16 },
-  heading: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: hero.ink },
-  gist: { fontSize: 14, lineHeight: 19, color: hero.secondary, marginTop: 6 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 24, marginTop: 20, paddingLeft: 2 },
+  screen: { flex: 1, backgroundColor: colour.Surface },
+  centered: { alignItems: 'center', justifyContent: 'center', padding: space.margin },
+  secondary: { color: colour.Grey },
+  visual: { marginHorizontal: space.margin, height: FRAME_H, borderRadius: radius.tile, overflow: 'hidden', backgroundColor: colour.Shimmer },
+  body: { paddingHorizontal: space.margin, paddingTop: HEADING_GAP },
+  heading: type['Title / Screen'],
+  meta: { flexDirection: 'row', alignItems: 'center', gap: space.gutter, marginTop: META_GAP },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: space.stack, marginTop: ROW_GAP },
   project: {
     marginLeft: 'auto',
-    width: 190,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#333330',
     flexDirection: 'row',
     alignItems: 'center',
-    overflow: 'hidden',
+    gap: space.gutter,
+    maxWidth: '60%',
+    paddingHorizontal: PILL_PAD_H,
+    paddingVertical: PILL_PAD_V,
+    borderRadius: radius.button,
+    backgroundColor: colour.Ink,
   },
-  projectOpen: { flex: 1, height: 44, justifyContent: 'center' },
-  projectName: { paddingLeft: 16, fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
-  projectRule: { width: StyleSheet.hairlineWidth * 2, height: 44, backgroundColor: 'rgba(255,255,255,0.25)' },
-  chevron: { width: 43, height: 44, alignItems: 'center', justifyContent: 'center' },
-  byline: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
-  avatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: hero.lime },
-  more: { fontSize: 18, fontWeight: '700', color: hero.ink, marginTop: 28, marginBottom: 12 },
-  siblings: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 13 },
-  sibling: { width: 170, height: 150, borderRadius: 16, overflow: 'hidden', backgroundColor: hero.fill, justifyContent: 'flex-end', padding: 14 },
-  siblingTitle: { fontSize: 13, fontWeight: '600', color: hero.ink },
-  siblingTitleOnImage: { color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 6 },
-  siblingPlay: {
+  projectName: { ...type['Body / Medium'], color: colour.Surface, flexShrink: 1 },
+  moreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.section },
+  count: { borderRadius: COUNT_R, paddingHorizontal: COUNT_PAD_H, paddingVertical: COUNT_PAD_V, backgroundColor: colour.Chip },
+  // P12d's "via YouTube · pinned just now" — here, never on the tile.
+  badge: {
     position: 'absolute',
-    right: 10,
-    top: 10,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    left: space.margin,
+    bottom: space.margin,
+    borderRadius: radius.chip,
+    paddingHorizontal: BADGE_PAD_H,
+    paddingVertical: BADGE_PAD_V,
+    backgroundColor: colour.Lime,
   },
+  thumbs: { paddingHorizontal: space.margin, paddingTop: THUMBS_GAP, gap: space.gutter },
+  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Shimmer },
 })
