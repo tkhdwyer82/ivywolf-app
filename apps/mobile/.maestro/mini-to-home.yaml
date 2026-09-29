@@ -1,0 +1,33 @@
+# Smoke: Mini (L7 showroom, full-bleed expo-video) → Home via the nav, three times. The TestFlight build died on the
+# first Mini → Home: the video player was released on unmount before Mini's focus cleanup paused it
+# (ERR_NATIVE_SHARED_OBJECT_NOT_FOUND). In a dev build that's a red screen, in a release build a crash; either way
+# the nav is gone and the last assertion fails.
+# Needs a signed-in app (it doesn't sign in). Right after launch a dev build can drop the first tap, hence the retry.
+#   maestro test apps/mobile/.maestro/mini-to-home.yaml
+appId: au.com.ivywolf.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: nav-home
+    timeout: 20000
+- repeat:
+    times: 3
+    commands:
+      - repeat:
+          while:
+            notVisible: Connect your Mini
+          times: 3
+          commands:
+            - tapOn:
+                id: nav-mini
+            - waitForAnimationToEnd:
+                timeout: 2000
+      - assertVisible: Connect your Mini
+      - tapOn:
+          id: nav-home
+      - waitForAnimationToEnd:
+          timeout: 2000
+      - assertNotVisible: Connect your Mini
+      - assertVisible:
+          id: nav-mini

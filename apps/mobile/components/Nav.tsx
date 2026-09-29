@@ -67,6 +67,7 @@ export function Nav({ room, listening = false, onHome }: { room: Room; listening
       <Pressable
         onPress={goHome}
         style={styles.tile}
+        testID="nav-home"
         accessibilityRole="tab"
         accessibilityLabel="Home"
         accessibilityState={{ selected: room === 'home' }}
@@ -89,6 +90,7 @@ export function Nav({ room, listening = false, onHome }: { room: Room; listening
       <Pressable
         onPress={goMini}
         style={styles.tile}
+        testID="nav-mini"
         accessibilityRole="tab"
         accessibilityLabel="Ivy Mini"
         accessibilityState={{ selected: room === 'mini' }}
