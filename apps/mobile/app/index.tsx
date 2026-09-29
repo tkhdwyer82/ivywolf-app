@@ -216,8 +216,8 @@ function toRows(groups: DayGroup[]): Row[] {
 function Header() {
   return (
     <View style={styles.header}>
-      <Text style={styles.wordmark}>
-        Ivy <Text style={{ color: colour.Grey }}>Wolf</Text>
+      <Text style={styles.wordmark} accessibilityRole="header">
+        IVY
       </Text>
       <View style={styles.headerActions}>
         <Pressable onPress={() => router.push('/search')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Search">
