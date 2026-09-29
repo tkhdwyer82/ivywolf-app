@@ -1,0 +1,4 @@
+-- Rolled-back test for 0032 (write, test in a rolled-back transaction, dry-run, push). Also Job G §5.7's
+-- "a dismissed suggestion never returns" — through the app's own query and a reseed.
+--
+--   node scripts/build-sql-test.mjs 0032 && supabase db query --linked -f scripts/test-0032.sql
