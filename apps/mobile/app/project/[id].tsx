@@ -191,9 +191,18 @@ export default function Project() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.stripRow}>
                 {ideas.map((i) => (
                   <Pressable key={i.id} onPress={() => router.push(`/idea/${i.id}`)} style={styles.thumb} accessibilityRole="button" accessibilityLabel={i.title}>
-                    <Shimmer style={StyleSheet.absoluteFill} />
-                    {i.frameStatus === 'done' && !!i.frameUrl && (
-                      <Image source={{ uri: i.frameUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+                    {i.shape !== 'photo' ? (
+                      // A quote, comparison, board or text card has no picture: its title stands in.
+                      <Text style={styles.thumbTitle} numberOfLines={4}>
+                        {i.title}
+                      </Text>
+                    ) : (
+                      <>
+                        <Shimmer style={StyleSheet.absoluteFill} />
+                        {i.frameStatus === 'done' && !!i.frameUrl && (
+                          <Image source={{ uri: i.frameUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+                        )}
+                      </>
                     )}
                   </Pressable>
                 ))}
@@ -312,7 +321,8 @@ const styles = StyleSheet.create({
   // The strip runs to the screen's edge: out of the body's margin, back in for the first thumb.
   strip: { marginHorizontal: -space.margin, marginTop: space.stack },
   stripRow: { paddingHorizontal: space.margin, gap: space.gutter },
-  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Shimmer },
+  thumbTitle: { ...type['Body / Small'], fontWeight: '600', padding: space.gutter + 2 },
+  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Chip },
   moreTitle: { marginTop: space.section, marginBottom: space.stack },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },
   cell: { paddingBottom: space.gutter },

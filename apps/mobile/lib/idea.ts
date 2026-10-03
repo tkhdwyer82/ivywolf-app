@@ -2,6 +2,11 @@
 // One idea (P9): the card, its project, when and where it was said, and the other cards in its thread.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { CardShape } from '@ivywolf/schema'
+import { toCardItem, type CardItem, type CardRow, type ThreadStage } from '@/lib/home'
+import { writeStyleSignal } from '@/lib/styleSignals'
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL!
 
 export type CardSource = 'voice' | 'import' | 'muse' | 'youtube' | 'tiktok' | 'pinterest' | 'graph'
 // A pinned suggestion's source, as its badge names it. 'graph' came from her own notes via More ideas (0031): it
@@ -40,6 +45,12 @@ export interface Idea {
   project: { id: string; name: string; kind: string } | null
   thread: { id: string; title: string; returnCount: number } | null
   siblings: Sibling[]
+  /** What CardFace draws (Figma 227:5): the shape and its payloads, credit, where it was said, the thread's stage. */
+  card: CardItem
+  /** 'creator' once she has chosen the view herself (0033). */
+  shapeSetBy: 'ivy' | 'creator' | null
+  /** It has a visual_query, so a photo can be found for it. */
+  hasVisualQuery: boolean
 }
 
 function need<T>(label: string, r: { data: T; error: { message: string } | null }): T {
@@ -47,12 +58,11 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
   return r.data
 }
 
-type Row = {
-  id: string; title: string; gist: string; confidence: number; play_from_ms: number; frame_url: string | null
-  frame_status: string; source: CardSource; source_url: string | null; hearted_at: string | null; recording_id: string | null; created_at: string
-  recordings: { recorded_at: string | null; storage_path: string | null; source: string } | null
+type Row = CardRow & {
+  source: CardSource; source_url: string | null; hearted_at: string | null; shape_set_by: 'ivy' | 'creator' | null
+  visual_query: string | null
   projects: { id: string; name: string; kind: string } | null
-  thread_cards: { threads: { id: string; title: string; return_count: number } | null }[]
+  thread_cards: { threads: { id: string; title: string; return_count: number; stage: ThreadStage } | null }[]
 }
 
 export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Idea | null> {
@@ -61,7 +71,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, title, gist, confidence, play_from_ms, frame_url, frame_status, source, source_url, hearted_at, recording_id, created_at, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title, return_count))'
+        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title, return_count, stage))'
       )
       .eq('id', id)
       .maybeSingle()
@@ -112,7 +122,40 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     project: row.projects,
     thread,
     siblings,
+    card: toCardItem(row, { size: siblings.length + 1, stage: t?.stage ?? null }),
+    shapeSetBy: row.shape_set_by,
+    hasVisualQuery: !!row.visual_query?.trim(),
   }
+}
+
+/** The views this idea can take: every shape whose payload exists, photo when there's a picture or a query, text always. */
+export function viewsFor(idea: Idea): CardShape[] {
+  const c = idea.card
+  const views: CardShape[] = []
+  if ((idea.frameStatus === 'done' && idea.frameUrl) || idea.hasVisualQuery) views.push('photo')
+  if (c.quote) views.push('quote')
+  if (c.diagram) views.push('diagram')
+  if (c.board) views.push('board')
+  views.push('text')
+  return views
+}
+
+/**
+ * Change view (every card's •••): she picks the form, and Ivy never overrides it (shape_set_by 'creator'). The
+ * change is a style signal — "wrong form" is a correction worth learning from. A photo view with no picture yet asks
+ * apps/web to find one on Unsplash; it resolves false when none was found (the card keeps its title until she picks
+ * again).
+ */
+export async function setShape(supabase: SupabaseClient, idea: Idea, shape: CardShape, token: string | null): Promise<boolean> {
+  const { error } = await supabase.from('cards').update({ shape, shape_set_by: 'creator' }).eq('id', idea.id)
+  if (error) throw new Error(`change view: ${error.message}`)
+  writeStyleSignal(supabase, 'shape_change', { field: 'shape', card_id: idea.id, from: idea.card.shape, to: shape }).catch((e) =>
+    console.warn(`[idea] shape signal: ${e.message}`)
+  )
+  if (shape !== 'photo' || (idea.frameStatus === 'done' && idea.frameUrl) || !token) return true
+  const res = await fetch(`${API_URL}/api/cards/${idea.id}/photo`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) throw new Error(`photo: ${res.status}`)
+  return ((await res.json()) as { photo?: boolean }).photo === true
 }
 
 export async function setHeart(supabase: SupabaseClient, id: string, on: boolean) {

@@ -1,20 +1,26 @@
 // apps/mobile/app/idea/[id].tsx
-// Idea (P9, the pin page). The visual on top — her frame, her imported picture, or the title set in the palette —
-// with back and •••; the summary is the heading (the transcript is behind •••, P6/P7); heart · mic · share; the dark
+// Idea (P9, the pin page). The visual on top in the form the idea takes (Job B revised, Figma 227:5): a photo — her
+// imported picture or an Unsplash photograph, credited under it with links back — or the quote, comparison, board or
+// text card drawn large; with back and •••; the summary is the heading (the transcript is behind •••, P6/P7); heart · mic · share; the dark
 // project button (its name opens the project, P11 — or My things, P4; ⌄ = save it elsewhere, P10); the byline
 // (who · when · where in the recording, tap to hear it); and More in this thread.
 // The mic is the voice correction: Record, tagged to this card (a stub in the pipeline for now).
 // No verbs here yet: a verb appears only once the idea has earned it (P13, Later row).
+// ••• → Change view: every card can be shown as any form it has the words for (photo, quote, comparison, board,
+// text); her choice sticks and is a style signal.
 
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
+import { Image } from 'expo-image'
+import { useAuth } from '@clerk/clerk-expo'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
-import { loadIdea, metaLine, setHeart, sourceBadge, threadPill, type Idea } from '@/lib/idea'
+import { loadIdea, metaLine, setHeart, setShape, sourceBadge, threadPill, viewsFor, type Idea } from '@/lib/idea'
+import { CardFace, Credit, SHAPE_NAME } from '@/components/CardFace'
 import { deleteCard } from '@/lib/deleteRecording'
 import { Glass, Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, radius, size, space, type } from '@ivywolf/ui'
@@ -24,6 +30,7 @@ import { ActionBar, BAR_BOTTOM } from '@/components/ActionBar'
 export default function IdeaPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const supabase = useSupabase()
+  const { getToken } = useAuth()
   const insets = useSafeAreaInsets()
   const [idea, setIdea] = useState<Idea | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
@@ -76,6 +83,27 @@ export default function IdeaPage() {
     }
   }
 
+  function changeView() {
+    if (!idea) return
+    const views = viewsFor(idea)
+    const labels = views.map((v) => (v === idea.card.shape ? `${SHAPE_NAME[v]} ✓` : SHAPE_NAME[v]))
+    ActionSheetIOS.showActionSheetWithOptions(
+      { title: 'Change view', options: [...labels, 'Cancel'], cancelButtonIndex: labels.length },
+      async (i) => {
+        const shape = views[i]
+        if (!shape || shape === idea.card.shape) return
+        setIdea({ ...idea, card: { ...idea.card, shape }, shapeSetBy: 'creator' })
+        try {
+          const found = await setShape(supabase, idea, shape, await getToken())
+          if (!found) setError('No photo for this one yet — it shows its title for now.')
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'That didn’t change')
+        }
+        load()
+      }
+    )
+  }
+
   function trash() {
     if (!idea) return
     Alert.alert('Move to trash?', 'The idea and its frame are deleted. The recording stays in Voice notes.', [
@@ -108,6 +136,7 @@ export default function IdeaPage() {
   }
 
   const drawn = idea.frameStatus === 'done' && !!idea.frameUrl
+  const photo = idea.card.shape === 'photo'
   const unsure = idea.confidence < LOW_CONFIDENCE
   const pill = threadPill(idea)
   const badge = sourceBadge(idea)
@@ -115,20 +144,49 @@ export default function IdeaPage() {
   return (
     <View style={styles.screen}>
       <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }}>
-        <View style={styles.visual}>
-          {drawn ? (
-            <Image source={{ uri: idea.frameUrl! }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
-          ) : (
-            <Shimmer style={StyleSheet.absoluteFill} />
-          )}
-          <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: space.margin, top: space.margin }} />
-          <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: space.margin, top: space.margin }} />
-          {badge && (
-            <View style={styles.badge} pointerEvents="none">
-              <Text style={type['Label / Pill']}>{badge}</Text>
+        {photo ? (
+          <>
+            <View style={styles.visual}>
+              {drawn ? (
+                <Image source={{ uri: idea.frameUrl! }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+              ) : (
+                <Shimmer style={StyleSheet.absoluteFill} />
+              )}
+              <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: space.margin, top: space.margin }} />
+              <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: space.margin, top: space.margin }} />
+              {badge && (
+                <View style={styles.badge} pointerEvents="none">
+                  <Text style={type['Label / Pill']}>{badge}</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+            {idea.card.credit && (
+              <View style={styles.credit}>
+                <Credit card={idea.card} linked />
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            <View style={styles.chromeRow}>
+              <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: space.margin, top: 0, backgroundColor: colour.Chip }} />
+              <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: space.margin, top: 0, backgroundColor: colour.Chip }} />
+            </View>
+            <CardFace
+              card={idea.card}
+              size="page"
+              photoHeight={FRAME_H}
+              playing={playing === idea.id}
+              onPlay={idea.storagePath ? () => play(idea.id, idea.storagePath, idea.playFromMs) : undefined}
+              style={styles.face}
+            />
+            {badge && (
+              <View style={[styles.badge, styles.badgeInline]} pointerEvents="none">
+                <Text style={type['Label / Pill']}>{badge}</Text>
+              </View>
+            )}
+          </>
+        )}
 
         <View style={styles.body}>
           <Text style={styles.heading}>{idea.title}</Text>
@@ -199,9 +257,14 @@ export default function IdeaPage() {
             {idea.siblings.map((s) => (
               <Pressable key={s.id} onPress={() => router.push(`/idea/${s.id}`)} style={styles.thumb} accessibilityRole="button" accessibilityLabel={s.title}>
                 {s.frameStatus === 'done' && s.frameUrl ? (
-                  <Image source={{ uri: s.frameUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
-                ) : (
+                  <Image source={{ uri: s.frameUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+                ) : s.frameStatus === 'none' || s.frameStatus === 'queued' ? (
                   <Shimmer style={StyleSheet.absoluteFill} />
+                ) : (
+                  // A quote, comparison, board or text card has no picture: its title stands in.
+                  <Text style={styles.thumbTitle} numberOfLines={4}>
+                    {s.title}
+                  </Text>
                 )}
               </Pressable>
             ))}
@@ -229,6 +292,7 @@ export default function IdeaPage() {
             ...(idea.recordingId
               ? [{ icon: 'text.alignleft' as const, label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) }]
               : []),
+            { icon: 'rectangle.3.group', label: 'Change view', onPress: changeView },
             { icon: 'square.on.square', label: 'Copy', onPress: copy },
             { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
           ]}
@@ -256,6 +320,7 @@ const THUMBS_GAP = 14
 const BADGE_PAD_H = 8 // P12d 201:98: 8 × 4
 const BADGE_PAD_V = 4
 const TAP_SLOP = (size.tap - size.icon) / 2
+const GLASS_ROW = 36 + space.gutter // PinChrome's glass disc, and a gutter under it
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colour.Surface },
@@ -291,5 +356,11 @@ const styles = StyleSheet.create({
     backgroundColor: colour.Lime,
   },
   thumbs: { paddingHorizontal: space.margin, paddingTop: THUMBS_GAP, gap: space.gutter },
-  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Shimmer },
+  credit: { paddingHorizontal: space.margin },
+  thumbTitle: { ...type['Body / Small'], fontWeight: '600', padding: space.gutter + 2 },
+  // Non-photo forms: the glass buttons sit in a row above the card instead of over a picture.
+  chromeRow: { height: GLASS_ROW, marginTop: space.margin },
+  face: { marginHorizontal: space.margin },
+  badgeInline: { position: 'relative', left: undefined, bottom: undefined, alignSelf: 'flex-start', marginLeft: space.margin, marginTop: space.gutter },
+  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Chip },
 })

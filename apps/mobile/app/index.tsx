@@ -4,7 +4,8 @@
 // nav trio is Home · ⊕ · Mini (launch UI 170:5, 145:5).
 // No blank state (rule 1): before the first card exists Home is First open (L1, 170:5) — Ivy's one line, "Say an
 // idea out loud.", and a lime arrow down to the ⊕. No grid, no setup.
-// Ivy on open: up to three sentences from the graph, written in above the chips, gone after 8 s or on scroll.
+// Ivy on open (162:2): up to three sentences from the graph, written in above the chips with their cite; tap to hear
+// that moment; gone after ~6 s or on scroll.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
 
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { SymbolView } from 'expo-symbols'
 import { useAuth } from '@clerk/clerk-expo'
+import { useAudioPlayer } from 'expo-audio'
 import { useSupabase } from '@/lib/supabase'
 import { requestProcessing } from '@/lib/record'
 import {
@@ -54,6 +56,23 @@ export default function Home() {
   const [ivy, setIvy] = useState<IvySentence[] | null>(null)
   const [dissolve, setDissolve] = useState(false)
   const list = useRef<FlashListRef<Row>>(null)
+  // A quote's ▶ chip (Figma 227:28) and Ivy's line (162:2) play from where it was said, without leaving Home.
+  const player = useAudioPlayer(null)
+  const [playing, setPlaying] = useState<string | null>(null)
+
+  async function play(key: string, storagePath: string | null, ms: number) {
+    if (!storagePath) return
+    if (playing === key) {
+      player.pause()
+      return setPlaying(null)
+    }
+    const { data: signed } = await supabase.storage.from('recordings').createSignedUrl(storagePath, 3600)
+    if (!signed) return
+    player.replace({ uri: signed.signedUrl })
+    await player.seekTo(ms / 1000)
+    player.play()
+    setPlaying(key)
+  }
 
   const load = useCallback(async () => {
     if (!userId) return
@@ -161,6 +180,7 @@ export default function Home() {
       <FlashList
         ref={list}
         data={rows}
+        extraData={playing}
         masonry
         numColumns={2}
         keyExtractor={(r) => r.key}
@@ -177,7 +197,7 @@ export default function Home() {
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <Header />
-            {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} />}
+            {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />}
             <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}
@@ -192,6 +212,8 @@ export default function Home() {
                 item={r.item}
                 meta={r.item.kind === 'action' ? metaLine(r.item, data.projects) : undefined}
                 onOpen={(i) => router.push(i.kind === 'card' ? `/idea/${i.id}` : `/todo/${i.id}`)}
+                playing={playing === r.item.id}
+                onPlay={(i) => i.kind === 'card' && play(i.id, i.storagePath, i.playFromMs)}
               />
             </View>
           )

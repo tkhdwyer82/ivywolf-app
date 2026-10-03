@@ -5,6 +5,7 @@
 // Pure functions below the loader so the grouping and wording can be tested without a device.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { CardBoard, CardDiagram, CardQuote, CardShape } from '@ivywolf/schema'
 import { space } from '@ivywolf/ui'
 import { requestProcessing } from './record'
 
@@ -24,6 +25,15 @@ interface Base {
   /** When it was said: the recording's recorded_at, else when the row was made. */
   at: string
 }
+export type ThreadStage = 'sparked' | 'developing' | 'ready' | 'shipped'
+
+/** Unsplash credit (0033 frame_attribution): "Photo by <photographer> on Unsplash", both linking back with utm. */
+export interface PhotoCredit {
+  photographer: string
+  photographerUrl: string
+  photoUrl: string
+}
+
 export interface CardItem extends Base {
   kind: 'card'
   title: string
@@ -34,6 +44,18 @@ export interface CardItem extends Base {
   threadSize: number
   /** Added through the Muse connector (recordings.source 'muse', 0026): the tile says "via Muse". */
   viaMuse: boolean
+  /** The form it takes (Figma 227:5). Cards from before shapes: photo while a frame is (or may be) coming, else text. */
+  shape: CardShape
+  quote: CardQuote | null
+  diagram: CardDiagram | null
+  board: CardBoard | null
+  credit: PhotoCredit | null
+  /** recordings.source — where it was said, for the quote's ▶ chip ("Mini · 12:40"). */
+  recordingSource: string | null
+  /** Its thread's stage — a board card's status pill. */
+  threadStage: ThreadStage | null
+  /** When the card landed (cards.created_at) — "new since she last looked" for Ivy's line. */
+  createdAt?: string
 }
 export interface ActionItem extends Base {
   kind: 'action'
@@ -78,6 +100,59 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
   return r.data
 }
 
+// ── Cards: one select and one mapper for Home, a project, and search ────────────────────────────────────────────
+
+/** The columns every card tile needs. Callers add their own thread embedding (for size and stage). */
+export const CARD_COLUMNS =
+  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, shape, quote, diagram, board, frame_attribution, recordings(recorded_at, storage_path, source)'
+
+export type CardRow = {
+  id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
+  confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
+  created_at: string; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
+  frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string } | null
+  recordings: { recorded_at: string | null; storage_path?: string | null; source?: string } | null
+}
+
+/** A card made before shapes (0033) has none: photo while its frame is coming or there, else text. */
+export function shapeOf(r: Pick<CardRow, 'shape' | 'frame_status' | 'frame_url'>): CardShape {
+  if (r.shape) return r.shape
+  if (r.frame_status === 'done') return r.frame_url ? 'photo' : 'text'
+  return r.frame_status === 'none' || r.frame_status === 'queued' ? 'photo' : 'text'
+}
+
+export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStage | null } = { size: 1, stage: null }): CardItem {
+  const a = c.frame_attribution
+  return {
+    kind: 'card',
+    id: c.id,
+    recordingId: c.recording_id,
+    projectId: c.project_id,
+    title: c.title,
+    gist: c.gist,
+    playFromMs: c.play_from_ms,
+    confidence: c.confidence,
+    frameUrl: c.frame_url,
+    frameStatus: c.frame_status,
+    frameAt: c.frame_at,
+    at: c.recordings?.recorded_at ?? c.created_at,
+    storagePath: c.recordings?.storage_path ?? null,
+    threadSize: thread.size,
+    viaMuse: c.recordings?.source === 'muse',
+    shape: shapeOf(c),
+    quote: c.quote,
+    diagram: c.diagram,
+    board: c.board,
+    credit:
+      a?.provider === 'unsplash' && a.photographer && a.photographer_url && a.photo_url
+        ? { photographer: a.photographer, photographerUrl: a.photographer_url, photoUrl: a.photo_url }
+        : null,
+    recordingSource: c.recordings?.source ?? null,
+    threadStage: thread.stage,
+    createdAt: c.created_at,
+  }
+}
+
 const LIMIT = 300
 const STUCK_MS = 30_000
 
@@ -86,7 +161,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
     supabase.from('projects').select('id, name, kind').order('is_default', { ascending: false }).order('created_at'),
     supabase
       .from('cards')
-      .select('id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, recordings(recorded_at, storage_path, source)')
+      .select(CARD_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(LIMIT),
     supabase
@@ -94,7 +169,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
       .select('id, recording_id, project_id, text, done, due_date, frame_url, frame_status, frame_at, created_at, recordings(recorded_at)')
       .order('created_at', { ascending: false })
       .limit(LIMIT),
-    supabase.from('threads').select('id, title, return_count, thread_cards(card_id)'),
+    supabase.from('threads').select('id, title, return_count, stage, thread_cards(card_id)'),
     supabase.from('recordings').select('id, status, received_at').in('status', ['queued', 'processing']),
     supabase.from('creators').select('last_opened_at').eq('id', userId).maybeSingle(),
   ])
@@ -112,40 +187,21 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
     id: string
     title: string
     return_count: number
+    stage: ThreadStage
     thread_cards: { card_id: string }[]
   }[]
-  const sizeOf = new Map<string, number>()
-  for (const t of threadRows) for (const tc of t.thread_cards) sizeOf.set(tc.card_id, t.thread_cards.length)
+  const threadOf = new Map<string, { size: number; stage: ThreadStage }>()
+  for (const t of threadRows) for (const tc of t.thread_cards) threadOf.set(tc.card_id, { size: t.thread_cards.length, stage: t.stage })
 
   type Rec = { recorded_at: string | null; storage_path?: string | null; source?: string } | null
-  const cardRows = need('cards', cards) as unknown as ({
-    id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
-    confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
-    created_at: string; recordings: Rec
-  })[]
+  const cardRows = need('cards', cards) as unknown as CardRow[]
   const actionRows = need('actions', actions) as unknown as {
     id: string; recording_id: string | null; project_id: string; text: string; done: boolean; due_date: string | null
     frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null; created_at: string; recordings: Rec
   }[]
 
   const items: Item[] = [
-    ...cardRows.map((c): CardItem => ({
-      kind: 'card',
-      id: c.id,
-      recordingId: c.recording_id,
-      projectId: c.project_id,
-      title: c.title,
-      gist: c.gist,
-      playFromMs: c.play_from_ms,
-      confidence: c.confidence,
-      frameUrl: c.frame_url,
-      frameStatus: c.frame_status,
-      frameAt: c.frame_at,
-      at: c.recordings?.recorded_at ?? c.created_at,
-      storagePath: c.recordings?.storage_path ?? null,
-      threadSize: sizeOf.get(c.id) ?? 1,
-      viaMuse: c.recordings?.source === 'muse',
-    })),
+    ...cardRows.map((c) => toCardItem(c, threadOf.get(c.id) ?? { size: 1, stage: null })),
     ...actionRows.map((a): ActionItem => ({
       kind: 'action',
       id: a.id,
@@ -243,9 +299,28 @@ export function tileHeight(id: string): number {
 }
 export const frameHeight = (item: Item): number => tileHeight(item.id)
 
-/** A tile's height in a column plus the gutter under it — for balancing the two columns. To-dos are estimated. */
+/**
+ * A tile's height in a column plus the gutter under it — for balancing the two columns. Photos are their frame plus
+ * the title and credit; the other shapes are estimated from what they hold (Figma 227:5); to-dos from L3b.
+ */
 const TODO_ESTIMATE = 100 // L3b 209:17 / 209:24: 96–100 for two lines of title and the meta
-const columnHeight = (item: Item) => (item.kind === 'action' ? TODO_ESTIMATE : frameHeight(item)) + space.gutter
+const PHOTO_CAPTION = 44 // 227:23–24: title 17 + credit 13, 8 and 3 above
+export function estimateHeight(item: Item): number {
+  if (item.kind === 'action') return TODO_ESTIMATE
+  switch (item.shape) {
+    case 'photo':
+      return frameHeight(item) + (item.credit ? PHOTO_CAPTION : PHOTO_CAPTION - 16)
+    case 'quote':
+      return item.quote ? 112 + Math.ceil(item.quote.text.length / 18) * 24 : 120
+    case 'diagram':
+      return item.diagram ? 40 + item.diagram.rows.length * 40 : 120
+    case 'board':
+      return item.board ? 84 + item.board.beats.length * 28 : 120
+    default:
+      return 60 + Math.min(4, Math.ceil(item.gist.length / 24)) * 18
+  }
+}
+const columnHeight = (item: Item) => estimateHeight(item) + space.gutter
 
 /**
  * Two columns, each tile into the shorter one — the Pinterest fill. Order within a day is kept top-down.
@@ -268,53 +343,105 @@ export interface IvySentence {
   text: string
   /** Rule 2: what the sentence is about — every sentence comes from the graph. */
   cites: { recordingId: string | null; ms: number }[]
+  /** The cite shown after the line (Figma 162:2 "· Thu 0:31"), and what tapping the line plays. */
+  cite?: { label: string; storagePath: string | null; ms: number }
 }
 
 const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 const count = (n: number) => WORDS[n] ?? String(n)
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const clock = (ms: number) => {
+  const s = Math.floor(ms / 1000)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+/** "Thu 0:31" — the day it was said and where in the recording (L4b's meta, 162:2's cite). */
+export function citeLabel(at: string, ms: number | null): string {
+  const day = WEEK[new Date(at).getDay()].slice(0, 3)
+  return ms === null ? day : `${day} ${clock(ms)}`
+}
+const citeOf = (c: CardItem): IvySentence['cite'] => ({ label: citeLabel(c.at, c.playFromMs), storagePath: c.storagePath, ms: c.playFromMs })
+
+/** How a new card is named in Ivy's line (Figma 227:14): "a quote", "a comparison", "the board is ready". */
+const SHAPE_WORDS: Record<CardItem['shape'], [string, string]> = {
+  quote: ['a quote', 'quotes'],
+  diagram: ['a comparison', 'comparisons'],
+  photo: ['a photo', 'photos'],
+  board: ['a board', 'boards'],
+  text: ['an idea', 'ideas'],
+}
+const ORDER: CardItem['shape'][] = ['quote', 'diagram', 'photo', 'text', 'board']
+/** Where the new cards came from, when they all came from one place: "From your Mini: …". */
+const FROM: Record<string, string> = { mini: 'From your Mini', note_taker: 'From the note taker', muse: 'From Muse', dji_import: 'From the import' }
+
+const list = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`)
+
+/**
+ * The cards said since she last opened Home, named by the form each took (Figma 227:5: "From the drive: a quote, a
+ * comparison, and the board is ready."). A board whose thread is ready says so. Null when nothing is new.
+ */
+export function newShapesSentence(cards: CardItem[]): IvySentence | null {
+  if (cards.length === 0) return null
+  const parts: string[] = []
+  for (const shape of ORDER) {
+    const of = cards.filter((c) => c.shape === shape)
+    if (shape === 'board') {
+      const ready = of.filter((c) => c.threadStage === 'ready')
+      const rest = of.length - ready.length
+      if (rest === 1) parts.push('a board')
+      else if (rest > 1) parts.push(`${count(rest)} boards`)
+      if (ready.length === 1) parts.push('the board is ready')
+      else if (ready.length > 1) parts.push(`${count(ready.length)} boards are ready`)
+      continue
+    }
+    if (of.length === 1) parts.push(SHAPE_WORDS[shape][0])
+    else if (of.length > 1) parts.push(`${count(of.length)} ${SHAPE_WORDS[shape][1]}`)
+  }
+  const sources = new Set(cards.map((c) => c.recordingSource))
+  const from = sources.size === 1 ? FROM[[...sources][0] ?? ''] : undefined
+  const body = list(parts)
+  const newest = [...cards].sort((a, b) => (a.at < b.at ? 1 : -1))[0]
+  return {
+    text: from ? `${from}: ${body}.` : `${cap(body)}.`,
+    cites: cards.map((c) => ({ recordingId: c.recordingId, ms: c.playFromMs })),
+    cite: citeOf(newest),
+  }
+}
 
 /**
  * At most three sentences, in this order: what's due today, a thread she keeps coming back to (≥ 3 returns), and
- * ideas that got a frame since she last opened Home. Nothing new → no sentences (Ivy stays silent).
+ * the cards said since she last opened Home, by form. Nothing new → no sentences (Ivy stays silent).
  */
 export function ivyOnOpen(data: HomeData, now = new Date()): IvySentence[] {
   const today = localDay(now.toISOString())
   const out: IvySentence[] = []
-  const cardOf = new Map(data.items.filter((i): i is CardItem => i.kind === 'card').map((c) => [c.id, c]))
+  const cards = data.items.filter((i): i is CardItem => i.kind === 'card')
+  const cardOf = new Map(cards.map((c) => [c.id, c]))
 
   const due = data.items.filter((i): i is ActionItem => i.kind === 'action' && !i.done && i.dueDate === today)
   if (due.length === 1) {
-    out.push({ text: `“${due[0].text}” is due today.`, cites: [{ recordingId: due[0].recordingId, ms: 0 }] })
+    out.push({ text: `“${due[0].text}” is due today.`, cites: [{ recordingId: due[0].recordingId, ms: 0 }], cite: { label: citeLabel(due[0].at, null), storagePath: null, ms: 0 } })
   } else if (due.length > 1) {
     out.push({ text: `${cap(count(due.length))} things are due today.`, cites: due.map((d) => ({ recordingId: d.recordingId, ms: 0 })) })
   }
 
   const since = data.lastOpenedAt
-  const framed = [...cardOf.values()].filter((c) => c.frameStatus === 'done' && c.frameAt && (!since || c.frameAt > since))
-
   const returning = [...data.threads].filter((t) => t.returnCount >= COMEBACK).sort((a, b) => b.returnCount - a.returnCount)[0]
   if (returning) {
-    const cards = returning.cardIds.map((id) => cardOf.get(id)).filter((c): c is CardItem => !!c)
-    const newFrame = framed.find((c) => returning.cardIds.includes(c.id))
+    const of = returning.cardIds.map((id) => cardOf.get(id)).filter((c): c is CardItem => !!c)
+    const latest = [...of].sort((a, b) => (a.at < b.at ? 1 : -1))[0]
     out.push({
-      text:
-        `You’ve come back to ${returning.title} ${count(returning.returnCount)} times` +
-        (newFrame ? '; it has a frame now.' : '.'),
-      cites: cards.map((c) => ({ recordingId: c.recordingId, ms: c.playFromMs })),
+      text: `You’ve come back to ${returning.title} ${count(returning.returnCount)} times.`,
+      cites: of.map((c) => ({ recordingId: c.recordingId, ms: c.playFromMs })),
+      cite: latest ? citeOf(latest) : undefined,
     })
-    if (newFrame) framed.splice(framed.indexOf(newFrame), 1)
   }
 
-  if (framed.length === 1) {
-    out.push({ text: `${framed[0].title} has a frame now.`, cites: [{ recordingId: framed[0].recordingId, ms: framed[0].playFromMs }] })
-  } else if (framed.length > 1) {
-    out.push({
-      text: `${cap(count(framed.length))} of your ideas have new frames.`,
-      cites: framed.map((c) => ({ recordingId: c.recordingId, ms: c.playFromMs })),
-    })
-  }
+  // Said since she last looked (by when the card landed, so a recording processed later still counts once).
+  const fresh = since ? cards.filter((c) => (c.createdAt ?? c.at) > since) : []
+  const shapes = newShapesSentence(fresh)
+  if (shapes) out.push(shapes)
   return out.slice(0, 3)
 }
 

@@ -1,19 +1,19 @@
 // apps/mobile/components/Tile.tsx
-// One pin in a masonry (Home P1, a project's All ideas, search). v3.4b — ideas are looked at; to-dos are read:
-//   Idea tile  — the frame and nothing else: no title, no chip, no play, no •••. Before the frame lands it's the
-//                Shimmer, never a colour block or the title. Tap opens the idea page, which has the words.
+// One pin in a masonry (Home P1, a project's All ideas, search).
+//   Idea tile  — the form the idea takes (Job B revised, Figma 227:5): photo, quote, diagram, board or text, drawn by
+//                CardFace. A photo shows the Shimmer until it lands, then its title and Unsplash credit under it.
+//                Tap opens the idea page; a quote's ▶ chip plays from where it was said.
 //                Below 0.6 confidence the tile is greyed (the idea page says "Ivy isn't sure").
 //   To-do tile — no frame: Heading / Card title, the Caption meta ("My things · Thu"), and a calendar only when a
 //                date was heard (L3b, Figma 209:17).
 // The title is still the tile's accessibility label, so VoiceOver reads it; it isn't drawn.
 
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import { Image } from 'expo-image'
 import { SymbolView } from 'expo-symbols'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { colour, radius, space, type } from '@ivywolf/ui'
 import { frameHeight, type Item } from '@/lib/home'
-import { Shimmer } from '@/components/Shimmer'
+import { CardFace } from '@/components/CardFace'
 
 /**
  * Two columns, always (never three): margin + tile + gutter + tile + margin fills the screen. Figma draws size/tile-w
@@ -35,6 +35,8 @@ export function Tile({
   item,
   meta,
   onOpen,
+  onPlay,
+  playing,
   width,
 }: {
   item: Item
@@ -42,6 +44,10 @@ export function Tile({
   meta?: string
   /** Opens the idea (P9) or the to-do (P17). */
   onOpen?: (item: Item) => void
+  /** A quote card's ▶ chip: play from play_from_ms. */
+  onPlay?: (item: Item) => void
+  /** This card's audio is playing (the chip shows pause). */
+  playing?: boolean
   /** Omit to fill the parent (a masonry cell). */
   width?: number
 }) {
@@ -62,33 +68,21 @@ export function Tile({
   }
 
   const unsure = item.confidence < LOW_CONFIDENCE
-  const drawn = item.frameStatus === 'done' && !!item.frameUrl
   return (
     <Pressable
       onPress={open}
       disabled={!open}
       accessibilityRole={open ? 'button' : undefined}
       accessibilityLabel={unsure ? `${item.title}. Ivy isn’t sure.` : item.title}
-      style={[styles.idea, { height: frameHeight(item) }, width !== undefined && { width }, unsure && styles.unsure]}
+      style={[width !== undefined && { width }, unsure && styles.unsure]}
       testID={`tile-${item.id}`}
     >
-      <Shimmer style={StyleSheet.absoluteFill} />
-      {drawn && (
-        <Image
-          source={{ uri: item.frameUrl! }}
-          recyclingKey={item.id}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          transition={200}
-          accessibilityIgnoresInvertColors
-        />
-      )}
+      <CardFace card={item} photoHeight={frameHeight(item)} playing={playing} onPlay={onPlay && item.storagePath ? () => onPlay(item) : undefined} />
     </Pressable>
   )
 }
 
 const styles = StyleSheet.create({
-  idea: { borderRadius: radius.tile, overflow: 'hidden', backgroundColor: colour.Shimmer },
   unsure: { opacity: UNSURE_OPACITY },
   todo: { borderRadius: radius.tile, backgroundColor: colour.Chip, padding: TODO_PAD },
   todoTop: { flexDirection: 'row', alignItems: 'flex-start', gap: space.stack },

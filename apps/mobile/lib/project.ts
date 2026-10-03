@@ -3,7 +3,7 @@
 // threads have. To-dos live in My things (P4), which has its own room, so a project page shows ideas only.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { CardItem, Project } from '@/lib/home'
+import { CARD_COLUMNS, toCardItem, type CardItem, type CardRow, type Project, type ThreadStage } from '@/lib/home'
 
 export interface ProjectPage {
   project: Project
@@ -16,12 +16,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
   return r.data
 }
 
-type CardRow = {
-  id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
-  confidence: number; frame_url: string | null; frame_status: CardItem['frameStatus']; frame_at: string | null
-  created_at: string; recordings: { recorded_at: string | null; storage_path: string | null; source: string } | null
-  thread_cards: { threads: { thread_cards: { card_id: string }[] } | null }[]
-}
+type Row = CardRow & { thread_cards: { threads: { stage: ThreadStage; thread_cards: { card_id: string }[] } | null }[] }
 
 export async function loadProject(supabase: SupabaseClient, id: string): Promise<ProjectPage | null> {
   const [project, cards, boards] = await Promise.all([
@@ -29,7 +24,7 @@ export async function loadProject(supabase: SupabaseClient, id: string): Promise
     supabase
       .from('cards')
       .select(
-        'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, recordings(recorded_at, storage_path, source), thread_cards(threads(thread_cards(card_id)))'
+        `${CARD_COLUMNS}, thread_cards(threads(stage, thread_cards(card_id)))`
       )
       .eq('project_id', id)
       .order('created_at', { ascending: false }),
@@ -39,24 +34,11 @@ export async function loadProject(supabase: SupabaseClient, id: string): Promise
   if (!p) return null
   if (boards.error) throw new Error(`boards: ${boards.error.message}`)
 
-  const ideas = (need('ideas', cards) as unknown as CardRow[])
-    .map((c): CardItem => ({
-      kind: 'card',
-      id: c.id,
-      recordingId: c.recording_id,
-      projectId: c.project_id,
-      title: c.title,
-      gist: c.gist,
-      playFromMs: c.play_from_ms,
-      confidence: c.confidence,
-      frameUrl: c.frame_url,
-      frameStatus: c.frame_status,
-      frameAt: c.frame_at,
-      at: c.recordings?.recorded_at ?? c.created_at,
-      storagePath: c.recordings?.storage_path ?? null,
-      viaMuse: c.recordings?.source === 'muse',
-      threadSize: c.thread_cards[0]?.threads?.thread_cards.length ?? 1,
-    }))
+  const ideas = (need('ideas', cards) as unknown as Row[])
+    .map((c) => {
+      const t = c.thread_cards[0]?.threads
+      return toCardItem(c, { size: t?.thread_cards.length ?? 1, stage: t?.stage ?? null })
+    })
     .sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0))
   return { project: p, ideas, boards: boards.count ?? 0 }
 }
