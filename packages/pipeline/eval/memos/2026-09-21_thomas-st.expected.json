@@ -11,8 +11,8 @@
     {"start_ms": 93468, "end_ms": 100223, "type": "request", "kind": "idea", "text": "thoughts, storyboards, demo concepts"}
   ],
   "cards": [
-    {"title": "Many hands, one thread", "play_from_ms": 1440, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_project": "Launch video", "frame_brief": "drawable", "frame_brief_mentions": ["device", "hands"]},
-    {"title": "Product -> AI -> video, seamless", "play_from_ms": 40590, "format_hint": "launch_video", "min_confidence": 0.8, "candidate_project": "Launch video"}
+    {"title": "Many hands, one thread", "play_from_ms": 1440, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_project": "Launch video", "frame_brief": "drawable", "frame_brief_mentions": ["device", "hands"], "shape": ["photo", "board"]},
+    {"title": "Product -> AI -> video, seamless", "play_from_ms": 40590, "format_hint": "launch_video", "min_confidence": 0.8, "candidate_project": "Launch video", "shape": ["text", "diagram", "board"]}
   ],
   "actions": [], "entities": [],
   "loose_ends": [{"text": "MrBeast-style video", "needs": "link"}],

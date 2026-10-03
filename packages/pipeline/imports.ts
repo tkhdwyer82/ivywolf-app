@@ -54,6 +54,9 @@ export async function attachImport(args: {
     frame_url: frameUrl,
     frame_status: 'done',
     frame_at: new Date().toISOString(),
+    // Her picture is the photo (lane 1): the card is a photo card and never searched for. No credit — it's hers.
+    shape: 'photo',
+    shape_set_by: 'ivy',
   }
 
   if (args.cards.length > 0) {

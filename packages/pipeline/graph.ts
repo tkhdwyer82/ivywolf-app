@@ -3,9 +3,9 @@
 // server code besides the Stripe webhook allowed to bypass RLS (see 0001_graph.sql header).
 
 import { createClient } from '@supabase/supabase-js'
-import type { ClassifyOutput } from '@ivywolf/schema'
 import { randomUUID } from 'node:crypto'
 import { PROJECT_AND_FRAME_VERSIONS, type CreatorContext, type PromptVersion } from './classify'
+import type { Analysed } from './shape'
 import { cardText, embed } from './embed'
 import {
   assignCards,
@@ -142,7 +142,7 @@ export async function writeClassification(args: {
   creatorId: string
   recordingId: string
   transcript: unknown
-  out: ClassifyOutput
+  out: Analysed
   promptVersion: PromptVersion
   /** The project the recording was made in ("Talk to this project"), or null. */
   projectId: string | null
@@ -151,8 +151,16 @@ export async function writeClassification(args: {
   const supabase = db()
   // Before classify_v6 these fields are unguided: no named project (→ the recording's project or My things), no brief.
   const guided = PROJECT_AND_FRAME_VERSIONS.has(args.promptVersion)
-  const candidateProject = (c: ClassifyOutput['cards'][number]) => (guided ? c.candidate_project : null)
+  const candidateProject = (c: Analysed['cards'][number]) => (guided ? c.candidate_project : null)
   const frameBrief = (x: { frame_brief: string }) => (guided ? x.frame_brief : null)
+  const shapeFields = (c: Analysed['cards'][number]) => ({
+    shape: c.shape,
+    shape_set_by: 'ivy',
+    visual_query: c.visual_query || null,
+    quote: c.quote,
+    diagram: c.diagram,
+    board: c.board,
+  })
 
   check(
     'recording',
@@ -162,7 +170,7 @@ export async function writeClassification(args: {
         title: out.title,
         transcript: args.transcript,
         trigger: out.trigger === 'wake_word' ? 'wake_word' : undefined,
-        meta: { prompt_version: args.promptVersion, style_signals: out.style_signals },
+        meta: { prompt_version: args.promptVersion, shape_version: out.shape_version, style_signals: out.style_signals },
       })
       .eq('id', recordingId)
   )
@@ -217,6 +225,7 @@ export async function writeClassification(args: {
               is_reference: c.is_reference,
               project_id: projectOf.get(candidateProject(c))!,
               frame_brief: frameBrief(c),
+              ...shapeFields(c),
             }))
           )
           .select('id, project_id')

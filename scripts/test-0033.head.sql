@@ -1,0 +1,3 @@
+-- Rolled-back test for 0033 (write, test in a rolled-back transaction, dry-run, push). Job B revised: card shapes.
+--
+--   node scripts/build-sql-test.mjs 0033 && supabase db query --linked -f scripts/test-0033.sql
