@@ -11,97 +11,172 @@ export const metadata = {
 
 const ENDPOINT = 'https://ivywolf-api.vercel.app/mcp'
 
-type Tool = { name: string; scope: 'ideas:read' | 'ideas:capture'; does: string; inputs: [string, string][]; returns: string }
+// Classification and side effects as Muse's connector guidelines ask for them (§5.4, §5.6). Error sentences are the
+// ones lib/mcp/tools.ts, handlers.ts and capture.ts return, word for word.
+type Tool = {
+  name: string
+  scope: 'ideas:read' | 'ideas:capture'
+  classification: 'Read' | 'Write · not sensitive'
+  does: string
+  sideEffects: string
+  inputs: [string, string][]
+  returns: string
+  errors: string[]
+  rateLimit: string
+}
+
+const READ_EFFECTS = 'None. Reads only; nothing in Ivy changes. The call is logged as described under Data handling.'
+const READ_LIMIT = 'Counts toward 60 calls a minute per creator.'
+const DATE_ERROR = 'Use an ISO date or date-time, like 2026-09-21 or 2026-09-21T09:00:00+10:00.'
 
 const TOOLS: Tool[] = [
   {
     name: 'list_ideas',
     scope: 'ideas:read',
+    classification: 'Read',
     does: 'Lists the creator’s ideas since a date, newest first.',
+    sideEffects: READ_EFFECTS,
     inputs: [
-      ['since', 'required. ISO 8601 date or date-time.'],
-      ['project', 'optional. A project name; any case.'],
-      ['status', 'optional. sparked, developing, ready or shipped — the stage of the idea’s thread.'],
-      ['limit', 'optional. 1–50, default 20.'],
+      ['since', 'optional. ISO 8601 date or date-time. Default: the last 30 days.'],
+      ['project', 'optional. A project name, any case, up to 120 characters. Default: every project.'],
+      ['status', 'optional. sparked, developing, ready or shipped — the stage of the idea’s thread. Default: any stage.'],
+      ['limit', 'optional. 1–50. Default 20.'],
     ],
     returns: 'ideas: id, title, gist, project, status, recorded_at, cite, link.',
+    errors: [DATE_ERROR, 'You don’t have a project called “…”. Your projects are: …'],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'search_ideas',
     scope: 'ideas:read',
+    classification: 'Read',
     does: 'Finds ideas about something, ranked by similarity of meaning (85%) and recency (15%, 30-day half-life).',
+    sideEffects: READ_EFFECTS + ' The query text is sent to Voyage AI to rank results and is not stored.',
     inputs: [
       ['query', 'required. 1–300 characters.'],
-      ['limit', 'optional. 1–20, default 10.'],
+      ['limit', 'optional. 1–20. Default 10.'],
     ],
-    returns: 'ideas, as list_ideas, each with a score.',
+    returns: 'ideas, as list_ideas, each with a score (0–1).',
+    errors: [],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'get_idea',
     scope: 'ideas:read',
+    classification: 'Read',
     does: 'One idea, with the other ideas in its thread and the to-dos said in the same recording.',
-    inputs: [['id', 'required. The idea’s id.']],
-    returns: 'idea; thread (id, name, stage, returns, last_return_at, link); returns; thread_siblings (up to 10); actions.',
+    sideEffects: READ_EFFECTS,
+    inputs: [['id', 'required. The idea’s id, from list_ideas, search_ideas or list_threads. No default.']],
+    returns:
+      'idea (as list_ideas); thread (id, name, stage, returns, last_return_at, link) or null; returns; thread_siblings (up to 10 ideas); actions (as list_actions).',
+    errors: ['That doesn’t look like an Ivy idea id.', 'I couldn’t find that idea in your Ivy. It may have been deleted.'],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'list_threads',
     scope: 'ideas:read',
+    classification: 'Read',
     does: 'Threads — ideas the creator keeps coming back to across recordings — most recently returned to first.',
+    sideEffects: READ_EFFECTS,
     inputs: [
-      ['min_returns', 'optional. Only threads returned to at least this many times.'],
-      ['limit', 'optional. 1–50, default 20.'],
+      ['min_returns', 'optional. 0 or more: only threads returned to at least this many times. Default: all threads.'],
+      ['limit', 'optional. 1–50. Default 20.'],
     ],
-    returns: 'threads: id, name, stage, returns, last_return_at, top_cards (3 ideas), cite, link.',
+    returns: 'threads: id, name, stage, returns, last_return_at, top_cards (up to 3 ideas), cite, link.',
+    errors: [],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'list_actions',
     scope: 'ideas:read',
-    does: 'To-dos heard in recordings, soonest due first.',
+    classification: 'Read',
+    does: 'To-dos heard in recordings, soonest due first; undated to-dos last.',
+    sideEffects: READ_EFFECTS,
     inputs: [
-      ['status', 'optional. open or done.'],
-      ['due_before', 'optional. ISO 8601 date.'],
-      ['limit', 'optional. 1–50, default 30.'],
+      ['status', 'optional. open or done. Default: both.'],
+      ['due_before', 'optional. ISO 8601 date. Default: any due date, or none.'],
+      ['limit', 'optional. 1–50. Default 30.'],
     ],
-    returns: 'actions: id, text, due, status, project, cite, link.',
+    returns: 'actions: id, text, due (a date or null), status, project, cite, link.',
+    errors: [DATE_ERROR],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'list_sessions',
     scope: 'ideas:read',
-    does: 'Long recordings (interviews, walk-and-talks) since a date, with their chapters.',
+    classification: 'Read',
+    does: 'Long recordings (interviews, walk-and-talks) since a date, newest first, with their chapters.',
+    sideEffects: READ_EFFECTS,
     inputs: [
-      ['since', 'required. ISO 8601 date or date-time.'],
-      ['limit', 'optional. 1–20, default 10.'],
+      ['since', 'optional. ISO 8601 date or date-time. Default: the last 30 days.'],
+      ['limit', 'optional. 1–20. Default 10.'],
     ],
     returns: 'sessions: id, title, duration_ms, recorded_at, chapters (title, start_ms, cite, link), cite, link.',
+    errors: [DATE_ERROR],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'get_session_quotes',
     scope: 'ideas:read',
+    classification: 'Read',
     does: 'A session’s quotable lines, best first.',
+    sideEffects: READ_EFFECTS,
     inputs: [
-      ['session_id', 'required. A session’s id from list_sessions.'],
-      ['limit', 'optional. 1–20, default 10.'],
+      ['session_id', 'required. A session’s id from list_sessions. No default.'],
+      ['limit', 'optional. 1–20. Default 10.'],
     ],
-    returns: 'quotes: text, speaker, ms, clip_score (0–1 or null), cite, link.',
+    returns: 'session_id; quotes: text, speaker, ms, clip_score (0–1 or null), cite, link.',
+    errors: [
+      'That doesn’t look like an Ivy session id.',
+      'I couldn’t find that session in your Ivy.',
+      'That recording is a voice memo, not a session. Ask for its idea or its transcript instead.',
+    ],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'get_transcript',
     scope: 'ideas:read',
+    classification: 'Read',
     does: 'Every word of one recording, with timestamps. The only tool that returns transcripts, and only for the recording asked for.',
-    inputs: [['recording_id', 'required. A recording’s id, from any cite.']],
+    sideEffects: READ_EFFECTS,
+    inputs: [['recording_id', 'required. A recording’s id, from any cite. No default.']],
     returns: 'recording_id, title, kind, recorded_at, utterances (start_ms, end_ms, speaker, text), cite, link.',
+    errors: [
+      'That doesn’t look like an Ivy recording id.',
+      'I couldn’t find that recording in your Ivy.',
+      'Ivy is still listening to that one. Try again in a minute.',
+    ],
+    rateLimit: READ_LIMIT,
   },
   {
     name: 'capture_idea',
     scope: 'ideas:capture',
+    classification: 'Write · not sensitive',
     does:
-      'Adds a new idea in the creator’s words. It is processed like a voice memo recorded in the app: sorted into ideas and to-dos within about a minute, and shown in Ivy marked “via Muse”. It is private to the creator.',
+      'Adds a new idea in the creator’s words. It is processed like a voice memo recorded in the app and shown in Ivy marked “via Muse”.',
+    sideEffects:
+      'Creates one private recording holding the text, in the creator’s own account. Within about a minute Ivy classifies it, as it does a voice memo: ' +
+      'the ideas in it become private cards, any to-dos become to-dos, and each card is placed in a thread with related ideas (a new one, or one ' +
+      'she has returned to before). Pictures are added as for any memo: a photo card gets a stock photograph from Unsplash, and a to-do may get one ' +
+      'small drawing generated in her style. No credits are charged to the creator. Nothing is shared, published or posted, and nothing else ' +
+      'is edited or deleted. A retry with the same idempotency key, or the same words within 10 minutes with no key, files nothing new.',
     inputs: [
-      ['text', 'required. Up to 4,000 characters.'],
-      ['idempotency_key', 'required. 8–128 characters of letters, digits and . _ : -. A retry with the same key returns the first result; the same key with different text is refused.'],
-      ['context', 'optional. Up to 120 characters, e.g. “from Charm”.'],
+      ['text', 'required. 1–4,000 characters. No default.'],
+      [
+        'idempotency_key',
+        'optional. 8–128 characters of letters, digits and . _ : -. A retry with the same key returns the first result; the same key with different text is refused. Default: derived from the text, so the same words within 10 minutes are filed once.',
+      ],
+      ['context', 'optional. Up to 120 characters, e.g. “from Charm”. Default: none.'],
     ],
-    returns: 'recording_id, status (queued, or the current status on a retry), replayed (on a retry), link.',
+    returns: 'recording_id, status (queued, or the current status on a retry), replayed (true on a retry), link.',
+    errors: [
+      'There’s nothing in that idea to add. Say it again with the words in.',
+      'That’s too long for one idea — keep it under 4000 characters.',
+      'Use letters, digits and . _ : - in the idempotency key.',
+      'That idempotency key was already used for a different idea. Send a new key for a new idea.',
+      'Ivy is already adding that idea. It’ll be in Home in a minute.',
+    ],
+    rateLimit: 'At most 10 a minute per creator, within the 60 calls a minute shared with the other tools.',
   },
 ]
 
@@ -123,6 +198,9 @@ export default function Connector() {
         new ones. It cannot edit, move or delete anything, create boards, spend credits or post anywhere.
       </p>
       <p>
+        A creator’s Ivy ideas, threads and sessions aren’t on the web; the connector is the only way Muse can read them.
+      </p>
+      <p>
         Endpoint: <code style={s.code}>{ENDPOINT}</code> — Model Context Protocol over Streamable HTTP. Responses are
         always single JSON bodies, never event streams. Protocol revisions 2026-07-28 and 2025-era clients are both
         served, statelessly.
@@ -136,14 +214,39 @@ export default function Connector() {
         <code style={s.code}>web_link</code> repeats <code style={s.code}>link</code> and will be removed in the next release.
         Lists return titles and short gists, never transcripts.
         Errors are returned as tool results with <code style={s.code}>isError</code> set and a plain sentence meant to be
-        shown to the creator.
+        shown to the creator. An input that fails its schema is answered by the MCP SDK as{' '}
+        <code style={s.code}>Input validation error: Invalid arguments for tool …</code>, followed by the sentence listed
+        under the tool where there is one.
       </p>
+      <p>Any tool can also answer:</p>
+      <ul>
+        <li>
+          Over the rate limit: “You’ve asked Ivy a lot in the last minute. Give it a moment and ask again.” (capture_idea:
+          “That’s ten ideas in a minute. Give Ivy a moment, then add the next one.”)
+        </li>
+        <li>
+          Missing scope: “This key can’t read your ideas. Make a new key in Ivy with “{SCOPE_WORDS['ideas:read']}” on.”
+          (capture_idea: “This key can read your ideas but can’t add new ones. Make a new key in Ivy with “
+          {SCOPE_WORDS['ideas:capture']}” on.”)
+        </li>
+        <li>Unexpected failure: “Ivy hit a problem answering that. Try again in a moment.”</li>
+        <li>No credential, or a revoked or expired one: HTTP 401 before any tool runs (see Authentication).</li>
+      </ul>
       {TOOLS.map((t) => (
         <section key={t.name} style={{ borderTop: '1px solid #E8E8ED', padding: '1rem 0' }}>
           <h3 style={{ fontSize: 17, margin: 0 }}>
-            <code style={s.code}>{t.name}</code> <span style={{ ...s.dim, fontWeight: 400, fontSize: 14 }}>· {t.scope}</span>
+            <code style={s.code}>{t.name}</code>{' '}
+            <span style={{ ...s.dim, fontWeight: 400, fontSize: 14 }}>
+              · {t.classification} · {t.scope}
+            </span>
           </h3>
           <p style={{ margin: '0.5rem 0' }}>{t.does}</p>
+          <p style={{ margin: '0.5rem 0' }}>
+            <span style={s.dim}>Side effects:</span> {t.sideEffects}
+          </p>
+          <p style={{ margin: '0.5rem 0 0' }}>
+            <span style={s.dim}>Inputs:</span>
+          </p>
           <ul style={{ margin: '0.25rem 0', paddingLeft: '1.25rem' }}>
             {t.inputs.map(([name, about]) => (
               <li key={name}>
@@ -151,8 +254,22 @@ export default function Connector() {
               </li>
             ))}
           </ul>
-          <p style={{ margin: '0.5rem 0 0' }}>
+          <p style={{ margin: '0.5rem 0' }}>
             <span style={s.dim}>Returns:</span> {t.returns}
+          </p>
+          <p style={{ margin: '0.5rem 0 0' }}>
+            <span style={s.dim}>Errors:</span>{' '}
+            {t.errors.length === 0 ? 'only those any tool can give (above).' : 'besides those any tool can give (above):'}
+          </p>
+          {t.errors.length > 0 && (
+            <ul style={{ margin: '0.25rem 0', paddingLeft: '1.25rem' }}>
+              {t.errors.map((e) => (
+                <li key={e}>“{e}”</li>
+              ))}
+            </ul>
+          )}
+          <p style={{ margin: '0.5rem 0 0' }}>
+            <span style={s.dim}>Rate limit:</span> {t.rateLimit}
           </p>
         </section>
       ))}
@@ -188,6 +305,14 @@ export default function Connector() {
         <code style={s.code}>Authorization: Bearer iv_…</code>. Keys don’t expire; they are revoked in the same place.
       </p>
       <p>Keys and tokens are stored only as SHA-256 hashes.</p>
+
+      <h2 style={s.h2}>Reviewer access</h2>
+      <p>
+        The reviewer credentials supplied with Ivy Wolf’s submission are for the production environment: this endpoint,
+        app.ivywolf.com.au and the live Ivy database, not a test copy. The reviewer account holds a sample notebook that
+        every tool can be tried on — ideas in a project, a thread returned to three times, a dated to-do, and a recorded
+        interview with chapters, quotes and a transcript. Ideas it captures stay private to that account.
+      </p>
 
       <h2 style={s.h2}>Rate limits</h2>
       <p>

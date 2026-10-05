@@ -76,7 +76,7 @@ async function seed(who: string = CREATOR, demo = false) {
     transcript: [
       { start_ms: 0, end_ms: 6000, speaker: '0', text: 'Open the restock video on the rooftop, a chase to the box.' },
       { start_ms: 6000, end_ms: 9000, speaker: '0', text: 'Book the rooftop for Saturday.' },
-      { start_ms: 9000, end_ms: 15000, speaker: '0', text: INJECTION },
+      { start_ms: 9000, end_ms: 15000, speaker: '0', text: demo ? 'And the box lands on the ledge right as the music drops.' : INJECTION },
     ],
   })
   const memoB = await recording({ source: 'phone', kind: 'memo', storage_path: `${who}/b.m4a`, recorded_at: daysAgo(1), title: 'Walk' })
