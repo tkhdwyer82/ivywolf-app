@@ -162,6 +162,23 @@ export async function writeClassification(args: {
     board: c.board,
   })
 
+  // The people heard in this recording, every way they were named: frames.ts strips these words from what goes to
+  // Unsplash and fal.ai (redact.ts). Known people bring the aliases already on file (transcripts drift).
+  const persons = out.entities.filter((e) => e.kind === 'person')
+  const known = persons.some((e) => e.canonical)
+    ? check(
+        'people',
+        await supabase
+          .from('entities')
+          .select('aliases')
+          .eq('creator_id', creatorId)
+          .in('canonical_name', persons.flatMap((e) => (e.canonical ? [e.canonical] : [])))
+      )
+    : []
+  const people = [
+    ...new Set([...persons.flatMap((e) => [e.name, ...(e.canonical ? [e.canonical] : []), ...e.aliases_seen]), ...(known ?? []).flatMap((k) => k.aliases as string[])]),
+  ].filter((n) => n.trim())
+
   check(
     'recording',
     await supabase
@@ -170,7 +187,7 @@ export async function writeClassification(args: {
         title: out.title,
         transcript: args.transcript,
         trigger: out.trigger === 'wake_word' ? 'wake_word' : undefined,
-        meta: { prompt_version: args.promptVersion, shape_version: out.shape_version, style_signals: out.style_signals },
+        meta: { prompt_version: args.promptVersion, shape_version: out.shape_version, style_signals: out.style_signals, people },
       })
       .eq('id', recordingId)
   )

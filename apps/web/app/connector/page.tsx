@@ -158,7 +158,7 @@ const TOOLS: Tool[] = [
       'Creates one private recording holding the text, in the creator’s own account. Within about a minute Ivy classifies it, as it does a voice memo: ' +
       'the ideas in it become private cards, any to-dos become to-dos, and each card is placed in a thread with related ideas (a new one, or one ' +
       'she has returned to before). Pictures are added as for any memo: a photo card gets a stock photograph from Unsplash, and a to-do may get one ' +
-      'small drawing generated in her style. No credits are charged to the creator. Nothing is shared, published or posted, and nothing else ' +
+      'picture generated in her style. No credits are charged to the creator. Nothing is shared, published or posted, and nothing else ' +
       'is edited or deleted. A retry with the same idempotency key, or the same words within 10 minutes with no key, files nothing new.',
     inputs: [
       ['text', 'required. 1–4,000 characters. No default.'],
@@ -335,6 +335,20 @@ export default function Connector() {
           capture_idea stores the text as a private recording in the creator’s account and processes it as the app
           processes a voice memo: Anthropic’s Claude sorts it into ideas and to-dos, and Voyage AI embeds each idea so it
           can be threaded with related ones. Deleting the recording in the app deletes the text and everything made from it.
+        </li>
+        <li>
+          Pictures for what capture_idea creates come from two more services, as they do for any memo.{' '}
+          <strong>Unsplash</strong>: for a card shown as a photo, Ivy sends a search phrase of 2–6 words that Claude
+          wrote to describe what to photograph (for example “hands wrapping a candle box”), with Ivy’s app key, then
+          tells Unsplash which photo was used, as its API guidelines require. <strong>fal.ai</strong>: for a to-do,
+          Ivy may have one picture drawn by the Flux Schnell model. It sends a one-sentence description Claude wrote of
+          what to draw, the creator’s style words and her colours as colour names, and a fixed instruction: no faces,
+          text, logos or brand marks. Neither service is sent the captured text, a transcript, a title or gist, the
+          creator’s identity or anyone else’s data. Nothing is sent when Claude found nothing to picture, when the card
+          isn’t a photo card, or when the same description was already drawn for this creator (the stored picture is
+          reused). Before either request leaves Ivy, the name of every person heard in the recording, and any other
+          name Ivy knows that person by, is removed in code. Leaving out brands, products and descriptions of faces is
+          an instruction to Claude, not a check in code.
         </li>
         <li>
           Each call is logged with the tool name, its non-text parameters (dates, limits, filters), whether it succeeded
