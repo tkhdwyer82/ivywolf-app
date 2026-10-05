@@ -179,6 +179,11 @@ export async function writeClassification(args: {
     ...new Set([...persons.flatMap((e) => [e.name, ...(e.canonical ? [e.canonical] : []), ...e.aliases_seen]), ...(known ?? []).flatMap((k) => k.aliases as string[])]),
   ].filter((n) => n.trim())
 
+  // meta is merged into, never replaced: it already holds what the recording arrived with (a capture's text and
+  // context, an import, a correction target, a filename). The recording is claimed, so nothing writes it meanwhile.
+  const prior = need('recording meta', await supabase.from('recordings').select('meta').eq('id', recordingId).single())
+  const priorMeta = prior.meta && typeof prior.meta === 'object' && !Array.isArray(prior.meta) ? (prior.meta as Record<string, unknown>) : {}
+
   check(
     'recording',
     await supabase
@@ -187,7 +192,7 @@ export async function writeClassification(args: {
         title: out.title,
         transcript: args.transcript,
         trigger: out.trigger === 'wake_word' ? 'wake_word' : undefined,
-        meta: { prompt_version: args.promptVersion, shape_version: out.shape_version, style_signals: out.style_signals, people },
+        meta: { ...priorMeta, prompt_version: args.promptVersion, shape_version: out.shape_version, style_signals: out.style_signals, people },
       })
       .eq('id', recordingId)
   )
