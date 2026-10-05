@@ -38,7 +38,8 @@ The object is for thinking. The platform is for what you thought.
 - A `request` segment is addressed to Ivy. Life-type requests route to the phone (Reminders); idea-type requests draft a board.
 
 ## Nav (launch UI, handover v3.2 · Figma 170:2, states 145:5)
-Home · ⊕ · Mini — three squircle tiles (components/Nav.tsx). Tap ⊕ = record; long-press = Talk / Import / Project.
+Home · ⊕ · Mini — one white pill with a lime ⊕ disc (components/Nav.tsx, L3b 209:31). Tap ⊕ = record; long-press = Talk / Import / Project.
+Sizes, type and colour come from packages/ui/theme (generated from Figma: `npm run tokens -w @ivywolf/ui`); no hand-typed sizes.
 Search and the avatar (Voice notes) live in Home's header. My things and Ivy Mini are default projects, not tabs.
 Explore, Boards and Life are retired; later rooms and verbs appear only when she has earned them (handover §3).
 

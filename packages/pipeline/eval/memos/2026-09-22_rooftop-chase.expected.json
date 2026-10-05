@@ -9,7 +9,7 @@
     {"start_ms": 33920, "end_ms": 41600, "type": "action", "text": "I need to have milk for the office for Thursday", "boundary_marker": "by the way"}
   ],
   "cards": [
-    {"title": "Arabella rooftop chase launch video", "play_from_ms": 5440, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_project": "Launch video", "frame_brief": "drawable", "frame_brief_mentions": ["roof", "chase", "street", "run"]}
+    {"title": "Arabella rooftop chase launch video", "play_from_ms": 5440, "format_hint": "launch_video", "min_confidence": 0.85, "candidate_project": "Launch video", "frame_brief": "drawable", "frame_brief_mentions": ["roof", "chase", "street", "run"], "shape": ["board", "photo"]}
   ],
   "actions": [{"text": "milk", "scope": "work", "due_date": "2026-09-24", "frame_brief": "drawable", "frame_brief_mentions": ["milk"]}],
   "entities": [{"name": "Arabella", "kind": "person", "canonical": null, "aliases_seen": ["Arabella"]}],

@@ -1,19 +1,22 @@
 // packages/pipeline/process.ts
-// Recording in → graph out. transcribe → junk gates → classify → write → status.
+// Recording in → graph out. transcribe → junk gates → classify → shape → write → status.
 // A text recording (0026, Muse's capture_idea) skips transcribe: its words are already on the row.
 // Callers claim the recording first (claimRecording) so it is processed at most once.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { ClassifyOutput, RecordingSource, Utterance } from '@ivywolf/schema'
+import type { RecordingSource, Utterance } from '@ivywolf/schema'
 import { signedUrl } from './storage'
 import { transcribe, type Transcript } from './transcribe'
 import { textUtterances } from './text'
 import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
 import { frameRecording } from './frames'
+import { shapeCards, type Analysed } from './shape'
 import { attachImport, parseImport } from './imports'
 import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification, type NewCard } from './graph'
 
 export { claimRecording, markFailed } from './graph'
+// For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
+export { photoForCard } from './frames'
 // For the MCP server's search_ideas (apps/web/lib/mcp/handlers.ts): the same embedding and similarity threading uses.
 export { embed } from './embed'
 export { cosine } from './threading'
@@ -23,7 +26,7 @@ const MIN_DURATION_MS = 3000
 
 export type ProcessResult =
   | { junk: 'no_speech' | 'too_short'; transcript: Transcript }
-  | { junk: null; transcript: Transcript; out: ClassifyOutput }
+  | { junk: null; transcript: Transcript; out: Analysed }
 
 /** Transcribe and classify without touching the graph. The eval runner uses this directly. */
 export async function analyse(args: {
@@ -43,13 +46,14 @@ export async function analyse(args: {
   }
   if (transcript.utterances.length === 0) return { junk: 'no_speech', transcript }
 
-  const out = await classify({
+  const classified = await classify({
     utterances: transcript.utterances,
     creator: args.creator,
     source: args.source,
     recorded: args.recorded,
     promptVersion: args.promptVersion,
   })
+  const out = await shapeCards({ out: classified, people: args.creator.people.map((p) => p.canonical) })
   return { junk: null, transcript, out }
 }
 
@@ -69,13 +73,14 @@ export async function analyseText(args: {
   const last = args.utterances[args.utterances.length - 1]
   const transcript: Transcript = { duration_ms: last?.end_ms ?? 0, utterances: args.utterances, raw: null }
   if (args.utterances.length === 0) return { junk: 'no_speech', transcript }
-  const out = await classify({
+  const classified = await classify({
     utterances: args.utterances,
     creator: args.creator,
     source: 'phone',
     recorded: args.recorded,
     promptVersion: args.promptVersion,
   })
+  const out = await shapeCards({ out: classified, people: args.creator.people.map((p) => p.canonical) })
   return { junk: null, transcript, out }
 }
 
@@ -95,8 +100,9 @@ async function ownTarget(supabase: SupabaseClient, creatorId: string, id: unknow
   return todo.data ? { id: todo.data.id, kind: 'to-do' } : null
 }
 
-const EMPTY_OUTPUT: ClassifyOutput = {
+const EMPTY_OUTPUT: Analysed = {
   trigger: 'none', title: 'Correction', segments: [], cards: [], actions: [], entities: [], loose_ends: [], requests: [], style_signals: [],
+  shape_version: null,
 }
 
 /** Full pipeline for one recordings row the caller has already claimed (status 'processing'). */

@@ -3,16 +3,16 @@
 // The field is focused on open; results land in Home's masonry as she types. What Explore (P22) had besides search —
 // Ideas for you, Rising — is retired with it.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { router, useFocusEffect } from 'expo-router'
+import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
-import { useAudioPlayer } from 'expo-audio'
 import { useSupabase } from '@/lib/supabase'
-import { masonry, metaLine, type CardItem, type Item, type Project } from '@/lib/home'
+import { masonry, type CardItem } from '@/lib/home'
 import { searchIdeas } from '@/lib/search'
-import { Tile, TILE_WIDTH } from '@/components/Tile'
+import { Tile, useTileWidth } from '@/components/Tile'
+import { space } from '@ivywolf/ui'
 import { hero, text } from '@/lib/theme'
 
 const SEARCH_WAIT_MS = 250
@@ -22,21 +22,9 @@ type Found = { q: string; ideas: CardItem[]; failed: boolean }
 export default function Search() {
   const supabase = useSupabase()
   const insets = useSafeAreaInsets()
-  const [projects, setProjects] = useState<Project[]>([])
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Found | null>(null)
-  const [playing, setPlaying] = useState<string | null>(null)
-  const player = useAudioPlayer(null)
-
-  useFocusEffect(
-    useCallback(() => {
-      supabase
-        .from('projects')
-        .select('id, name, kind')
-        .then(({ data }) => data && setProjects(data as Project[]))
-    }, [supabase])
-  )
 
   // Search as she types, once she pauses; a slower earlier answer never replaces a newer one.
   useEffect(() => {
@@ -61,20 +49,6 @@ export default function Search() {
       clearTimeout(t)
     }
   }, [q, supabase])
-
-  async function play(item: Item) {
-    if (item.kind !== 'card' || !item.storagePath) return
-    if (playing === item.id) {
-      player.pause()
-      return setPlaying(null)
-    }
-    const { data: url } = await supabase.storage.from('recordings').createSignedUrl(item.storagePath, 3600)
-    if (!url) return
-    player.replace({ uri: url.signedUrl })
-    await player.seekTo(item.playFromMs / 1000)
-    player.play()
-    setPlaying(item.id)
-  }
 
   const searching = q.trim().length > 0
 
@@ -110,7 +84,7 @@ export default function Search() {
           </Pressable>
         </View>
         {error && <Text style={[text.caption, styles.secondary, styles.error]}>{error}</Text>}
-        {searching && <Results results={results} q={q.trim()} projects={projects} playing={playing} onPlay={play} />}
+        {searching && <Results results={results} q={q.trim()} />}
       </ScrollView>
     </View>
   )
@@ -119,16 +93,11 @@ export default function Search() {
 function Results({
   results,
   q,
-  projects,
-  playing,
-  onPlay,
 }: {
   results: Found | null
   q: string
-  projects: Project[]
-  playing: string | null
-  onPlay: (item: Item) => void
 }) {
+  const tileWidth = useTileWidth()
   if (!results || results.q !== q) return <ActivityIndicator color={hero.ink} style={{ marginTop: 40 }} />
   if (results.failed) return null // the error line above says why
   if (results.ideas.length === 0) {
@@ -138,9 +107,11 @@ function Results({
   return (
     <View style={[styles.columns, { marginTop: 20 }]}>
       {[left, right].map((col, c) => (
-        <View key={c} style={{ width: TILE_WIDTH }}>
+        <View key={c} style={{ width: tileWidth }}>
           {col.map((item) => (
-            <Tile key={item.id} item={item} meta={metaLine(item, projects)} playing={playing === item.id} onPlay={onPlay} onOpen={(i) => router.push(`/idea/${i.id}`)} />
+            <View key={item.id} style={{ paddingBottom: space.gutter }}>
+              <Tile item={item} width={tileWidth} onOpen={(i) => router.push(`/idea/${i.id}`)} />
+            </View>
           ))}
         </View>
       ))}

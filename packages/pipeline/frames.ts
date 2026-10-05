@@ -1,18 +1,28 @@
 // packages/pipeline/frames.ts
-// Every card and to-do gets a frame (handover §4 rule 6). Called after a recording's graph writes: each card or
-// action with a frame_brief is drawn in the creator's style pack; one with no brief is left for the app to render
-// typographically (its title in the palette).
+// Frames after a recording's graph writes.
+//
+// Cards (Job B revised, Figma 227:5): a card takes the form shape_v1 chose, and only a photo card has a picture —
+// a real photograph from Unsplash (unsplash.ts), found from its visual_query, credited and download-tracked. Quote,
+// diagram, board and text cards are drawn natively by the app ('typographic'). No card frame is generated: a photo
+// search that finds nothing turns the card into a text card. A card she imported keeps her picture (imports.ts).
+//
+// To-dos, as before (Job 4): each action with a frame_brief is drawn in the creator's style pack; one with no brief is
+// left for the app to render typographically.
 //
 //   frame_status: none → queued → done | typographic | failed
 //
-// A failure sets 'failed' and never blocks the card — the app shows the typographic frame instead.
+// A failure sets 'failed' (to-dos) or falls back to text (cards) and never blocks the row.
 // To-dos are cached by (style pack, normalised brief): "a carton of milk" is drawn once per creator, and its file is
 // removed when the last to-do using it is deleted (reference-counted by apps/mobile/lib/deleteRecording.ts).
 // Only the brief, tone words and palette are sent to fal.ai — never a name, the transcript or other creators' data.
+// "Never a name" is enforced, not just asked for: the words of anyone heard in the recording are stripped from the
+// brief and the visual_query before they leave (redact.ts), and the strip is logged (a count, never the names).
 
 import { createHash } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { fetchAndUpload } from './storage'
+import { searchPhoto, trackDownload } from './unsplash'
+import { peopleFor, stripPeople } from './redact'
 
 const MODEL = 'fal-ai/flux/schnell'
 const ENDPOINT = `https://fal.run/${MODEL}`
@@ -115,7 +125,7 @@ async function draw(prompt: string): Promise<{ url: string; width: number; heigh
   return { ...image, costUsd: megapixels * USD_PER_MEGAPIXEL }
 }
 
-async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise<void> {
+async function frameOne(creatorId: string, pack: StylePack, s: Subject, people: string[]): Promise<void> {
   const supabase = db()
   const table = s.kind === 'card' ? 'cards' : 'actions'
   const setStatus = async (fields: Record<string, unknown>) => {
@@ -123,12 +133,15 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise
     if (error) throw new Error(`${table} ${s.id}: ${error.message}`)
   }
 
-  if (!s.brief?.trim()) {
+  const guarded = s.brief?.trim() ? stripPeople(s.brief, people) : { text: '', removed: 0 }
+  if (guarded.removed) console.warn(`[frames] ${s.kind} ${s.id}: removed ${guarded.removed} name word(s) from frame_brief before fal`)
+  const brief = guarded.text
+  if (!brief.trim()) {
     await setStatus({ frame_status: 'typographic' })
     return
   }
 
-  const hash = briefHash(s.brief)
+  const hash = briefHash(brief)
   const log = async (row: Record<string, unknown>) => {
     const { error } = await supabase.from('frame_generations').insert({
       creator_id: creatorId,
@@ -171,7 +184,7 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise
 
   await setStatus({ frame_status: 'queued' })
   try {
-    const image = await draw(framePrompt(s.brief, pack))
+    const image = await draw(framePrompt(brief, pack))
     // Cards: one frame each. To-dos: one per (style pack, brief), shared by every to-do with that brief.
     const path =
       s.kind === 'card'
@@ -190,6 +203,67 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject): Promise
 }
 
 /**
+ * A photo card's picture: the best Unsplash match for its visual_query, hotlinked and credited, with the download
+ * event sent. Nothing found, no query, or the search failing → the card becomes a text card (shape_set_by 'ivy'),
+ * unless she chose photo herself (Change view), when it stays photo and shows its title until she picks again.
+ * Returns whether a photo was set.
+ */
+export async function photoForCard(creatorId: string, cardId: string, palette?: string[], people?: string[]): Promise<boolean> {
+  const supabase = db()
+  const { data: card, error } = await supabase
+    .from('cards')
+    .select('id, recording_id, visual_query, title, shape_set_by')
+    .eq('id', cardId)
+    .eq('creator_id', creatorId)
+    .single()
+  if (error || !card) throw new Error(`card ${cardId}: ${error?.message ?? 'missing'}`)
+  if (!palette) {
+    const { data: pack } = await supabase.from('style_packs').select('palette').eq('creator_id', creatorId).maybeSingle()
+    palette = (pack?.palette as string[] | undefined) ?? []
+  }
+
+  const guarded = stripPeople((card.visual_query as string | null)?.trim() ?? '', people ?? (await peopleFor(supabase, creatorId, card.recording_id as string | null)))
+  if (guarded.removed) console.warn(`[frames] card ${cardId}: removed ${guarded.removed} name word(s) from visual_query before Unsplash`)
+  const query = guarded.text || null
+  const update = async (fields: Record<string, unknown>) => {
+    const { error } = await supabase.from('cards').update(fields).eq('id', cardId)
+    if (error) throw new Error(`card ${cardId}: ${error.message}`)
+  }
+  const miss = (why: string) => {
+    console.log(`[frames] card ${cardId}: no photo (${why})`)
+    return card.shape_set_by === 'creator'
+      ? update({ frame_status: 'typographic' })
+      : update({ shape: 'text', shape_set_by: 'ivy', frame_status: 'typographic' })
+  }
+
+  if (!query) {
+    await miss('no visual_query')
+    return false
+  }
+  await update({ frame_status: 'queued' })
+  try {
+    const photo = await searchPhoto(query, palette)
+    if (!photo) {
+      await miss(`nothing for "${query}"`)
+      return false
+    }
+    await update({
+      frame_url: photo.url,
+      frame_status: 'done',
+      frame_at: new Date().toISOString(),
+      frame_attribution: photo.attribution,
+    })
+    await trackDownload(photo.attribution.download_location)
+    console.log(`[frames] card ${cardId}: Unsplash ${photo.attribution.photo_id} for "${query}"`)
+    return true
+  } catch (err) {
+    console.error(`[frames] card ${cardId}: Unsplash failed`, err)
+    await miss('search failed').catch(() => {})
+    return false
+  }
+}
+
+/**
  * Frame every card and action of one recording that doesn't have one yet. Never throws for a single frame; throws
  * only if the recording's rows or the style pack can't be read at all.
  */
@@ -202,18 +276,35 @@ export async function frameRecording(creatorId: string, recordingId: string): Pr
     .single()
   if (packError || !pack) throw new Error(`style pack for ${creatorId}: ${packError?.message ?? 'missing'}`)
 
-  const subjects: Subject[] = []
-  for (const kind of ['card', 'action'] as const) {
-    const { data, error } = await supabase
-      .from(kind === 'card' ? 'cards' : 'actions')
-      .select('id, frame_brief')
-      .eq('recording_id', recordingId)
-      .eq('frame_status', 'none')
-    if (error) throw new Error(`${kind}s for ${recordingId}: ${error.message}`)
-    subjects.push(...(data ?? []).map((r) => ({ kind, id: r.id as string, brief: r.frame_brief as string | null })))
-  }
+  const { data: actions, error: aErr } = await supabase
+    .from('actions')
+    .select('id, frame_brief')
+    .eq('recording_id', recordingId)
+    .eq('frame_status', 'none')
+  if (aErr) throw new Error(`actions for ${recordingId}: ${aErr.message}`)
+  const { data: cards, error: cErr } = await supabase
+    .from('cards')
+    .select('id, shape')
+    .eq('recording_id', recordingId)
+    .eq('frame_status', 'none')
+  if (cErr) throw new Error(`cards for ${recordingId}: ${cErr.message}`)
+
+  const people = await peopleFor(supabase, creatorId, recordingId)
 
   // To-dos first and one at a time, so two to-dos with the same brief share one generation.
-  for (const s of subjects.filter((x) => x.kind === 'action')) await frameOne(creatorId, pack, s)
-  await Promise.all(subjects.filter((x) => x.kind === 'card').map((s) => frameOne(creatorId, pack, s)))
+  for (const a of actions ?? []) await frameOne(creatorId, pack, { kind: 'action', id: a.id as string, brief: a.frame_brief as string | null }, people)
+
+  await Promise.all(
+    (cards ?? []).map(async (c) => {
+      try {
+        if (c.shape === 'photo') await photoForCard(creatorId, c.id as string, pack.palette as string[], people)
+        else {
+          const { error } = await supabase.from('cards').update({ frame_status: 'typographic' }).eq('id', c.id)
+          if (error) throw new Error(error.message)
+        }
+      } catch (err) {
+        console.error(`[frames] card ${c.id} failed`, err)
+      }
+    })
+  )
 }

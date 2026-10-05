@@ -1,27 +1,34 @@
 // apps/mobile/app/project/[id].tsx
 // Project (P11). Back; share and ••• (Rename, Delete — her own projects only; the defaults can't be changed); the
-// name; the Private project chip and "4 ideas · 1 board"; All ideas / More ideas; the ideas in a two-column masonry
-// with the title in the frame; one floating pill, Talk to {project}, which opens Record scoped to this project.
-// More ideas is Rising scoped to the project (P12) — a line of placeholder until the cohort exists.
+// name; the Private project chip and "4 ideas · 1 board"; the ideas in a two-column masonry, frames only; the action
+// bar (Talk, scoped to this project).
+// More ideas (Job G, P12b 202:2): a tab only when a thread in the project has come back ≥ 3 times — "Your ideas" (a
+// strip of her thumbs, → All ideas) and "More ideas for this thread" (up to five suggestions, each a frame with a
+// lime pin: tap opens it, long-press hides it). The action bar gains More ideas with the tab. Create joins the bar
+// once there's a Create flow.
 // No blank state (rule 1): a project with no ideas yet is one prompt to talk to it.
 // Left out of the frame: add-people (projects are private in the pilot), the filter icon over the grid, and the
 // stars on tile corners — nothing yet says what they do.
 // Reached from the Idea page's project button and "You keep coming back to this" in My things.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { Image } from 'expo-image'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
-import { useAudioPlayer } from 'expo-audio'
 import { useSupabase } from '@/lib/supabase'
-import { masonry, projectFrameHeight, type Item } from '@/lib/home'
+import { masonry, tileHeight } from '@/lib/home'
 import { countLine, deleteProject, loadProject, renameProject, type ProjectPage } from '@/lib/project'
-import { Tile, TILE_WIDTH } from '@/components/Tile'
-import { Menu } from '@/components/PinChrome'
-import { hero, text } from '@/lib/theme'
-
-const GAP = 16 // between tiles in a column (Figma 83:603)
+import { Tile, useTileWidth } from '@/components/Tile'
+import { SuggestionTile } from '@/components/SuggestionTile'
+import { ProjectTabs, type ProjectTab } from '@/components/ProjectTabs'
+import { Shimmer } from '@/components/Shimmer'
+import { hideSuggestion, loadMoreIdeas, takePinNote, type PinNote, type Suggestion } from '@/lib/suggestions'
+import { IvyNote } from '@/components/IvyNote'
+import { Menu, MENU_OFFSET } from '@/components/PinChrome'
+import { colour, radius, size, space, type } from '@ivywolf/ui'
+import { ActionBar, BAR_BOTTOM } from '@/components/ActionBar'
 
 export default function Project() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -29,34 +36,42 @@ export default function Project() {
   const insets = useSafeAreaInsets()
   const [page, setPage] = useState<ProjectPage | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'all' | 'more'>('all')
+  const [tab, setTab] = useState<ProjectTab>('all')
+  const [more, setMore] = useState<Awaited<ReturnType<typeof loadMoreIdeas>>>(null)
+  const [pinNote, setPinNote] = useState<PinNote | null>(null)
+  const [dissolve, setDissolve] = useState(false)
   const [menu, setMenu] = useState(false)
-  const [playing, setPlaying] = useState<string | null>(null)
-  const player = useAudioPlayer(null)
+  const tileWidth = useTileWidth()
 
+  // On focus: so a pin or a dismiss on the open screen, or a new card in the thread, is here when she's back.
   const load = useCallback(() => {
-    loadProject(supabase, id)
-      .then((p) => {
+    // Back from a pin (P12d): All ideas, with Ivy's one cited line; it dissolves on its own or on scroll.
+    const note = takePinNote(id)
+    if (note) {
+      setPinNote(note)
+      setDissolve(false)
+      setTab('all')
+    }
+    Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id)])
+      .then(([p, m]) => {
         setPage(p)
+        setMore(m)
+        if (!m) setTab('all')
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
   }, [supabase, id])
-  useFocusEffect(load)
 
-  async function play(item: Item) {
-    if (item.kind !== 'card' || !item.storagePath) return
-    if (playing === item.id) {
-      player.pause()
-      return setPlaying(null)
-    }
-    const { data } = await supabase.storage.from('recordings').createSignedUrl(item.storagePath, 3600)
-    if (!data) return
-    player.replace({ uri: data.signedUrl })
-    await player.seekTo(item.playFromMs / 1000)
-    player.play()
-    setPlaying(item.id)
-  }
+  // Long-press: gone at once, no UI. If it didn't take, the next load puts it back.
+  const hide = useCallback(
+    (s: Suggestion) => {
+      setMore((m) => (m ? { ...m, suggestions: m.suggestions.filter((x) => x.id !== s.id) } : m))
+      hideSuggestion(supabase, s.id).catch(load)
+    },
+    [supabase, load]
+  )
+  const [moreLeft, moreRight] = useMemo(() => balance(more?.suggestions ?? []), [more])
+  useFocusEffect(load)
 
   function rename() {
     if (!page) return
@@ -99,9 +114,9 @@ export default function Project() {
     return (
       <View style={[styles.screen, styles.centered]}>
         {page === null || error ? (
-          <Text style={[text.body, styles.secondary]}>{error ?? 'This project has gone.'}</Text>
+          <Text style={[type['Body'], styles.secondary]}>{error ?? 'This project has gone.'}</Text>
         ) : (
-          <ActivityIndicator color={hero.ink} />
+          <ActivityIndicator color={colour.Ink} />
         )}
       </View>
     )
@@ -110,7 +125,7 @@ export default function Project() {
   const { project, ideas, boards } = page
   const talk = () => router.push({ pathname: '/record', params: { projectId: project.id } })
   const own = project.kind === 'user'
-  const [left, right] = masonry(ideas, (i) => projectFrameHeight(i) + GAP)
+  const [left, right] = masonry(ideas)
 
   // Rule 1: before the first idea, the whole screen is the prompt to talk to it.
   if (ideas.length === 0) {
@@ -119,12 +134,12 @@ export default function Project() {
         <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onShare={undefined} />
         <View style={styles.cold}>
           <Text style={styles.coldTitle}>Talk to {project.name}</Text>
-          <Text style={[text.body, styles.secondary, styles.coldLine]}>Only this project hears it. Ivy files what you say here.</Text>
+          <Text style={[type['Body'], styles.secondary, styles.coldLine]}>Only this project hears it. Ivy files what you say here.</Text>
           <Pressable onPress={talk} style={styles.coldMic} accessibilityRole="button" accessibilityLabel={`Talk to ${project.name}`}>
-            <SymbolView name="mic" tintColor={hero.ink} size={30} />
+            <SymbolView name="mic.fill" tintColor={colour.Ink} size={size.icon} />
           </Pressable>
         </View>
-        {menu && <ProjectMenu top={insets.top + 10} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
+        {menu && <ProjectMenu top={insets.top + MENU_OFFSET} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
       </View>
     )
   }
@@ -133,63 +148,95 @@ export default function Project() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }} onScrollBeginDrag={() => setDissolve(true)}>
         <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onShare={share} />
         <View style={styles.body}>
           <Text style={styles.name}>{project.name}</Text>
           <View style={styles.metaRow}>
             <View style={styles.private}>
-              <SymbolView name="lock" tintColor={hero.ink} size={14} />
-              <Text style={styles.privateLabel}>Private project</Text>
+              <Text style={type['Label / Pill']}>Private project</Text>
             </View>
             <Text style={styles.count}>{countLine(ideas.length, boards)}</Text>
           </View>
-          {error && <Text style={[text.caption, styles.secondary, { marginTop: 8 }]}>{error}</Text>}
+          {error && <Text style={[type['Caption'], { marginTop: space.gutter }]}>{error}</Text>}
 
-          <View style={styles.tabs} accessibilityRole="tablist">
-            <Tab label="All ideas" on={tab === 'all'} onPress={() => setTab('all')} />
-            <Tab label="More ideas" on={tab === 'more'} onPress={() => setTab('more')} />
-          </View>
+          {pinNote && (
+            <View style={styles.pinNote}>
+              <IvyNote sentences={[{ text: pinNote.text, cites: pinNote.cites }]} dissolve={dissolve} onGone={() => setPinNote(null)} />
+            </View>
+          )}
+          <ProjectTabs tab={tab} moreIdeas={!!more} onChange={setTab} />
+          {!more && <View style={styles.noTabs} />}
 
-          {tab === 'all' ? (
+          {tab === 'all' || !more ? (
             <View style={styles.columns}>
               {[left, right].map((col, c) => (
-                <View key={c} style={{ width: TILE_WIDTH }}>
+                <View key={c} style={{ width: tileWidth }}>
                   {col.map((item) => (
-                    <Tile
-                      key={item.id}
-                      item={item}
-                      meta=""
-                      inside
-                      playing={playing === item.id}
-                      onPlay={play}
-                      onOpen={(i) => router.push(`/idea/${i.id}`)}
-                    />
+                    <View key={item.id} style={styles.cell}>
+                      <Tile item={item} width={tileWidth} onOpen={(i) => router.push(`/idea/${i.id}`)} />
+                    </View>
                   ))}
                 </View>
               ))}
             </View>
           ) : (
-            <Text style={[text.body, styles.secondary]}>
-              Ideas from other creators, picked for {project.name} and your style, will show here once Rising opens.
-            </Text>
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={type['Title / Section']}>Your ideas</Text>
+                <Pressable onPress={() => setTab('all')} hitSlop={(size.tap - ARROW) / 2} style={styles.arrow} accessibilityRole="button" accessibilityLabel="All ideas">
+                  <SymbolView name="arrow.right" tintColor={colour.Ink} size={ARROW / 2} weight="semibold" />
+                </Pressable>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.stripRow}>
+                {ideas.map((i) => (
+                  <Pressable key={i.id} onPress={() => router.push(`/idea/${i.id}`)} style={styles.thumb} accessibilityRole="button" accessibilityLabel={i.title}>
+                    {i.shape !== 'photo' ? (
+                      // A quote, comparison, board or text card has no picture: its title stands in.
+                      <Text style={styles.thumbTitle} numberOfLines={4}>
+                        {i.title}
+                      </Text>
+                    ) : (
+                      <>
+                        <Shimmer style={StyleSheet.absoluteFill} />
+                        {i.frameStatus === 'done' && !!i.frameUrl && (
+                          <Image source={{ uri: i.frameUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+                        )}
+                      </>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+
+              {more.suggestions.length > 0 && (
+                <>
+                  <Text style={[type['Title / Section'], styles.moreTitle]}>More ideas for this thread</Text>
+                  <View style={styles.columns}>
+                    {[moreLeft, moreRight].map((col, c) => (
+                      <View key={c} style={{ width: tileWidth }}>
+                        {col.map((s) => (
+                          <View key={s.id} style={styles.cell}>
+                            <SuggestionTile suggestion={s} width={tileWidth} onOpen={(x) => router.push(`/suggestion/${x.id}`)} onHide={hide} />
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </>
           )}
         </View>
       </ScrollView>
 
-      <Pressable onPress={talk} style={[styles.talk, { bottom: insets.bottom + 2 }]} accessibilityRole="button" accessibilityLabel={`Talk to ${project.name}`}>
-        <View style={styles.talkMic}>
-          <SymbolView name="mic" tintColor={hero.ink} size={22} />
-        </View>
-        <View style={{ flexShrink: 1 }}>
-          <Text style={styles.talkTitle} numberOfLines={1}>
-            Talk to {project.name}
-          </Text>
-          <Text style={styles.talkSub}>only this project hears it</Text>
-        </View>
-      </Pressable>
+      <ActionBar
+        verbs={[
+          ...(more ? [{ key: 'more', label: 'More ideas', icon: 'square.grid.2x2' as const, onPress: () => setTab('more') }] : []),
+          { key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk },
+        ]}
+      />
 
-      {menu && <ProjectMenu top={insets.top + 10} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
+      {menu && <ProjectMenu top={insets.top + MENU_OFFSET} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
     </View>
   )
 }
@@ -197,18 +244,18 @@ export default function Project() {
 function Header({ top, own, onMenu, onShare }: { top: number; own: boolean; onMenu: () => void; onShare?: () => void }) {
   return (
     <View style={[styles.header, { marginTop: top }]}>
-      <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back">
-        <SymbolView name="chevron.left" tintColor={hero.ink} size={20} weight="semibold" />
+      <Pressable onPress={() => router.back()} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Back">
+        <SymbolView name="chevron.left" tintColor={colour.Ink} size={size.icon} />
       </Pressable>
       <View style={styles.headerRight}>
         {onShare && (
-          <Pressable onPress={onShare} hitSlop={10} accessibilityRole="button" accessibilityLabel="Share">
-            <SymbolView name="square.and.arrow.up" tintColor={hero.ink} size={22} />
+          <Pressable onPress={onShare} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Share">
+            <SymbolView name="square.and.arrow.up" tintColor={colour.Ink} size={size.icon} />
           </Pressable>
         )}
         {own && (
-          <Pressable onPress={onMenu} hitSlop={10} accessibilityRole="button" accessibilityLabel="More">
-            <SymbolView name="ellipsis" tintColor={hero.ink} size={22} />
+          <Pressable onPress={onMenu} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="More">
+            <SymbolView name="ellipsis" tintColor={colour.Ink} size={size.icon} />
           </Pressable>
         )}
       </View>
@@ -229,57 +276,66 @@ function ProjectMenu({ top, onClose, onRename, onDelete }: { top: number; onClos
   )
 }
 
-function Tab({ label, on, onPress }: { label: string; on: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: on }}>
-      <Text style={[styles.tab, on && styles.tabOn]}>{label}</Text>
-      <View style={[styles.tabRule, !on && { opacity: 0 }]} />
-    </Pressable>
-  )
+
+/** Two columns of suggestions, each into the shorter one — the same fill as her ideas. */
+function balance(items: Suggestion[]): [Suggestion[], Suggestion[]] {
+  const cols: [Suggestion[], Suggestion[]] = [[], []]
+  const h = [0, 0]
+  for (const s of items) {
+    const c = h[0] <= h[1] ? 0 : 1
+    cols[c].push(s)
+    h[c] += tileHeight(s.id) + space.gutter
+  }
+  return cols
 }
 
-// Figma 83:603 — header icons 24 at y 62; name Bold 34; Private chip fill 29 high radius 8, lock 16, Medium 14;
-// count Regular 14 secondary; tabs 17 (active Semibold, 2.5 rule under it), 28 apart; tiles 170 wide, 16 apart,
-// from y 296; Talk pill 230 × 60 white, radius 30, shadow, lime 44 mic, Semibold 15 + Regular 11 secondary.
+// P12b (Figma 202:2) — measured, not tokens: the chip is 10 under the name, radius 16 (not radius/chip), 12 × 8
+// padding (tabs: components/ProjectTabs.tsx). P12b sets its text
+// column at 16 while its tiles sit at 12; both use space/margin here. The empty project (P11, no Job G frame) keeps
+// its 84 lime mic and 32 side padding.
+const CHIP_GAP = 10
+const CHIP_R = 16
+const CHIP_PAD_H = 12
+const CHIP_PAD_V = 8
+const COLD_MIC = 84
+const ARROW = 36 // the → disc by Your ideas (202:15)
+const COLD_PAD = 32
+const TAP_SLOP = (size.tap - size.icon) / 2
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: hero.room },
-  centered: { alignItems: 'center', justifyContent: 'center', padding: 20 },
-  secondary: { color: hero.secondary },
-  header: { height: 48, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  body: { paddingHorizontal: 20 },
-  name: { fontSize: 34, fontWeight: '700', letterSpacing: -0.8, color: hero.ink, marginTop: 14 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 },
-  private: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 29, borderRadius: 8, paddingHorizontal: 10, backgroundColor: hero.fill },
-  privateLabel: { fontSize: 14, fontWeight: '500', color: hero.ink },
-  count: { fontSize: 14, color: hero.secondary },
-  tabs: { flexDirection: 'row', gap: 28, marginTop: 21, marginBottom: 20 },
-  tab: { fontSize: 17, color: hero.ink },
-  tabOn: { fontWeight: '600' },
-  tabRule: { height: 2.5, borderRadius: 1.25, backgroundColor: hero.ink, marginTop: 6 },
+  screen: { flex: 1, backgroundColor: colour.Surface },
+  centered: { alignItems: 'center', justifyContent: 'center', padding: space.margin },
+  secondary: { color: colour.Grey },
+  header: { height: size.tap, paddingHorizontal: space.margin, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: space.stack },
+  body: { paddingHorizontal: space.margin },
+  name: { ...type['Title / Screen'], marginTop: space.stack },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.stack, marginTop: CHIP_GAP },
+  private: { borderRadius: CHIP_R, paddingHorizontal: CHIP_PAD_H, paddingVertical: CHIP_PAD_V, backgroundColor: colour.Chip },
+  count: { ...type['Body'], color: colour.Grey },
+  noTabs: { height: space.stack },
+  // IvyNote pads itself to the margin; the body already has it.
+  pinNote: { marginHorizontal: -space.margin },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  arrow: { width: ARROW, height: ARROW, borderRadius: ARROW / 2, backgroundColor: colour.Chip, alignItems: 'center', justifyContent: 'center' },
+  // The strip runs to the screen's edge: out of the body's margin, back in for the first thumb.
+  strip: { marginHorizontal: -space.margin, marginTop: space.stack },
+  stripRow: { paddingHorizontal: space.margin, gap: space.gutter },
+  thumbTitle: { ...type['Body / Small'], fontWeight: '600', padding: space.gutter + 2 },
+  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Chip },
+  moreTitle: { marginTop: space.section, marginBottom: space.stack },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },
-  talk: {
-    position: 'absolute',
-    alignSelf: 'center',
-    width: 230,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: hero.room,
-    flexDirection: 'row',
+  cell: { paddingBottom: space.gutter },
+  cold: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: COLD_PAD, paddingBottom: BAR_BOTTOM + size['bar-h'] },
+  coldTitle: { ...type['Title / Section'], textAlign: 'center' },
+  coldLine: { textAlign: 'center', marginTop: space.gutter },
+  coldMic: {
+    marginTop: space.section * 2,
+    width: COLD_MIC,
+    height: COLD_MIC,
+    borderRadius: COLD_MIC / 2,
+    backgroundColor: colour.Lime,
     alignItems: 'center',
-    gap: 12,
-    paddingLeft: 8,
-    paddingRight: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
+    justifyContent: 'center',
   },
-  talkMic: { width: 44, height: 44, borderRadius: 22, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center' },
-  talkTitle: { fontSize: 15, fontWeight: '600', color: hero.ink },
-  talkSub: { fontSize: 11, color: hero.secondary, marginTop: 2 },
-  cold: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 80 },
-  coldTitle: { fontSize: 22, fontWeight: '700', color: hero.ink, textAlign: 'center' },
-  coldLine: { textAlign: 'center', marginTop: 8 },
-  coldMic: { marginTop: 48, width: 84, height: 84, borderRadius: 42, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center' },
 })

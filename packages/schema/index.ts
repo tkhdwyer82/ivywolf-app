@@ -112,6 +112,41 @@ export const ClassifyOutput = z.object({
 })
 export type ClassifyOutput = z.infer<typeof ClassifyOutput>
 
+// ── shape_v1 structured output (Figma 227:5, v3.4) ───────────────────────────────
+// A second, small call after classify: the form each card takes on Home. Separate from ClassifyOutput because adding
+// these fields to the classify schema pushes its structured-output grammar over the size limit.
+/** The form an idea takes on Home. `text` is the low-confidence fallback. */
+export const CardShape = z.enum(['photo', 'quote', 'diagram', 'board', 'text'])
+export type CardShape = z.infer<typeof CardShape>
+
+/** quote: one line copied verbatim from the segment; speaker is a canonical name, or null when it's her own voice. */
+export const CardQuote = z.object({ text: z.string(), speaker: z.string().nullable() })
+export type CardQuote = z.infer<typeof CardQuote>
+/** diagram: a comparison she said out loud — "old versus new: 5am → 7am". Rendered natively, never drawn. */
+export const CardDiagram = z.object({ title: z.string(), rows: z.array(z.object({ from: z.string(), to: z.string() })) })
+export type CardDiagram = z.infer<typeof CardDiagram>
+/** board: a hook and the beats she described, in order. Its status pill is the thread's stage, read at render time. */
+export const CardBoard = z.object({ hook: z.string(), beats: z.array(z.string()) })
+export type CardBoard = z.infer<typeof CardBoard>
+
+// Payloads are flat ("" / [] = none) so the grammar stays small; shape.ts folds them into the objects above.
+export const ShapeOutput = z.object({
+  cards: z.array(
+    z.object({
+      card_index: z.number().int(),
+      shape: CardShape,
+      visual_query: z.string(),
+      quote_text: z.string(),
+      quote_speaker: z.string().nullable(),
+      diagram_title: z.string(),
+      diagram_rows: z.array(z.object({ from: z.string(), to: z.string() })),
+      board_hook: z.string(),
+      board_beats: z.array(z.string()),
+    })
+  ),
+})
+export type ShapeOutput = z.infer<typeof ShapeOutput>
+
 // ── Graph rows (as read by the app under RLS) ────────────────────────────────────
 // Column names and nullability follow supabase/migrations/0001_graph.sql. Only the columns the app selects.
 export const RecordingRow = z.object({

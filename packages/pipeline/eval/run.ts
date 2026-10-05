@@ -1,20 +1,21 @@
 // packages/pipeline/eval/run.ts
-// Runs one memo through transcribe + classify (no graph writes) and diffs it against <memo>.expected.json,
+// Runs one memo through transcribe + classify + shape (no graph writes) and diffs it against <memo>.expected.json,
 // using the scoring in eval/README.md.
 //
 //   npx tsx --env-file=../../.env.local eval/run.ts <memo> <recordings-bucket storage path> [prompt_version]
 //   e.g. eval/run.ts 2026-09-21_thomas-st eval/2026-09-21_thomas-st.m4a classify_v2
 //
-// Writes eval/runs/<memo>.<prompt_version>.actual.json and prints the diff. Exit code 1 if any check fails.
+// Writes eval/runs/<memo>.<prompt_version>.<shape_version>.actual.json and prints the diff. Exit code 1 if any check fails.
 // Card titles/gists are matched "by meaning" per the README — that part is printed side by side for a human.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ClassifyOutput, Utterance } from '@ivywolf/schema'
+import type { Utterance } from '@ivywolf/schema'
 import { signedUrl } from '../storage'
 import { analyse } from '../process'
 import { PROMPT_VERSION, type PromptVersion, type RecordedDay } from '../classify'
+import { SHAPE_VERSION, type Analysed } from '../shape'
 import { cardText, embed } from '../embed'
 import {
   assignCards,
@@ -48,6 +49,8 @@ interface Expected {
     candidate_threads?: string[]
     /** When present, the card's candidate_project must be exactly this (null = none). */
     candidate_project?: string | null
+    /** shape_v1: the shapes this card may take (Figma 227:5). Absent = not scored. */
+    shape?: string[]
   } & FrameExpectation)[]
   actions: ({ text: string; scope?: string; due_date?: string | null } & FrameExpectation)[]
   entities: { name: string; kind: string; canonical: string | null; aliases_seen: string[] }[]
@@ -84,7 +87,7 @@ const overlap = (a: { start_ms: number; end_ms: number }, b: { start_ms: number;
 
 export function diff(
   exp: Expected,
-  act: ClassifyOutput,
+  act: Analysed,
   utterances: Utterance[],
   recentThreadTitles: string[] = []
 ): Check[] {
@@ -178,6 +181,9 @@ export function diff(
       const f = frameCheck(e, c.frame_brief ?? '')
       push(`card "${e.title}" frame_brief`, f.pass, f.detail)
     }
+    if (e.shape) {
+      push(`card "${e.title}" shape`, e.shape.includes(c.shape), `expected one of ${JSON.stringify(e.shape)}, got ${c.shape}`)
+    }
   }
   const extra = act.cards.filter((_, j) => !used.has(j))
   push(
@@ -248,6 +254,14 @@ export function diff(
     const named = briefs.filter((b) => names.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(b)))
     push('frame briefs name no one', named.length === 0, named.length ? named.map((b) => `"${b}"`).join(' | ') : `names checked: ${JSON.stringify(names)}`)
   }
+  // shape_v1: a visual_query goes to a stock-photo search, so it names no one either.
+  if (exp.cards.some((c) => c.shape)) {
+    const names = exp.entities.flatMap((e) => [e.name, ...(e.canonical ? [e.canonical] : []), ...e.aliases_seen])
+    const named = act.cards
+      .map((c) => c.visual_query ?? '')
+      .filter((q) => names.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(q)))
+    push('visual queries name no one', named.length === 0, named.length ? named.map((q) => `"${q}"`).join(' | ') : `names checked: ${JSON.stringify(names)}`)
+  }
 
   push(
     'loose_ends',
@@ -290,7 +304,7 @@ export interface EarlierState {
  * exactly as threadNewCards would. Its thread titles then feed the later memo's classify call as
  * recent_thread_titles, as loadCreatorContext would supply them.
  */
-export async function replayEarlier(name: string, earlier: ClassifyOutput): Promise<EarlierState> {
+export async function replayEarlier(name: string, earlier: Analysed): Promise<EarlierState> {
   const cards = earlier.cards.map((c, i) => ({
     id: `earlier#${i}`,
     title: c.title,
@@ -320,7 +334,7 @@ const describe = (x: Assignment, title: string) =>
  */
 export async function threadingCheck(
   state: EarlierState,
-  later: ClassifyOutput
+  later: Analysed
 ): Promise<{ check: Check; report: string[] }> {
   const b = later.cards.map((c, i) => ({
     id: `this#${i}`,
@@ -387,9 +401,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   let earlierMissing: string | null = null
   if (expected.expect_merge_suggestion_with) {
     const other = expected.expect_merge_suggestion_with
-    const otherFile = path.join(here, 'runs', `${other}.${promptVersion}.actual.json`)
+    const otherFile = path.join(here, 'runs', `${other}.${promptVersion}.${SHAPE_VERSION}.actual.json`)
     try {
-      earlierState = await replayEarlier(other, JSON.parse(readFileSync(otherFile, 'utf8')) as ClassifyOutput)
+      earlierState = await replayEarlier(other, JSON.parse(readFileSync(otherFile, 'utf8')) as Analysed)
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
       earlierMissing = `run ${other} on ${promptVersion} first (${path.relative(process.cwd(), otherFile)} missing)`
@@ -412,7 +426,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   })
 
   mkdirSync(path.join(here, 'runs'), { recursive: true })
-  const outFile = path.join(here, 'runs', `${memo}.${promptVersion}.actual.json`)
+  const outFile = path.join(here, 'runs', `${memo}.${promptVersion}.${SHAPE_VERSION}.actual.json`)
   writeFileSync(outFile, JSON.stringify(result.junk ? { junk: result.junk } : result.out, null, 2))
 
   if (result.junk) {
