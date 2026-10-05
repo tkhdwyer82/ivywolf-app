@@ -90,11 +90,11 @@ export function registerTools(server: McpServer) {
     {
       title: 'List ideas',
       description:
-        "The creator's ideas (cards) since a date, newest first: title, gist, project, thread stage, when it was said, " +
+        "The creator's ideas (cards) since a date (default: the last 30 days), newest first: title, gist, project, thread stage, when it was said, " +
         'and where in the recording (cite). Use for "what ideas did I have this week?". Never includes transcripts. ' +
         DATA_NOTE,
       inputSchema: z.object({
-        since: when.describe('Only ideas from this date or time on (ISO 8601).'),
+        since: when.optional().describe('Only ideas from this date or time on (ISO 8601). Default: the last 30 days.'),
         project: z.string().max(120).optional().describe('Only ideas in the project with this name.'),
         status: z.enum(['sparked', 'developing', 'ready', 'shipped']).optional().describe("Only ideas whose thread is at this stage."),
         limit: z.number().int().min(1).max(50).default(20).describe('How many to return, 1–50. Default 20.'),
@@ -175,11 +175,11 @@ export function registerTools(server: McpServer) {
     {
       title: 'List sessions',
       description:
-        'Long recordings (interviews, walk-and-talks from the Mini or a DJI mic) since a date: title, duration, and ' +
+        'Long recordings (interviews, walk-and-talks from the Mini or a DJI mic) since a date (default: the last 30 days): title, duration, and ' +
         'chapters (the ideas in it, in the order said, with start times). ' +
         DATA_NOTE,
       inputSchema: z.object({
-        since: when.describe('Only sessions from this date or time on (ISO 8601).'),
+        since: when.optional().describe('Only sessions from this date or time on (ISO 8601). Default: the last 30 days.'),
         limit: z.number().int().min(1).max(20).default(10).describe('How many to return, 1–20. Default 10.'),
       }),
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -226,7 +226,7 @@ export function registerTools(server: McpServer) {
         'File a new idea in Ivy, in her words, as if she had said it into Ivy. Use when she says "add an idea: …" or ' +
         '"tell Ivy …". Ivy sorts it into ideas and to-dos over the next minute; they appear in Home marked "via Muse". ' +
         'Pass her words as she said them — do not summarise or add to them. Send a new idempotency_key per idea, and ' +
-        'the same one again if you retry.',
+        'the same one again if you retry; without one, the same words within 10 minutes count as a retry.',
       inputSchema: z.object({
         text: z
           .string()
@@ -239,7 +239,8 @@ export function registerTools(server: McpServer) {
           .min(8)
           .max(128)
           .regex(/^[A-Za-z0-9._:-]+$/, 'Use letters, digits and . _ : - in the idempotency key.')
-          .describe('Unique per idea (a UUID is fine). Retrying with the same key never files it twice.'),
+          .optional()
+          .describe('Unique per idea (a UUID is fine). Retrying with the same key never files it twice. Default: derived from the words, so the same words within 10 minutes are filed once.'),
         context: z.string().max(120).optional().describe('Where it came from, e.g. "from Charm".'),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

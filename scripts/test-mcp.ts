@@ -364,6 +364,25 @@ async function main() {
   const badDate = await call(muse, 'list_ideas', { since: 'last tuesday' }).catch((e) => ({ ok: false, text: String(e), json: null }))
   check('list_ideas: a bad date is refused', !badDate.ok, badDate.text.slice(0, 120))
 
+  // No since (an ask with no date in it): the last 30 days. One card from 45 days ago is out of it, then removed.
+  const oldCard = must('old card', await db.from('cards').insert({
+    creator_id: CREATOR, recording_id: s.memoA, title: 'Old idea', gist: 'From last month.', play_from_ms: 0, confidence: 0.9, created_at: daysAgo(45),
+  }).select('id').single())
+  const oldSession = must('old session', await db.from('recordings').insert({
+    creator_id: CREATOR, status: 'done', source: 'dji_import', kind: 'session', storage_path: `${CREATOR}/old.wav`,
+    recorded_at: daysAgo(45), received_at: daysAgo(45), title: 'Old interview',
+  }).select('id').single())
+  const noSince = await call(muse, 'list_ideas', { limit: 50 })
+  const noSinceIds = ((noSince.json?.ideas ?? []) as any[]).map((i) => i.id)
+  check('list_ideas: no since → the last 30 days', noSince.ok && noSinceIds.length === ideas.length && !noSinceIds.includes(oldCard.id), noSince.text.slice(0, 160))
+  const longAgo = await call(muse, 'list_ideas', { since: daysAgo(60), limit: 50 })
+  check('list_ideas: an explicit since still reaches further back', ((longAgo.json?.ideas ?? []) as any[]).some((i) => i.id === oldCard.id))
+  const noSinceSessions = await call(muse, 'list_sessions', {})
+  const sessIds = ((noSinceSessions.json?.sessions ?? []) as any[]).map((x) => x.id)
+  check('list_sessions: no since → the last 30 days', noSinceSessions.ok && sessIds.includes(s.session) && !sessIds.includes(oldSession.id), noSinceSessions.text.slice(0, 160))
+  await db.from('cards').delete().eq('id', oldCard.id)
+  await db.from('recordings').delete().eq('id', oldSession.id)
+
   const found = await call(muse, 'search_ideas', { query: 'rooftop chase', limit: 5 })
   const top2 = (found.json?.ideas ?? []).slice(0, 2).map((i: any) => i.id).sort()
   check('search_ideas: rooftop cards rank first', found.ok && top2.join() === [s.rooftop1.id, s.rooftop2.id].sort().join(),
@@ -438,6 +457,17 @@ async function main() {
   }
   const made = must('captured cards', await db.from('cards').select('title, gist, play_from_ms').eq('recording_id', captured.json.recording_id))
   check('capture_idea: classify_v6 text path made a card', status === 'done' && made.length >= 1, `${status}; ${made.map((c) => c.title).join(' | ')}`)
+
+  // No idempotency_key (an agent asked in plain words): derived from the words, so its retry still files once.
+  const plain = 'Light the candle before the lid comes off.'
+  const noKey1 = await call(muse, 'capture_idea', { text: plain })
+  const noKey2 = await call(muse, 'capture_idea', { text: plain })
+  check('capture_idea: no key → queued', noKey1.ok && noKey1.json.status === 'queued', noKey1.text)
+  check('capture_idea: no key, same words again → the same recording', noKey2.ok && noKey2.json.recording_id === noKey1.json?.recording_id && noKey2.json.replayed === true, noKey2.text)
+  for (let i = 0, st = 'queued'; i < 90 && ['queued', 'processing'].includes(st); i++) {
+    await new Promise((r) => setTimeout(r, 2000))
+    st = must('status', await db.from('recordings').select('status').eq('id', noKey1.json.recording_id).single()).status
+  }
 
   const readOnly = await connect(s.readKey)
   const refused = await call(readOnly, 'capture_idea', { text: 'Should not land.', idempotency_key: randomUUID() })
