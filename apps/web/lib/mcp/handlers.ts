@@ -105,10 +105,16 @@ async function projectId(creatorId: string, name: string): Promise<string> {
   throw new McpError(`You don't have a project called "${clean(name, 80)}". Your projects are: ${rows.map((p) => p.name).join(', ')}.`)
 }
 
+/** When an ask names no date ("what ideas have I had?"), list_ideas and list_sessions look back this far. */
+const DEFAULT_SINCE_DAYS = 30
+/** `since` as an ISO instant; omitted, the last DEFAULT_SINCE_DAYS days. */
+const sinceOrDefault = (since: string | undefined) =>
+  since ? new Date(since).toISOString() : new Date(Date.now() - DEFAULT_SINCE_DAYS * 86_400_000).toISOString()
+
 // ── list_ideas ───────────────────────────────────────────────────────────────────────────────────────────────
 export async function listIdeas(
   creatorId: string,
-  args: { since: string; project?: string; status?: string; limit?: number }
+  args: { since?: string; project?: string; status?: string; limit?: number }
 ): Promise<{ ideas: Card[] }> {
   const status = args.status
   let q = db()
@@ -116,7 +122,7 @@ export async function listIdeas(
     .select(status ? CARD_COLUMNS.replace('thread_cards(threads(', 'thread_cards!inner(threads!inner(') : CARD_COLUMNS)
     .eq('creator_id', creatorId)
     .not('source', 'in', PINNED_SOURCES) // her ideas only: a pinned suggestion (Job G) has no cite of hers (follow-up: cite source_url)
-    .gte('created_at', new Date(args.since).toISOString())
+    .gte('created_at', sinceOrDefault(args.since))
   if (args.project) q = q.eq('project_id', await projectId(creatorId, args.project))
   if (status) q = q.eq('thread_cards.threads.stage', status)
   const rows = check(await q.order('created_at', { ascending: false }).limit(args.limit ?? 20)) as unknown as CardRow[]
@@ -291,7 +297,7 @@ async function sessionCards(creatorId: string, recordingIds: string[]) {
   ) as unknown as CardRow[]
 }
 
-export async function listSessions(creatorId: string, args: { since: string; limit?: number }) {
+export async function listSessions(creatorId: string, args: { since?: string; limit?: number }) {
   const rows = check(
     await db()
       .from('recordings')
@@ -299,7 +305,7 @@ export async function listSessions(creatorId: string, args: { since: string; lim
       .eq('creator_id', creatorId)
       .eq('kind', 'session')
       .eq('status', 'done')
-      .gte('received_at', new Date(args.since).toISOString())
+      .gte('received_at', sinceOrDefault(args.since))
       .order('received_at', { ascending: false })
       .limit(args.limit ?? 10)
   ) as SessionRow[]

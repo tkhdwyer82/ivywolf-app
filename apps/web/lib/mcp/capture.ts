@@ -18,12 +18,14 @@ import { clean, McpError, recordingLink, type Link } from './handlers'
 
 /** A claim older than this with no recording is from a call that died between claiming and writing. */
 const STALE_CLAIM_MS = 60_000
+/** With no idempotency_key, the key is the words plus this window: the same words inside it are one idea. */
+const AUTO_KEY_WINDOW_MS = 10 * 60_000
 
 type Captured = { recording_id: string; status: string; replayed?: true } & Link
 
 export async function captureIdea(
   creatorId: string,
-  args: { text: string; idempotency_key: string; context?: string }
+  args: { text: string; idempotency_key?: string; context?: string }
 ): Promise<Captured> {
   const text = clean(args.text, Number.MAX_SAFE_INTEGER) ?? ''
   const utterances = textUtterances(text)
@@ -31,7 +33,9 @@ export async function captureIdea(
 
   const db = supabaseAdmin()
   const textHash = createHash('sha256').update(text).digest('hex')
-  const key = args.idempotency_key
+  // Agents asked in plain words often send no key. Deriving one keeps a retry from filing twice; a window boundary
+  // falling between a call and its retry is the one case it misses.
+  const key = args.idempotency_key ?? `auto:${textHash.slice(0, 32)}:${Math.floor(Date.now() / AUTO_KEY_WINDOW_MS)}`
 
   // ── Claim the key, or answer with what it already filed ──────────────────────────────────────────────────
   for (let attempt = 0; ; attempt++) {
