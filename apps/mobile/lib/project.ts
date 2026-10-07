@@ -4,11 +4,13 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { CARD_COLUMNS, toCardItem, type CardItem, type CardRow, type Project, type ThreadStage } from '@/lib/home'
+import { loadLinks, withLinks, type Links } from '@/lib/links'
 
 export interface ProjectPage {
   project: Project
   ideas: CardItem[]
   boards: number
+  links: Links
 }
 
 function need<T>(label: string, r: { data: T; error: { message: string } | null }): T {
@@ -19,8 +21,8 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 type Row = CardRow & { thread_cards: { threads: { stage: ThreadStage; thread_cards: { card_id: string }[] } | null }[] }
 
 export async function loadProject(supabase: SupabaseClient, id: string): Promise<ProjectPage | null> {
-  const [project, cards, boards] = await Promise.all([
-    supabase.from('projects').select('id, name, kind').eq('id', id).maybeSingle(),
+  const [project, cards, boards, links] = await Promise.all([
+    supabase.from('projects').select('id, name, kind, gradient').eq('id', id).maybeSingle(),
     supabase
       .from('cards')
       .select(
@@ -29,6 +31,7 @@ export async function loadProject(supabase: SupabaseClient, id: string): Promise
       .eq('project_id', id)
       .order('created_at', { ascending: false }),
     supabase.from('boards').select('id, threads!inner(project_id)', { count: 'exact', head: true }).eq('threads.project_id', id),
+    loadLinks(supabase),
   ])
   const p = need('project', project) as Project | null
   if (!p) return null
@@ -37,10 +40,10 @@ export async function loadProject(supabase: SupabaseClient, id: string): Promise
   const ideas = (need('ideas', cards) as unknown as Row[])
     .map((c) => {
       const t = c.thread_cards[0]?.threads
-      return toCardItem(c, { size: t?.thread_cards.length ?? 1, stage: t?.stage ?? null })
+      return withLinks(toCardItem(c, { size: t?.thread_cards.length ?? 1, stage: t?.stage ?? null }), links)
     })
     .sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0))
-  return { project: p, ideas, boards: boards.count ?? 0 }
+  return { project: p, ideas, boards: boards.count ?? 0, links }
 }
 
 /** "4 ideas · 1 board" — the board count only once there is one. */

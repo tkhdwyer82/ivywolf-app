@@ -3,6 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CardShape } from '@ivywolf/schema'
+import type { GradientName } from '@ivywolf/ui'
 import { toCardItem, type CardItem, type CardRow, type ThreadStage } from '@/lib/home'
 import { writeStyleSignal } from '@/lib/styleSignals'
 
@@ -61,7 +62,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 type Row = CardRow & {
   source: CardSource; source_url: string | null; hearted_at: string | null; shape_set_by: 'ivy' | 'creator' | null
   visual_query: string | null
-  projects: { id: string; name: string; kind: string } | null
+  projects: { id: string; name: string; kind: string; gradient: GradientName } | null
   thread_cards: { threads: { id: string; title: string; return_count: number; stage: ThreadStage } | null }[]
 }
 
@@ -71,7 +72,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, recordings(recorded_at, storage_path, source), projects(id, name, kind), thread_cards(threads(id, title, return_count, stage))'
+        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, pinned_at, shared_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, recordings(recorded_at, storage_path, source), projects(id, name, kind, gradient), thread_cards(threads(id, title, return_count, stage))'
       )
       .eq('id', id)
       .maybeSingle()
@@ -201,4 +202,10 @@ export function sourceBadge(idea: Idea, now = new Date()): string | null {
   const mins = (now.getTime() - at.getTime()) / 60000
   const when = mins < 60 ? 'just now' : at.toDateString() === now.toDateString() ? 'today' : DAYS[at.getDay()]
   return `via ${name} · pinned ${when}`
+}
+
+/** Pin to top (0034): the Pinned row above Today on Home, and the top of its project. Null unpins. */
+export async function setPinned(supabase: SupabaseClient, id: string, on: boolean) {
+  const { error } = await supabase.from('cards').update({ pinned_at: on ? new Date().toISOString() : null }).eq('id', id)
+  if (error) throw new Error(`pin: ${error.message}`)
 }

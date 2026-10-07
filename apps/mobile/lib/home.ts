@@ -6,13 +6,16 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CardBoard, CardDiagram, CardQuote, CardShape } from '@ivywolf/schema'
-import { space } from '@ivywolf/ui'
+import { space, type GradientName } from '@ivywolf/ui'
 import { requestProcessing } from './record'
+import { loadLinks, withLinks, type Links } from './links'
 
 export interface Project {
   id: string
   name: string
   kind: 'things' | 'mini' | 'user'
+  /** Its card gradient (0034, Figma 1462:4): every non-photo card in it wears this. */
+  gradient: GradientName
 }
 
 interface Base {
@@ -56,6 +59,17 @@ export interface CardItem extends Base {
   threadStage: ThreadStage | null
   /** When the card landed (cards.created_at) — "new since she last looked" for Ivy's line. */
   createdAt?: string
+  /** Its project's gradient and name (the tile's footer, Figma 1462:36). Null where the project wasn't read. */
+  gradient: GradientName | null
+  projectName: string | null
+  /** Pin to top (0034): pinned cards sit in the Pinned row, newest pin first. */
+  pinnedAt: string | null
+  /** Copy link made its public page (0034); null = private. */
+  sharedAt: string | null
+  /** Like on the hold arc is the idea page's heart (0019). */
+  heartedAt: string | null
+  /** How many ideas it's linked to (card_links, 0034). Filled in by the screen's loader. */
+  links: number
 }
 export interface ActionItem extends Base {
   kind: 'action'
@@ -82,6 +96,8 @@ export interface FailedRecording {
 export interface HomeData {
   projects: Project[]
   items: Item[]
+  /** Every link between her ideas, both ways (card_links, 0034). */
+  links: Links
   threads: Thread[]
   /** Recordings Ivy is still working on — Home keeps polling while there are any. */
   inFlight: number
@@ -104,7 +120,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 
 /** The columns every card tile needs. Callers add their own thread embedding (for size and stage). */
 export const CARD_COLUMNS =
-  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, shape, quote, diagram, board, frame_attribution, recordings(recorded_at, storage_path, source)'
+  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, shape, quote, diagram, board, frame_attribution, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, gradient)'
 
 export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
@@ -112,6 +128,10 @@ export type CardRow = {
   created_at: string; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
   frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string } | null
   recordings: { recorded_at: string | null; storage_path?: string | null; source?: string } | null
+  pinned_at?: string | null
+  shared_at?: string | null
+  hearted_at?: string | null
+  projects?: { name: string; gradient?: GradientName | null; id?: string; kind?: string } | null
 }
 
 /** A card made before shapes (0033) has none: photo while its frame is coming or there, else text. */
@@ -150,6 +170,12 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     recordingSource: c.recordings?.source ?? null,
     threadStage: thread.stage,
     createdAt: c.created_at,
+    gradient: c.projects?.gradient ?? null,
+    projectName: c.projects?.name ?? null,
+    pinnedAt: c.pinned_at ?? null,
+    sharedAt: c.shared_at ?? null,
+    heartedAt: c.hearted_at ?? null,
+    links: 0,
   }
 }
 
@@ -158,7 +184,7 @@ const STUCK_MS = 30_000
 
 export async function loadHome(supabase: SupabaseClient, userId: string): Promise<HomeData> {
   const [projects, cards, actions, threads, inFlight, creator] = await Promise.all([
-    supabase.from('projects').select('id, name, kind').order('is_default', { ascending: false }).order('created_at'),
+    supabase.from('projects').select('id, name, kind, gradient').order('is_default', { ascending: false }).order('created_at'),
     supabase
       .from('cards')
       .select(CARD_COLUMNS)
@@ -173,6 +199,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
     supabase.from('recordings').select('id, status, received_at').in('status', ['queued', 'processing']),
     supabase.from('creators').select('last_opened_at').eq('id', userId).maybeSingle(),
   ])
+  const links = await loadLinks(supabase)
   const failed = need(
     'failed',
     await supabase
@@ -201,7 +228,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
   }[]
 
   const items: Item[] = [
-    ...cardRows.map((c) => toCardItem(c, threadOf.get(c.id) ?? { size: 1, stage: null })),
+    ...cardRows.map((c) => withLinks(toCardItem(c, threadOf.get(c.id) ?? { size: 1, stage: null }), links)),
     ...actionRows.map((a): ActionItem => ({
       kind: 'action',
       id: a.id,
@@ -220,6 +247,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
   return {
     projects: need('projects', projects) as Project[],
     items,
+    links,
     threads: threadRows.map((t) => ({ id: t.id, title: t.title, returnCount: t.return_count, cardIds: t.thread_cards.map((tc) => tc.card_id) })),
     inFlight: (need('recordings', inFlight) ?? []).length,
     stuck: ((need('recordings', inFlight) ?? []) as { id: string; status: string; received_at: string }[])
@@ -311,15 +339,23 @@ export function estimateHeight(item: Item): number {
     case 'photo':
       return frameHeight(item) + (item.credit ? PHOTO_CAPTION : PHOTO_CAPTION - 16)
     case 'quote':
-      return item.quote ? 112 + Math.ceil(item.quote.text.length / 18) * 24 : 120
+      return (item.quote ? 112 + Math.ceil(item.quote.text.length / 18) * 24 : 120) + FOOTER
     case 'diagram':
-      return item.diagram ? 40 + item.diagram.rows.length * 40 : 120
+      return (item.diagram ? 40 + item.diagram.rows.length * 40 : 120) + FOOTER
     case 'board':
-      return item.board ? 84 + item.board.beats.length * 28 : 120
+      return (item.board ? 84 + item.board.beats.length * 28 : 120) + FOOTER
     default:
-      return 60 + Math.min(4, Math.ceil(item.gist.length / 24)) * 18
+      return Math.max(textMinHeight(item.id), 60 + Math.min(4, Math.ceil(item.gist.length / 24)) * 18 + FOOTER)
   }
 }
+
+/** A gradient tile's footer line ("Ivy brand · Car 0:42", Figma 1462:36) and the gap above it. */
+const FOOTER = 26
+/**
+ * A text card stands as tall as the rhythm around it (Figma 1462:36: title at the top, the gist and footer at the
+ * bottom), 40 shorter than a photo so the two kinds don't line up.
+ */
+export const textMinHeight = (id: string): number => tileHeight(id) - 40
 const columnHeight = (item: Item) => estimateHeight(item) + space.gutter
 
 /**

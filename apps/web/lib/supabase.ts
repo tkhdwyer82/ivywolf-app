@@ -36,3 +36,11 @@ export function supabaseAdmin(): SupabaseClient {
     auth: { persistSession: false },
   })
 }
+
+/**
+ * Signed-out client: the anon key and no token, so RLS gives it nothing. Used only to call shared_card() (0034), the
+ * one function that answers anyone — for a card she has shared, and only with the card.
+ */
+export function supabaseAnon(): SupabaseClient {
+  return createClient(SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } })
+}

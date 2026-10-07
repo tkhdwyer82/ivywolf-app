@@ -8,11 +8,14 @@
 // that moment; gone after ~6 s or on scroll.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
+// Job C+: pinned cards sit in a Pinned row above Today (and leave the days); hold any card for its arc (Like · Link
+// ideas · Add context · Share; to-dos Done · Date · Share); Link ideas puts Home in link mode — the banner where
+// Ivy's line was, a mark on every tile, Done in the nav's place.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { FlashList, type FlashListRef } from '@shopify/flash-list'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { SymbolView } from 'expo-symbols'
@@ -41,12 +44,25 @@ import { Nav } from '@/components/Nav'
 import { BAR_BOTTOM } from '@/components/ActionBar'
 import { FailedRecordings } from '@/components/FailedRecordings'
 import { deleteRecording } from '@/lib/deleteRecording'
+import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
+import { useCardActions } from '@/components/CardActions'
+import { LinkBanner } from '@/components/LinkMode'
+import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
 
 const POLL_MS = 4000
 const FRAME_WAIT_MS = 5 * 60 * 1000 // keep polling for a frame this long after a card lands
 
 export default function Home() {
+  return (
+    <HoldProvider>
+      <HomeScreen />
+    </HoldProvider>
+  )
+}
+
+function HomeScreen() {
   const supabase = useSupabase()
+  const holding = useHolding()
   const { userId, getToken } = useAuth()
   const asked = useRef(new Set<string>())
   const insets = useSafeAreaInsets()
@@ -125,7 +141,57 @@ export default function Home() {
     () => (data ? data.items.filter((i) => project === null || i.projectId === project) : []),
     [data, project]
   )
-  const rows = useMemo(() => toRows(groupByDay(visible)), [visible])
+  const pinned = useMemo(() => pinnedOf(visible), [visible])
+  const rows = useMemo(() => toRows(groupByDay(visible.filter((i) => i.kind !== 'card' || !i.pinnedAt))), [visible])
+  const actions = useCardActions({
+    links: data?.links,
+    reload: load,
+    findCard: (id) => data?.items.find((i) => i.kind === 'card' && i.id === id) as never,
+  })
+  const linking = actions.linking
+
+  // An idea's ••• → Link ideas (My things, Ivy Mini): link mode from that idea, once Home has it.
+  const { linkFrom } = useLocalSearchParams<{ linkFrom?: string }>()
+  const startedFrom = useRef<string | null>(null)
+  useEffect(() => {
+    if (!linkFrom || !data || startedFrom.current === linkFrom) return
+    const from = data.items.find((i) => i.kind === 'card' && i.id === linkFrom)
+    if (from && from.kind === 'card') {
+      startedFrom.current = linkFrom
+      setProject(null)
+      actions.startLinking(from)
+    }
+  }, [linkFrom, data, actions])
+
+  /** One tile on Home: holdable, and in link mode a mark over it that a tap toggles. */
+  const tile = (item: Item, width?: number, inPinned?: boolean) => {
+    const meta = item.kind === 'action' && data ? metaLine(item, data.projects) : undefined
+    const open = linking
+      ? actions.toggleLink
+      : (i: Item) => router.push(i.kind === 'card' ? `/idea/${i.id}` : `/todo/${i.id}`)
+    return (
+      <Hold
+        actions={() => actions.actionsFor(item)}
+        face={() => <Tile item={item} meta={meta} pinned={inPinned} />}
+        viewRef={actions.viewRef(item.id)}
+        disabled={!!linking}
+      >
+        {(onLongPress) => (
+          <Tile
+            item={item}
+            meta={meta}
+            width={width}
+            onOpen={open}
+            onLongPress={onLongPress}
+            mark={actions.markFor(item)}
+            pinned={inPinned}
+            playing={playing === item.id}
+            onPlay={(i) => i.kind === 'card' && play(i.id, i.storagePath, i.playFromMs)}
+          />
+        )}
+      </Hold>
+    )
+  }
   // Ivy Mini appears as a chip once it has something in it.
   const chips = useMemo(
     () => (data ? data.projects.filter((p) => p.kind !== 'mini' || data.items.some((i) => i.projectId === p.id)) : []),
@@ -180,7 +246,10 @@ export default function Home() {
       <FlashList
         ref={list}
         data={rows}
-        extraData={playing}
+        extraData={[playing, linking]}
+        scrollEnabled={!holding}
+        onScroll={linking ? actions.remeasure : undefined}
+        scrollEventThrottle={16}
         masonry
         numColumns={2}
         keyExtractor={(r) => r.key}
@@ -197,30 +266,27 @@ export default function Home() {
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <Header />
-            {ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />}
+            {linking ? (
+              <LinkBanner title={linking.from.title} />
+            ) : (
+              ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
+            )}
             <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}
+            <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
           </View>
         }
         renderItem={({ item: r }) =>
           r.kind === 'day' ? (
             <Text style={styles.divider}>{r.label}</Text>
           ) : (
-            <View style={styles.cell}>
-              <Tile
-                item={r.item}
-                meta={r.item.kind === 'action' ? metaLine(r.item, data.projects) : undefined}
-                onOpen={(i) => router.push(i.kind === 'card' ? `/idea/${i.id}` : `/todo/${i.id}`)}
-                playing={playing === r.item.id}
-                onPlay={(i) => i.kind === 'card' && play(i.id, i.storagePath, i.playFromMs)}
-              />
-            </View>
+            <View style={styles.cell}>{tile(r.item)}</View>
           )
         }
       />
 
-      <Nav room="home" listening={data.inFlight > 0} onHome={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />
+      {actions.layer(<Nav room="home" listening={data.inFlight > 0} onHome={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />)}
     </View>
   )
 }
