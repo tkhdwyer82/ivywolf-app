@@ -3,7 +3,7 @@
 // photo credit — drawn after the app's CardFace (apps/mobile/components/CardFace.tsx) on its project's gradient.
 // Never the recording, transcript, context, linked ideas, project or thread: shared_card() (0034) doesn't return them.
 
-import { gradientOf } from '@ivywolf/ui'
+import { gradientOf } from '@ivywolf/ui/theme/gradients'
 import { hero } from '@/components/graph'
 
 export type SharedCard = {
