@@ -17,9 +17,12 @@
 //   /oauth/token      client-authenticated, not session-authenticated
 //   /oauth/revoke     likewise
 //   /api/health       liveness probe, must answer before auth
+//   /idea/<id>        Copy link (Job C+): a card she has shared is public, the card alone (title, form, credit), via
+//                     shared_card() (0034). The page decides for itself: her own card → the full view; a shared card →
+//                     the card; otherwise, signed out → /sign-in and back (as before), signed in → 404.
 //
 // /oauth/consent and /oauth/decision are deliberately not public: she must be signed in to see or answer consent.
-// Nor are /idea, /thread, /todo and /recording (the web views the connector links to): signed out → /sign-in and back.
+// Nor are /thread, /todo and /recording (the web views the connector links to): signed out → /sign-in and back.
 //
 // CORS (Job F2): Muse's own origins may call the connector's machine endpoints from a browser. Everything else is
 // same-origin as before. The consent page can't be framed (clickjacking an Allow button).
@@ -44,6 +47,7 @@ const isPublicRoute = createRouteMatcher([
   '/oauth/token',
   '/oauth/revoke',
   '/api/health',
+  '/idea/(.*)',
 ])
 
 const isConnectorEndpoint = createRouteMatcher(['/mcp', '/.well-known/(.*)', '/oauth/register', '/oauth/token', '/oauth/revoke'])

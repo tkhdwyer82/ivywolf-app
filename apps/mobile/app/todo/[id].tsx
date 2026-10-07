@@ -179,7 +179,13 @@ export default function TodoPage() {
         <Menu
           top={insets.top + 10}
           onClose={() => setMenu(false)}
-          items={[{ icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true }]}
+          items={[
+            // The hold arc's to-do actions, as a list (Job C+). Date opens the Date sheet, which needs a date heard.
+            { icon: todo.done ? 'arrow.uturn.backward' : 'checkmark', label: todo.done ? 'Not done' : 'Done', onPress: markDone },
+            ...(todo.dueDate ? [{ icon: 'calendar' as const, label: 'Date', onPress: () => setSheet(true) }] : []),
+            { icon: 'square.and.arrow.up', label: 'Share', onPress: () => Share.share({ message: todo.text }) },
+            { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
+          ]}
         />
       )}
       {todo.dueDate && (

@@ -1,17 +1,50 @@
-// /idea/<id> — one idea on the web (app.ivywolf.com.au): what the connector's links open. Her own only: signed out,
-// proxy.ts sends her to sign in and back; anyone else's (or no such idea) is a 404, by RLS (lib/web/graph.ts).
+// /idea/<id> — one idea on the web (app.ivywolf.com.au).
+//   Her own (signed in, RLS finds it): the full view — what the connector's links open.
+//   Anyone else, once she has shared it (Copy link, Job C+): the card alone — title, form and credit — from
+//   shared_card() (0034). Never the recording, transcript, context or linked ideas.
+//   Neither: signed out → /sign-in and back (her own link before she's signed in); signed in → 404.
+// The route is public in proxy.ts so the shared card can answer; this page makes the decision.
 
+import type { Metadata } from 'next'
+import { auth } from '@clerk/nextjs/server'
 import { notFound } from 'next/navigation'
 import { Cite, Frame, Heading, Meta, OpenInApp, Page } from '@/components/graph'
-import { loadIdea } from '@/lib/web/graph'
+import { SharedCardView, type SharedCard } from '@/components/shared-card'
+import { isId, loadIdea } from '@/lib/web/graph'
+import { supabaseAnon } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Idea · Ivy Wolf', robots: { index: false, follow: false } }
+
+async function loadShared(id: string): Promise<SharedCard | null> {
+  if (!isId(id)) return null
+  const { data, error } = await supabaseAnon().rpc('shared_card', { p_card_id: id })
+  if (error) throw new Error(error.message)
+  return (data as SharedCard | null) ?? null
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params
+  const shared = await loadShared(id).catch(() => null)
+  const robots = { index: false, follow: false }
+  if (!shared) return { title: 'Idea · Ivy Wolf', robots }
+  return {
+    title: `${shared.title} · Ivy Wolf`,
+    robots,
+    openGraph: { title: shared.title, siteName: 'Ivy Wolf', images: shared.frame_url ? [shared.frame_url] : undefined },
+  }
+}
 
 export default async function Idea({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const idea = await loadIdea(id)
-  if (!idea) notFound()
+  const { userId, redirectToSignIn } = await auth()
+
+  const idea = userId ? await loadIdea(id) : null
+  if (!idea) {
+    const shared = await loadShared(id)
+    if (shared) return <SharedCardView card={shared} />
+    if (!userId) return redirectToSignIn()
+    notFound()
+  }
   const thread = idea.thread_cards.find((tc) => tc.threads)?.threads ?? null
 
   return (

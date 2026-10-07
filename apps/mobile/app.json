@@ -55,6 +55,14 @@
       "expo-notifications",
       "@bacons/apple-targets",
       "./plugins/withRecordShortcut",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Ivy opens your library only when you add an image or video to your ideas.",
+          "savePhotosPermission": "Ivy saves a card to your photos only when you tap Download image.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       "expo-image",
       "expo-video"
     ],

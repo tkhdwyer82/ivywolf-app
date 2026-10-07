@@ -7,13 +7,17 @@
 //   To-do tile — no frame: Heading / Card title, the Caption meta ("My things · Thu"), and a calendar only when a
 //                date was heard (L3b, Figma 209:17).
 // The title is still the tile's accessibility label, so VoiceOver reads it; it isn't drawn.
+// Job C+: hold for the arc (components/HoldArc.tsx gives the tile its onLongPress); in link mode a mark sits over it
+// (components/LinkMode.tsx); a linked idea shows its link count, top right; a pinned one, the pin.
 
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native'
 import { SymbolView } from 'expo-symbols'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { colour, radius, space, type } from '@ivywolf/ui'
 import { frameHeight, type Item } from '@/lib/home'
 import { CardFace } from '@/components/CardFace'
+import { HOLD_MS } from '@/components/HoldArc'
+import { LinkBadge, LinkMarkView, type LinkMark } from '@/components/LinkMode'
 
 /**
  * Two columns, always (never three): margin + tile + gutter + tile + margin fills the screen. Figma draws size/tile-w
@@ -38,6 +42,9 @@ export function Tile({
   onPlay,
   playing,
   width,
+  onLongPress,
+  mark,
+  pinned,
 }: {
   item: Item
   /** A to-do's meta line ("My things · Thu"). Ideas carry no text. */
@@ -50,12 +57,27 @@ export function Tile({
   playing?: boolean
   /** Omit to fill the parent (a masonry cell). */
   width?: number
+  /** Hold (about 0.35 s) for the arc. */
+  onLongPress?: (e: GestureResponderEvent) => void
+  /** Link mode: what's drawn over it. */
+  mark?: LinkMark | null
+  /** In the Pinned row. */
+  pinned?: boolean
 }) {
   const open = onOpen ? () => onOpen(item) : undefined
 
   if (item.kind === 'action') {
     return (
-      <Pressable onPress={open} disabled={!open} accessibilityRole={open ? 'button' : undefined} style={[styles.todo, width !== undefined && { width }]} testID={`tile-${item.id}`}>
+      <Pressable
+        onPress={open}
+        onLongPress={onLongPress}
+        delayLongPress={HOLD_MS}
+        disabled={!open && !onLongPress}
+        accessibilityRole={open ? 'button' : undefined}
+        accessibilityHint={onLongPress ? 'Hold for Done, Date and Share.' : undefined}
+        style={[styles.todo, width !== undefined && { width }]}
+        testID={`tile-${item.id}`}
+      >
         <View style={styles.todoTop}>
           <Text style={styles.todoTitle} numberOfLines={3}>
             {item.text}
@@ -63,6 +85,7 @@ export function Tile({
           {item.dueDate && !item.done && <SymbolView name="calendar" tintColor={colour.Ink} size={TODO_ICON} />}
         </View>
         {!!meta && <Text style={styles.todoMeta}>{meta}</Text>}
+        {mark && <LinkMarkView mark={mark} />}
       </Pressable>
     )
   }
@@ -71,13 +94,20 @@ export function Tile({
   return (
     <Pressable
       onPress={open}
-      disabled={!open}
+      onLongPress={onLongPress}
+      delayLongPress={HOLD_MS}
+      disabled={!open && !onLongPress}
       accessibilityRole={open ? 'button' : undefined}
       accessibilityLabel={unsure ? `${item.title}. Ivy isn’t sure.` : item.title}
-      style={[width !== undefined && { width }, unsure && styles.unsure]}
+      accessibilityHint={onLongPress ? 'Hold for Like, Link ideas, Add context and Share.' : undefined}
+      style={[width !== undefined && { width }]}
       testID={`tile-${item.id}`}
     >
-      <CardFace card={item} photoHeight={frameHeight(item)} playing={playing} onPlay={onPlay && item.storagePath ? () => onPlay(item) : undefined} />
+      <View style={unsure && styles.unsure}>
+        <CardFace card={item} photoHeight={frameHeight(item)} playing={playing} onPlay={onPlay && item.storagePath ? () => onPlay(item) : undefined} pinned={pinned} />
+      </View>
+      {!mark && !pinned && <LinkBadge count={item.links} />}
+      {mark && <LinkMarkView mark={mark} />}
     </Pressable>
   )
 }

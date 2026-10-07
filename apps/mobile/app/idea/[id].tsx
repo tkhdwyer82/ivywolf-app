@@ -8,6 +8,8 @@
 // No verbs here yet: a verb appears only once the idea has earned it (P13, Later row).
 // ••• → Change view: every card can be shown as any form it has the words for (photo, quote, comparison, board,
 // text); her choice sticks and is a style signal.
+// Job C+: the ••• also lists the hold arc's actions — Pin to top (Unpin), Like, Link ideas, Add context, Share — and,
+// once the card has a public link, Stop sharing link. Share opens the Share sheet (1459:207).
 
 import { useCallback, useState } from 'react'
 import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
@@ -19,7 +21,10 @@ import { Image } from 'expo-image'
 import { useAuth } from '@clerk/clerk-expo'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
-import { loadIdea, metaLine, setHeart, setShape, sourceBadge, threadPill, viewsFor, type Idea } from '@/lib/idea'
+import { loadIdea, metaLine, setHeart, setPinned, setShape, sourceBadge, threadPill, viewsFor, type Idea } from '@/lib/idea'
+import { setShared } from '@/lib/share'
+import { ShareSheet } from '@/components/ShareSheet'
+import { AddContextSheet } from '@/components/AddContextSheet'
 import { CardFace, Credit, SHAPE_NAME } from '@/components/CardFace'
 import { deleteCard } from '@/lib/deleteRecording'
 import { Glass, Menu, MENU_OFFSET } from '@/components/PinChrome'
@@ -36,6 +41,7 @@ export default function IdeaPage() {
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState<string | null>(null)
   const [menu, setMenu] = useState(false)
+  const [sheet, setSheet] = useState<'share' | 'context' | null>(null)
   const player = useAudioPlayer(null)
 
   const load = useCallback(() => {
@@ -102,6 +108,35 @@ export default function IdeaPage() {
         load()
       }
     )
+  }
+
+  async function pin() {
+    if (!idea) return
+    const on = !idea.card.pinnedAt
+    try {
+      await setPinned(supabase, idea.id, on)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That didn’t pin')
+    }
+    load()
+  }
+
+  async function stopSharing() {
+    if (!idea) return
+    try {
+      await setShared(supabase, idea.id, false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That didn’t change')
+    }
+    load()
+  }
+
+  /** Link ideas: link mode in this idea's project (only its ideas), or on Home for My things and Ivy Mini. */
+  function linkIdeas() {
+    if (!idea) return
+    if (idea.project && idea.project.kind === 'user') router.push({ pathname: '/project/[id]', params: { id: idea.project.id, linkFrom: idea.id } })
+    else router.navigate({ pathname: '/', params: { linkFrom: idea.id } })
   }
 
   function trash() {
@@ -206,7 +241,7 @@ export default function IdeaPage() {
               <SymbolView name={idea.heartedAt ? 'heart.fill' : 'heart'} tintColor={colour.Ink} size={size.icon} />
             </Pressable>
             <Pressable
-              onPress={() => Share.share({ message: idea.gist ? `${idea.title}\n\n${idea.gist}` : idea.title })}
+              onPress={() => setSheet('share')}
               hitSlop={TAP_SLOP}
               accessibilityRole="button"
               accessibilityLabel="Share"
@@ -288,6 +323,12 @@ export default function IdeaPage() {
           top={insets.top + MENU_OFFSET}
           onClose={() => setMenu(false)}
           items={[
+            { icon: idea.card.pinnedAt ? 'pin.slash' : 'pin', label: idea.card.pinnedAt ? 'Unpin' : 'Pin to top', onPress: pin },
+            { icon: idea.heartedAt ? 'heart.fill' : 'heart', label: idea.heartedAt ? 'Unlike' : 'Like', onPress: heart },
+            { icon: 'link', label: 'Link ideas', onPress: linkIdeas },
+            { icon: 'paperclip', label: 'Add context', onPress: () => setSheet('context') },
+            { icon: 'square.and.arrow.up', label: 'Share', onPress: () => setSheet('share') },
+            ...(idea.card.sharedAt ? [{ icon: 'eye.slash' as const, label: 'Stop sharing link', onPress: stopSharing }] : []),
             { icon: 'pencil', label: 'Edit idea', onPress: () => router.push(`/idea/edit/${idea.id}`) },
             ...(idea.recordingId
               ? [{ icon: 'text.alignleft' as const, label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) }]
@@ -298,6 +339,8 @@ export default function IdeaPage() {
           ]}
         />
       )}
+      {sheet === 'share' && <ShareSheet card={idea.card} onClose={() => setSheet(null)} onShared={load} />}
+      {sheet === 'context' && <AddContextSheet card={idea.card} onClose={() => setSheet(null)} />}
     </View>
   )
 }

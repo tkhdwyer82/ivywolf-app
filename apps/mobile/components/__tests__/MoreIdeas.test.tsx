@@ -37,7 +37,7 @@ describe('More ideas', () => {
     expect(screen.getByRole('tab', { name: 'More ideas' })).toBeTruthy()
   })
   it('draws a suggestion as a frame and one pin — no text', async () => {
-    await render(<SuggestionTile suggestion={s} onOpen={() => {}} onHide={() => {}} />)
+    await render(<SuggestionTile suggestion={s} onOpen={() => {}} onLongPress={() => {}} />)
     expect(count('Text')).toBe(0)
     expect(screen.getAllByTestId('suggestion-pin')).toHaveLength(1)
     expect(screen.getByLabelText('Open on the box, not your face')).toBeTruthy()

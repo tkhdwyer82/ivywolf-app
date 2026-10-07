@@ -10,8 +10,11 @@
 // Left out of the frame: add-people (projects are private in the pilot), the filter icon over the grid, and the
 // stars on tile corners — nothing yet says what they do.
 // Reached from the Idea page's project button and "You keep coming back to this" in My things.
+// Job C+: pinned ideas sit at the top (Pinned row); hold an idea for its arc, a suggestion for Keep · Not for this
+// project · Link ideas · Share. Link mode here shows only this project's ideas. ?linkFrom=<card> (an idea's •••
+// Link ideas) opens the page in link mode.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
@@ -24,14 +27,28 @@ import { Tile, useTileWidth } from '@/components/Tile'
 import { SuggestionTile } from '@/components/SuggestionTile'
 import { ProjectTabs, type ProjectTab } from '@/components/ProjectTabs'
 import { Shimmer } from '@/components/Shimmer'
-import { hideSuggestion, loadMoreIdeas, takePinNote, type PinNote, type Suggestion } from '@/lib/suggestions'
+import { loadMoreIdeas, takePinNote, type PinNote, type Suggestion } from '@/lib/suggestions'
 import { IvyNote } from '@/components/IvyNote'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, radius, size, space, type } from '@ivywolf/ui'
 import { ActionBar, BAR_BOTTOM } from '@/components/ActionBar'
+import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
+import { useCardActions } from '@/components/CardActions'
+import { LinkBanner } from '@/components/LinkMode'
+import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
+import type { CardItem } from '@/lib/home'
 
 export default function Project() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  return (
+    <HoldProvider>
+      <ProjectScreen />
+    </HoldProvider>
+  )
+}
+
+function ProjectScreen() {
+  const { id, linkFrom } = useLocalSearchParams<{ id: string; linkFrom?: string }>()
+  const holding = useHolding()
   const supabase = useSupabase()
   const insets = useSafeAreaInsets()
   const [page, setPage] = useState<ProjectPage | null | undefined>(undefined)
@@ -62,16 +79,60 @@ export default function Project() {
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
   }, [supabase, id])
 
-  // Long-press: gone at once, no UI. If it didn't take, the next load puts it back.
-  const hide = useCallback(
-    (s: Suggestion) => {
-      setMore((m) => (m ? { ...m, suggestions: m.suggestions.filter((x) => x.id !== s.id) } : m))
-      hideSuggestion(supabase, s.id).catch(load)
-    },
-    [supabase, load]
-  )
+  // Kept or set aside from the arc: gone from the tab at once. If it didn't take, the next load puts it back.
+  const gone = useCallback((s: Suggestion) => {
+    setMore((m) => (m ? { ...m, suggestions: m.suggestions.filter((x) => x.id !== s.id) } : m))
+  }, [])
   const [moreLeft, moreRight] = useMemo(() => balance(more?.suggestions ?? []), [more])
   useFocusEffect(load)
+
+  // load() returns nothing; the arc's reload wants to wait for the page, so it loads directly.
+  const reload = useCallback(async () => {
+    const [p, m] = await Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id)])
+    setPage(p)
+    setMore(m)
+    return p
+  }, [supabase, id])
+  const latest = useRef<ProjectPage | null | undefined>(undefined)
+  latest.current = page
+  const actions = useCardActions({
+    links: page?.links,
+    reload,
+    findCard: (cardId) => latest.current?.ideas.find((i) => i.id === cardId),
+  })
+  const linking = actions.linking
+
+  // Opened from an idea's ••• → Link ideas: link mode from that idea, once it's loaded.
+  const startedFrom = useRef<string | null>(null)
+  useEffect(() => {
+    if (!linkFrom || !page || startedFrom.current === linkFrom) return
+    const from = page.ideas.find((i) => i.id === linkFrom)
+    if (from) {
+      startedFrom.current = linkFrom
+      setTab('all')
+      actions.startLinking(from)
+    }
+  }, [linkFrom, page, actions])
+
+  const tile = (item: CardItem, width: number, inPinned?: boolean) => (
+    <Hold
+      actions={() => actions.actionsFor(item)}
+      face={() => <Tile item={item} width={width} pinned={inPinned} />}
+      viewRef={actions.viewRef(item.id)}
+      disabled={!!linking}
+    >
+      {(onLongPress) => (
+        <Tile
+          item={item}
+          width={width}
+          onOpen={linking ? actions.toggleLink : (i) => router.push(`/idea/${i.id}`)}
+          onLongPress={onLongPress}
+          mark={actions.markFor(item)}
+          pinned={inPinned}
+        />
+      )}
+    </Hold>
+  )
 
   function rename() {
     if (!page) return
@@ -125,7 +186,8 @@ export default function Project() {
   const { project, ideas, boards } = page
   const talk = () => router.push({ pathname: '/record', params: { projectId: project.id } })
   const own = project.kind === 'user'
-  const [left, right] = masonry(ideas)
+  const pinned = pinnedOf(ideas)
+  const [left, right] = masonry(ideas.filter((i) => !i.pinnedAt))
 
   // Rule 1: before the first idea, the whole screen is the prompt to talk to it.
   if (ideas.length === 0) {
@@ -148,7 +210,13 @@ export default function Project() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }} onScrollBeginDrag={() => setDissolve(true)}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }}
+        onScrollBeginDrag={() => setDissolve(true)}
+        scrollEnabled={!holding}
+        onScroll={linking ? actions.remeasure : undefined}
+        scrollEventThrottle={16}
+      >
         <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onShare={share} />
         <View style={styles.body}>
           <Text style={styles.name}>{project.name}</Text>
@@ -160,6 +228,11 @@ export default function Project() {
           </View>
           {error && <Text style={[type['Caption'], { marginTop: space.gutter }]}>{error}</Text>}
 
+          {linking && (
+            <View style={styles.banner}>
+              <LinkBanner title={linking.from.title} />
+            </View>
+          )}
           {pinNote && (
             <View style={styles.pinNote}>
               <IvyNote sentences={[{ text: pinNote.text, cites: pinNote.cites }]} dissolve={dissolve} onGone={() => setPinNote(null)} />
@@ -169,17 +242,22 @@ export default function Project() {
           {!more && <View style={styles.noTabs} />}
 
           {tab === 'all' || !more ? (
-            <View style={styles.columns}>
-              {[left, right].map((col, c) => (
-                <View key={c} style={{ width: tileWidth }}>
-                  {col.map((item) => (
-                    <View key={item.id} style={styles.cell}>
-                      <Tile item={item} width={tileWidth} onOpen={(i) => router.push(`/idea/${i.id}`)} />
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </View>
+            <>
+              <View style={styles.pinned}>
+                <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
+              </View>
+              <View style={styles.columns}>
+                {[left, right].map((col, c) => (
+                  <View key={c} style={{ width: tileWidth }}>
+                    {col.map((item) => (
+                      <View key={item.id} style={styles.cell}>
+                        {tile(item, tileWidth)}
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </>
           ) : (
             <>
               <View style={styles.sectionRow}>
@@ -216,7 +294,11 @@ export default function Project() {
                       <View key={c} style={{ width: tileWidth }}>
                         {col.map((s) => (
                           <View key={s.id} style={styles.cell}>
-                            <SuggestionTile suggestion={s} width={tileWidth} onOpen={(x) => router.push(`/suggestion/${x.id}`)} onHide={hide} />
+                            <Hold actions={() => actions.suggestionActions(s, gone)} face={() => <SuggestionTile suggestion={s} width={tileWidth} />}>
+                              {(onLongPress) => (
+                                <SuggestionTile suggestion={s} width={tileWidth} onOpen={(x) => router.push(`/suggestion/${x.id}`)} onLongPress={onLongPress} />
+                              )}
+                            </Hold>
                           </View>
                         ))}
                       </View>
@@ -229,12 +311,14 @@ export default function Project() {
         </View>
       </ScrollView>
 
-      <ActionBar
-        verbs={[
-          ...(more ? [{ key: 'more', label: 'More ideas', icon: 'square.grid.2x2' as const, onPress: () => setTab('more') }] : []),
-          { key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk },
-        ]}
-      />
+      {actions.layer(
+        <ActionBar
+          verbs={[
+            ...(more ? [{ key: 'more', label: 'More ideas', icon: 'square.grid.2x2' as const, onPress: () => setTab('more') }] : []),
+            { key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk },
+          ]}
+        />
+      )}
 
       {menu && <ProjectMenu top={insets.top + MENU_OFFSET} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
     </View>
@@ -326,6 +410,9 @@ const styles = StyleSheet.create({
   moreTitle: { marginTop: space.section, marginBottom: space.stack },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },
   cell: { paddingBottom: space.gutter },
+  // PinnedRow and LinkBanner pad themselves to the margin; the body already has it.
+  pinned: { marginHorizontal: -space.margin, marginBottom: space.stack },
+  banner: { marginHorizontal: -space.margin, marginBottom: space.gutter },
   cold: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: COLD_PAD, paddingBottom: BAR_BOTTOM + size['bar-h'] },
   coldTitle: { ...type['Title / Section'], textAlign: 'center' },
   coldLine: { textAlign: 'center', marginTop: space.gutter },

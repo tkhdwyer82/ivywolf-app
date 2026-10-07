@@ -8,11 +8,17 @@
 //   board   — dark card: the hook, a lime dot per beat, and the thread's stage as a lime pill (BOARD · READY).
 //   text    — a plain card, title and gist: the low-confidence fallback.
 // `size` is 'tile' in a masonry and 'page' at the top of the idea page (bigger type, the same parts).
+// Gradients (Job C+, Figma 1462:4 / 1462:36): every non-photo form wears its project's gradient, with white or ink
+// text as the palette lists, and on a tile a footer — "Ivy brand · Car 0:42". Photos keep the photo; lime is never a
+// card colour (the comparison's "to" cells and the board's dots and pill are white on the gradient).
 
+import type { ReactNode } from 'react'
 import { Linking, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Image } from 'expo-image'
-import { colour, radius, space, type } from '@ivywolf/ui'
-import type { CardItem } from '@/lib/home'
+import { LinearGradient } from 'expo-linear-gradient'
+import { SymbolView } from 'expo-symbols'
+import { colour, gradientOf, radius, space, type } from '@ivywolf/ui'
+import { textMinHeight, type CardItem } from '@/lib/home'
 import { Shimmer } from '@/components/Shimmer'
 
 /** Where it was said, as the quote chip names it: "Mini · 12:40". */
@@ -51,6 +57,8 @@ export function CardFace({
   playing,
   onPlay,
   style,
+  footer = size === 'tile',
+  pinned,
 }: {
   card: CardItem
   size?: Size
@@ -61,64 +69,79 @@ export function CardFace({
   /** Play from play_from_ms. Without it the chip is drawn but not a button. */
   onPlay?: () => void
   style?: StyleProp<ViewStyle>
+  /** "Project · Car 0:42" under a gradient card. On by default on a tile. */
+  footer?: boolean
+  /** In the Pinned row: the pin, top right. */
+  pinned?: boolean
 }) {
   const page = size === 'page'
+  const ink = card.gradient ? gradientOf(card.gradient).ink : true
+  const fg = { color: ink ? colour.Ink : colour.Surface }
+  const soft = { color: ink ? INK_SOFT : WHITE_SOFT }
+  const foot = footer && card.gradient ? <Footer card={card} style={soft} /> : null
+  const pin = pinned ? <Pin ink={ink} /> : null
   switch (card.shape) {
     case 'quote':
       if (card.quote)
         return (
-          <View style={[styles.box, styles.quoteBox, page && styles.boxPage, style]}>
-            <Text style={[styles.quoteMark, page && styles.quoteMarkPage]} accessibilityElementsHidden>
+          <Bed card={card} style={[styles.box, styles.quoteBox, page && styles.boxPage, style]}>
+            {pin}
+            <Text style={[styles.quoteMark, page && styles.quoteMarkPage, fg]} accessibilityElementsHidden>
               “
             </Text>
-            <Text style={[styles.quoteText, page && styles.quoteTextPage]}>{card.quote.text}</Text>
-            {!!card.quote.speaker && <Text style={styles.speaker}>— {card.quote.speaker}</Text>}
+            <Text style={[styles.quoteText, page && styles.quoteTextPage, fg]}>{card.quote.text}</Text>
+            {!!card.quote.speaker && <Text style={[styles.speaker, soft]}>— {card.quote.speaker}</Text>}
             <PlayChip label={playChip(card)} playing={playing} onPress={onPlay} />
-          </View>
+            {foot}
+          </Bed>
         )
       break
     case 'diagram':
       if (card.diagram)
         return (
-          <View style={[styles.box, styles.diagramBox, page && styles.boxPage, style]}>
-            {!!card.diagram.title && <Text style={styles.overline}>{card.diagram.title.toUpperCase()}</Text>}
+          <Bed card={card} style={[styles.box, card.gradient ? styles.diagramBed : styles.diagramBox, page && styles.boxPage, style]}>
+            {pin}
+            {!!card.diagram.title && <Text style={[styles.overline, card.gradient && soft]}>{card.diagram.title.toUpperCase()}</Text>}
             {card.diagram.rows.map((r, i) => (
               <View key={i} style={styles.row}>
-                <View style={[styles.cell, styles.cellFrom]}>
-                  <Text style={[styles.cellText, page && styles.cellTextPage]} numberOfLines={2}>
+                <View style={[styles.cell, card.gradient ? (ink ? styles.cellFromInk : styles.cellFromWhite) : styles.cellFrom]}>
+                  <Text style={[styles.cellText, page && styles.cellTextPage, card.gradient && fg]} numberOfLines={2}>
                     {r.from}
                   </Text>
                 </View>
-                <Arrow />
-                <View style={[styles.cell, styles.cellTo]}>
+                <Arrow tint={card.gradient ? fg.color : undefined} />
+                <View style={[styles.cell, card.gradient ? styles.cellToOnGradient : styles.cellTo]}>
                   <Text style={[styles.cellText, page && styles.cellTextPage]} numberOfLines={2}>
                     {r.to}
                   </Text>
                 </View>
               </View>
             ))}
-          </View>
+            {foot}
+          </Bed>
         )
       break
     case 'board':
       if (card.board)
         return (
-          <View style={[styles.box, styles.boardBox, page && styles.boxPage, style]}>
-            <Text style={[styles.boardTitle, page && styles.boardTitlePage]} numberOfLines={2}>
+          <Bed card={card} style={[styles.box, styles.boardBox, page && styles.boxPage, style]}>
+            {pin}
+            <Text style={[styles.boardTitle, page && styles.boardTitlePage, card.gradient && fg]} numberOfLines={2}>
               {card.board.hook || card.title}
             </Text>
             {card.board.beats.map((b, i) => (
               <View key={i} style={styles.beat}>
-                <View style={styles.beatDot} />
-                <Text style={[styles.beatText, page && styles.beatTextPage]} numberOfLines={1}>
+                <View style={[styles.beatDot, card.gradient && { backgroundColor: fg.color }]} />
+                <Text style={[styles.beatText, page && styles.beatTextPage, card.gradient && fg]} numberOfLines={1}>
                   {b}
                 </Text>
               </View>
             ))}
-            <View style={styles.statusPill}>
+            <View style={[styles.statusPill, card.gradient && styles.pillOnGradient]}>
               <Text style={styles.pillText}>BOARD · {STAGE[card.threadStage ?? 'sparked']}</Text>
             </View>
-          </View>
+            {foot}
+          </Bed>
         )
       break
     case 'photo':
@@ -141,6 +164,7 @@ export function CardFace({
                 <Text style={styles.pillText}>PHOTO</Text>
               </View>
             )}
+            {pinned && <Pin ink={false} />}
           </View>
           {!page && (
             <Text style={styles.photoTitle} numberOfLines={2}>
@@ -151,17 +175,54 @@ export function CardFace({
         </View>
       )
   }
-  // text — and any shape whose payload is missing.
+  // text — and any shape whose payload is missing. On a tile it stands as tall as the rhythm: the title at the top,
+  // the gist and the footer at the bottom (Figma 1462:36).
   return (
-    <View style={[styles.box, styles.textBox, page && styles.boxPage, style]}>
-      <Text style={[styles.textTitle, page && styles.textTitlePage]} numberOfLines={page ? undefined : 3}>
+    <Bed card={card} style={[styles.box, styles.textBox, page && styles.boxPage, !page && card.gradient && { minHeight: textMinHeight(card.id) }, style]}>
+      {pin}
+      <Text style={[styles.textTitle, page && styles.textTitlePage, fg]} numberOfLines={page ? undefined : 4}>
         {card.title}
       </Text>
-      {!!card.gist && (
-        <Text style={[styles.textGist, page && styles.textGistPage]} numberOfLines={page ? undefined : 4}>
-          {card.gist}
-        </Text>
-      )}
+      <View style={styles.textBottom}>
+        {!!card.gist && (
+          <Text style={[styles.textGist, page && styles.textGistPage, card.gradient ? soft : null]} numberOfLines={page ? undefined : 4}>
+            {card.gist}
+          </Text>
+        )}
+        {foot}
+      </View>
+    </Bed>
+  )
+}
+
+/** The card's bed: its project's gradient, top to bottom — or the grey Chip where the project wasn't read. */
+function Bed({ card, style, children }: { card: CardItem; style: StyleProp<ViewStyle>; children: ReactNode }) {
+  if (!card.gradient) return <View style={style}>{children}</View>
+  const g = gradientOf(card.gradient)
+  return (
+    <LinearGradient colors={g.colors} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[style, styles.noBed]}>
+      {children}
+    </LinearGradient>
+  )
+}
+
+/** "Ivy brand · Car 0:42": where it lives, and where it was said. */
+export const footerLine = (card: Pick<CardItem, 'projectName' | 'recordingSource' | 'playFromMs'>) =>
+  [card.projectName, playChip(card)].filter(Boolean).join(' · ')
+
+function Footer({ card, style }: { card: CardItem; style: { color: string } }) {
+  return (
+    <Text style={[styles.footer, style]} numberOfLines={1}>
+      {footerLine(card)}
+    </Text>
+  )
+}
+
+/** Figma 1461:133 — the pin, top right of a pinned card. */
+function Pin({ ink }: { ink: boolean }) {
+  return (
+    <View style={styles.pin} pointerEvents="none" accessibilityLabel="Pinned">
+      <SymbolView name="pin.fill" tintColor={ink ? colour.Ink : colour.Surface} size={PIN} />
     </View>
   )
 }
@@ -207,8 +268,8 @@ function PlayChip({ label, playing, onPress }: { label: string; playing?: boolea
 }
 
 /** Figma 227:34 — the 12 × 12 arrow between a diagram's cells (assets/figma/diagram-arrow.svg, from the frame). */
-function Arrow() {
-  return <Image source={require('@/assets/figma/diagram-arrow.svg')} style={styles.arrow} accessibilityElementsHidden />
+function Arrow({ tint }: { tint?: string }) {
+  return <Image source={require('@/assets/figma/diagram-arrow.svg')} style={styles.arrow} tintColor={tint} accessibilityElementsHidden />
 }
 
 // Figma 227:5 — measured, not tokens: card padding 14 (12 on the quote), the quote mark Bold 40, the diagram cells 30
@@ -231,6 +292,12 @@ const PHOTO_TITLE = 14
 const CREDIT = 11
 const HAIRLINE = '#E6E6E4'
 const CHIP_SLOP = 12
+// Job C+ (1462:36) — measured: the footer is Regular 11 at 60–75% of the text colour, 12 under the card's words; the
+// comparison's cells on a gradient are white at 35% (ink text) / 22% (white text), the "to" cell white at 90%.
+const INK_SOFT = 'rgba(29,29,31,0.7)'
+const WHITE_SOFT = 'rgba(255,255,255,0.78)'
+const FOOTER = 11
+const PIN = 16
 
 const styles = StyleSheet.create({
   box: { borderRadius: radius.tile, padding: PAD, overflow: 'hidden' },
@@ -294,4 +361,13 @@ const styles = StyleSheet.create({
   textTitlePage: type['Title / Section'],
   textGist: { ...type['Body / Small'], color: colour.Grey },
   textGistPage: { ...type['Body'], color: colour.Grey },
+  textBottom: { marginTop: 'auto', gap: 6 },
+  noBed: { backgroundColor: undefined },
+  diagramBed: { gap: ROW_GAP },
+  cellFromInk: { backgroundColor: 'rgba(255,255,255,0.35)' },
+  cellFromWhite: { backgroundColor: 'rgba(255,255,255,0.22)' },
+  cellToOnGradient: { backgroundColor: 'rgba(255,255,255,0.9)' },
+  pillOnGradient: { backgroundColor: 'rgba(255,255,255,0.9)' },
+  footer: { fontSize: FOOTER, marginTop: space.gutter + 4 },
+  pin: { position: 'absolute', top: 12, right: 12, zIndex: 1 },
 })
