@@ -10,7 +10,7 @@ import { auth } from '@clerk/nextjs/server'
 import { notFound } from 'next/navigation'
 import { Cite, Frame, Heading, Meta, OpenInApp, Page } from '@/components/graph'
 import { SharedCardView, type SharedCard } from '@/components/shared-card'
-import { isId, loadIdea } from '@/lib/web/graph'
+import { cardPicture, isId, loadIdea } from '@/lib/web/graph'
 import { supabaseAnon } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
@@ -19,7 +19,8 @@ async function loadShared(id: string): Promise<SharedCard | null> {
   if (!isId(id)) return null
   const { data, error } = await supabaseAnon().rpc('shared_card', { p_card_id: id })
   if (error) throw new Error(error.message)
-  return (data as SharedCard | null) ?? null
+  const card = (data as SharedCard | null) ?? null
+  return card && { ...card, frame_url: cardPicture({ frame_url: card.frame_url, credited: !!card.credit }) }
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
