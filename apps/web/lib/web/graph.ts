@@ -29,12 +29,30 @@ export type CardView = {
   confidence: number
   frame_url: string | null
   frame_status: string
+  frame_attribution: { provider?: string; photographer?: string } | null
+  source: string
   created_at: string
   recordings: Rec | null
   projects: { name: string } | null
   thread_cards: { threads: { id: string; title: string; return_count: number; stage: string } | null }[]
 }
-const CARD = `id, title, gist, play_from_ms, confidence, frame_url, frame_status, created_at, recordings(${REC}), projects(name), thread_cards(threads(id, title, return_count, stage))`
+const CARD = `id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_attribution, source, created_at, recordings(${REC}), projects(name), thread_cards(threads(id, title, return_count, stage))`
+
+/**
+ * The only pictures a card shows (Job I, as apps/mobile/lib/home.ts cardPicture): a credited Unsplash photo or her own
+ * import. The fal frames drawn for cards before Job B live at frames/<creator>/<card>.jpg and are never shown.
+ */
+export function cardPicture(c: { frame_url: string | null; credited: boolean; source?: string | null }): string | null {
+  if (!c.frame_url) return null
+  if (c.credited || c.source === 'import') return c.frame_url
+  // shared_card() (0034) doesn't return the source: her import's poster is the one picture under <creator>/imports/.
+  return /\/frames\/[^/]+\/imports\//.test(c.frame_url) ? c.frame_url : null
+}
+
+const shown = (c: CardView): CardView => ({
+  ...c,
+  frame_url: cardPicture({ frame_url: c.frame_url, credited: c.frame_attribution?.provider === 'unsplash' && !!c.frame_attribution.photographer, source: c.source }),
+})
 
 function need<T>(r: { data: T; error: { message: string } | null }): T {
   if (r.error) throw new Error(r.error.message)
@@ -44,7 +62,8 @@ function need<T>(r: { data: T; error: { message: string } | null }): T {
 export async function loadIdea(id: string): Promise<CardView | null> {
   if (!isId(id)) return null
   const db = await supabaseAsUser()
-  return need(await db.from('cards').select(CARD).eq('id', id).maybeSingle()) as unknown as CardView | null
+  const card = need(await db.from('cards').select(CARD).eq('id', id).maybeSingle()) as unknown as CardView | null
+  return card && shown(card)
 }
 
 export type ThreadView = {
@@ -64,7 +83,7 @@ export async function loadThread(id: string): Promise<ThreadView | null> {
     await db.from('threads').select(`id, title, stage, return_count, first_seen, last_seen, thread_cards(cards(${CARD}))`).eq('id', id).maybeSingle()
   ) as unknown as (Omit<ThreadView, 'cards'> & { thread_cards: { cards: CardView | null }[] }) | null
   if (!t) return null
-  const cards = t.thread_cards.flatMap((tc) => (tc.cards ? [tc.cards] : [])).sort((a, b) => b.created_at.localeCompare(a.created_at))
+  const cards = t.thread_cards.flatMap((tc) => (tc.cards ? [shown(tc.cards)] : [])).sort((a, b) => b.created_at.localeCompare(a.created_at))
   return { id: t.id, title: t.title, stage: t.stage, return_count: t.return_count, first_seen: t.first_seen, last_seen: t.last_seen, cards }
 }
 
@@ -95,7 +114,7 @@ export async function loadRecording(id: string): Promise<RecordingView | null> {
   const db = await supabaseAsUser()
   const rec = need(await db.from('recordings').select(REC).eq('id', id).maybeSingle()) as Rec | null
   if (!rec) return null
-  const cards = need(await db.from('cards').select(CARD).eq('recording_id', id).order('play_from_ms')) as unknown as CardView[]
+  const cards = (need(await db.from('cards').select(CARD).eq('recording_id', id).order('play_from_ms')) as unknown as CardView[]).map(shown)
   const actions = need(await db.from('actions').select('id, text, done, due_date').eq('recording_id', id).order('created_at')) as RecordingView['actions']
   return { ...rec, cards, actions }
 }
