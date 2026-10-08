@@ -1,24 +1,36 @@
 // apps/mobile/components/Nav.tsx
-// The nav trio (L3b, Figma 209:31): Home · ⊕ · Mini in one white pill, bar-h tall and fully round. Home and Mini
-// are rooms — SF Symbols, filled when selected (house / house.fill, rectangle.portrait / .fill). The ⊕ is an action,
-// not a room: a lime disc (size/nav) with the mic that never shows a selected state, only the listening halo.
-// Tap ⊕ = mic. Long-press ⊕ = Talk / Import / Project (rule 1). Search lives in the header, never here.
+// The nav (Figma 145:5, "Nav · selected states"): Home · ⊕ · Mini as three separate squircle tiles, size/nav square,
+// r16, 8 apart. Home and Mini are rooms — each changes in its own way when selected, never by colour: Home's outline
+// house fills ink with a smile; Mini's outline rectangle + grille goes solid ink with the grille knocked out. The ⊕ is
+// an action, not a room: a lime tile with the mic that never shows a selected state, only the listening halo.
+// Glyphs are the frame's own (assets/figma/nav-*.svg, 24 × 24). Tap ⊕ = mic. Long-press ⊕ = Talk / Import / Project
+// (rule 1). Search lives in the header, never here.
 
 import { useEffect, useRef } from 'react'
 import { ActionSheetIOS, Alert, Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
-import { SymbolView } from 'expo-symbols'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { useAuth } from '@clerk/clerk-expo'
 import { colour, size } from '@ivywolf/ui'
 import { useSupabase } from '@/lib/supabase'
-import { BAR_BOTTOM, FLOAT_SHADOW } from '@/components/ActionBar'
+import { BAR_BOTTOM } from '@/components/ActionBar'
 
-// Figma 209:31 — measured, not tokens: the pill is 220 wide with room glyphs 20 in from its ends; the mic glyph is
-// 20; the halo is the disc + 8 all round, lime at 35 %.
-const PILL_W = 220
-const END_PAD = 20
-const MIC = 20
+// Figma 145:5 — measured, not tokens: tiles r16 and 8 apart, glyphs 24, shadow 0 4 14 at 14 % (an iOS radius of 7);
+// the halo is the tile + 8 all round (72, r22), lime at 35 %.
+const TILE_R = 16
+const GAP = 8
+const GLYPH = 24
 const HALO = 8
+const HALO_R = 22
+const TILE_SHADOW = { shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 7, shadowOffset: { width: 0, height: 4 } } as const
+
+const GLYPHS = {
+  home: require('@/assets/figma/nav-home-rest.svg'),
+  homeSelected: require('@/assets/figma/nav-home-selected.svg'),
+  mini: require('@/assets/figma/nav-mini-rest.svg'),
+  miniSelected: require('@/assets/figma/nav-mini-selected.svg'),
+  mic: require('@/assets/figma/nav-mic.svg'),
+}
 
 export type Room = 'home' | 'mini'
 
@@ -64,45 +76,46 @@ export function Nav({ room, listening = false, onHome }: { room: Room; listening
     )
 
   return (
-    <View style={styles.pill}>
+    <View style={styles.bar} pointerEvents="box-none">
       <Pressable
         onPress={goHome}
-        style={styles.room}
+        style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
         accessibilityRole="tab"
         accessibilityLabel="Home"
         accessibilityState={{ selected: room === 'home' }}
         testID="nav-home"
       >
-        <SymbolView name={room === 'home' ? 'house.fill' : 'house'} tintColor={colour.Ink} size={size.icon} />
+        <Image source={room === 'home' ? GLYPHS.homeSelected : GLYPHS.home} style={styles.glyph} accessibilityElementsHidden />
       </Pressable>
       <View>
         {listening && <Halo />}
         <Pressable
           onPress={() => router.push('/record')}
           onLongPress={menu}
-          style={({ pressed }) => [styles.disc, pressed && { transform: [{ scale: 0.96 }] }]}
+          style={({ pressed }) => [styles.tile, styles.listen, pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel="Talk"
           accessibilityHint="Hold for Talk, Import or Project"
+          testID="nav-listen"
         >
-          <SymbolView name="mic.fill" tintColor={colour.Ink} size={MIC} />
+          <Image source={GLYPHS.mic} style={styles.glyph} accessibilityElementsHidden />
         </Pressable>
       </View>
       <Pressable
         onPress={goMini}
-        style={styles.room}
+        style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
         accessibilityRole="tab"
         accessibilityLabel="Ivy Mini"
         accessibilityState={{ selected: room === 'mini' }}
         testID="nav-mini"
       >
-        <SymbolView name={room === 'mini' ? 'rectangle.portrait.fill' : 'rectangle.portrait'} tintColor={colour.Ink} size={size.icon} />
+        <Image source={room === 'mini' ? GLYPHS.miniSelected : GLYPHS.mini} style={styles.glyph} accessibilityElementsHidden />
       </Pressable>
     </View>
   )
 }
 
-/** The disc + 8 all round, lime at 35 % — pulses rather than sits. */
+/** The tile + 8 all round, lime at 35 % — pulses rather than sits. */
 function Halo() {
   const pulse = useRef(new Animated.Value(0)).current
   useEffect(() => {
@@ -130,37 +143,34 @@ function Halo() {
 }
 
 const styles = StyleSheet.create({
-  pill: {
+  bar: {
     position: 'absolute',
     alignSelf: 'center',
-    bottom: BAR_BOTTOM,
-    width: PILL_W,
-    height: size['bar-h'],
-    borderRadius: size['bar-h'] / 2,
-    backgroundColor: colour.Surface,
+    bottom: BAR_BOTTOM + (size['bar-h'] - size.nav) / 2,
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    // Room glyphs sit END_PAD in from the ends; their hit areas are size/tap, centred on the glyph.
-    paddingHorizontal: END_PAD - (size.tap - size.icon) / 2,
-    ...FLOAT_SHADOW,
+    gap: GAP,
   },
-  room: { width: size.tap, height: size.tap, alignItems: 'center', justifyContent: 'center' },
-  disc: {
+  tile: {
     width: size.nav,
     height: size.nav,
-    borderRadius: size.nav / 2,
-    backgroundColor: colour.Lime,
+    borderRadius: TILE_R,
+    borderCurve: 'continuous',
+    backgroundColor: colour.Surface,
     alignItems: 'center',
     justifyContent: 'center',
+    ...TILE_SHADOW,
   },
+  listen: { backgroundColor: colour.Lime },
+  pressed: { transform: [{ scale: 0.96 }] },
+  glyph: { width: GLYPH, height: GLYPH },
   halo: {
     position: 'absolute',
     left: -HALO,
     top: -HALO,
     width: size.nav + HALO * 2,
     height: size.nav + HALO * 2,
-    borderRadius: (size.nav + HALO * 2) / 2,
+    borderRadius: HALO_R,
+    borderCurve: 'continuous',
     backgroundColor: 'rgba(216,242,122,0.35)',
   },
 })

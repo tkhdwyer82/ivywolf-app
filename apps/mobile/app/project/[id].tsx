@@ -7,8 +7,10 @@
 // lime pin: tap opens it, long-press hides it). The action bar gains More ideas with the tab. Create joins the bar
 // once there's a Create flow.
 // No blank state (rule 1): a project with no ideas yet is one prompt to talk to it.
-// Left out of the frame: add-people (projects are private in the pilot), the filter icon over the grid, and the
-// stars on tile corners — nothing yet says what they do.
+// Job I (165:5, 1468:128): the header is fixed under the status bar — back; add people (private in the pilot, and
+// says so), share, •••; POWERED BY her connected tools and + Add tool; All ideas · More ideas always (More ideas is
+// her strip until a thread earns suggestions). Still left out: the filter icon over the grid and the tile stars —
+// nothing yet says what they do.
 // Reached from the Idea page's project button and "You keep coming back to this" in My things.
 // Job C+: pinned ideas sit at the top (Pinned row); hold an idea for its arc, a suggestion for Keep · Not for this
 // project · Link ideas · Share. Link mode here shows only this project's ideas. ?linkFrom=<card> (an idea's •••
@@ -58,6 +60,7 @@ function ProjectScreen() {
   const [pinNote, setPinNote] = useState<PinNote | null>(null)
   const [dissolve, setDissolve] = useState(false)
   const [menu, setMenu] = useState(false)
+  const [tools, setTools] = useState<Tool[]>([])
   const tileWidth = useTileWidth()
 
   // On focus: so a pin or a dismiss on the open screen, or a new card in the thread, is here when she's back.
@@ -69,11 +72,11 @@ function ProjectScreen() {
       setDissolve(false)
       setTab('all')
     }
-    Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id)])
-      .then(([p, m]) => {
+    Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id), loadTools(supabase)])
+      .then(([p, m, t]) => {
         setPage(p)
         setMore(m)
-        if (!m) setTab('all')
+        setTools(t)
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
@@ -186,6 +189,8 @@ function ProjectScreen() {
   const { project, ideas, boards } = page
   const talk = () => router.push({ pathname: '/record', params: { projectId: project.id } })
   const own = project.kind === 'user'
+  // Add people (165:5). Projects are private in the pilot: the icon is there, and says so.
+  const people = () => Alert.alert('Private project', 'Only you can see this project for now.')
   const pinned = pinnedOf(ideas)
   const [left, right] = masonry(ideas.filter((i) => !i.pinnedAt))
 
@@ -193,7 +198,7 @@ function ProjectScreen() {
   if (ideas.length === 0) {
     return (
       <View style={styles.screen}>
-        <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onShare={undefined} />
+        <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onPeople={people} />
         <View style={styles.cold}>
           <Text style={styles.coldTitle}>Talk to {project.name}</Text>
           <Text style={[type['Body'], styles.secondary, styles.coldLine]}>Only this project hears it. Ivy files what you say here.</Text>
@@ -210,6 +215,7 @@ function ProjectScreen() {
 
   return (
     <View style={styles.screen}>
+      <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onShare={share} onPeople={people} />
       <ScrollView
         contentContainerStyle={{ paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }}
         onScrollBeginDrag={() => setDissolve(true)}
@@ -217,7 +223,6 @@ function ProjectScreen() {
         onScroll={linking ? actions.remeasure : undefined}
         scrollEventThrottle={16}
       >
-        <Header top={insets.top} own={own} onMenu={() => setMenu(true)} onShare={share} />
         <View style={styles.body}>
           <Text style={styles.name}>{project.name}</Text>
           <View style={styles.metaRow}>
@@ -226,6 +231,7 @@ function ProjectScreen() {
             </View>
             <Text style={styles.count}>{countLine(ideas.length, boards)}</Text>
           </View>
+          <PoweredBy tools={tools} />
           {error && <Text style={[type['Caption'], { marginTop: space.gutter }]}>{error}</Text>}
 
           {linking && (
@@ -238,10 +244,9 @@ function ProjectScreen() {
               <IvyNote sentences={[{ text: pinNote.text, cites: pinNote.cites }]} dissolve={dissolve} onGone={() => setPinNote(null)} />
             </View>
           )}
-          <ProjectTabs tab={tab} moreIdeas={!!more} onChange={setTab} />
-          {!more && <View style={styles.noTabs} />}
+          <ProjectTabs tab={tab} onChange={setTab} />
 
-          {tab === 'all' || !more ? (
+          {tab === 'all' ? (
             <>
               <View style={styles.pinned}>
                 <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
@@ -286,7 +291,7 @@ function ProjectScreen() {
                 ))}
               </ScrollView>
 
-              {more.suggestions.length > 0 && (
+              {!!more && more.suggestions.length > 0 && (
                 <>
                   <Text style={[type['Title / Section'], styles.moreTitle]}>More ideas for this thread</Text>
                   <View style={styles.columns}>
@@ -325,24 +330,65 @@ function ProjectScreen() {
   )
 }
 
-function Header({ top, own, onMenu, onShare }: { top: number; own: boolean; onMenu: () => void; onShare?: () => void }) {
+/**
+ * Fixed above the scroll (165:5): back; add people, share, •••. White, from under the status bar, so the page
+ * scrolls beneath it and never under the clock.
+ */
+function Header({ top, own, onMenu, onShare, onPeople }: { top: number; own: boolean; onMenu: () => void; onShare?: () => void; onPeople: () => void }) {
   return (
-    <View style={[styles.header, { marginTop: top }]}>
-      <Pressable onPress={() => router.back()} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Back">
-        <SymbolView name="chevron.left" tintColor={colour.Ink} size={size.icon} />
-      </Pressable>
-      <View style={styles.headerRight}>
-        {onShare && (
-          <Pressable onPress={onShare} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Share">
-            <SymbolView name="square.and.arrow.up" tintColor={colour.Ink} size={size.icon} />
+    <View style={[styles.headerWrap, { paddingTop: top }]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Back" testID="project-back">
+          <SymbolView name="chevron.left" tintColor={colour.Ink} size={size.icon} />
+        </Pressable>
+        <View style={styles.headerRight}>
+          <Pressable onPress={onPeople} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Add people">
+            <SymbolView name="person.badge.plus" tintColor={colour.Ink} size={size.icon} />
           </Pressable>
-        )}
-        {own && (
-          <Pressable onPress={onMenu} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="More">
-            <SymbolView name="ellipsis" tintColor={colour.Ink} size={size.icon} />
-          </Pressable>
-        )}
+          {onShare && (
+            <Pressable onPress={onShare} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Share">
+              <SymbolView name="square.and.arrow.up" tintColor={colour.Ink} size={size.icon} />
+            </Pressable>
+          )}
+          {own && (
+            <Pressable onPress={onMenu} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="More">
+              <SymbolView name="ellipsis" tintColor={colour.Ink} size={size.icon} />
+            </Pressable>
+          )}
+        </View>
       </View>
+    </View>
+  )
+}
+
+/** Her connected tools (0013 creator_connections), by name. */
+type Tool = { slug: string; name: string; tileUrl: string | null }
+async function loadTools(supabase: ReturnType<typeof useSupabase>): Promise<Tool[]> {
+  const { data, error } = await supabase.from('creator_connections').select('slug, connections(name, tile_url)').order('connected_at')
+  if (error) return [] // a footnote: never block the page on it
+  return ((data ?? []) as unknown as { slug: string; connections: { name: string; tile_url: string | null } | null }[]).map((r) => ({
+    slug: r.slug,
+    name: r.connections?.name ?? r.slug,
+    tileUrl: r.connections?.tile_url ?? null,
+  }))
+}
+
+/** POWERED BY · her tools · + Add tool (1468:128). Tools are the footnote (rule 4): small, grey overline, chips. */
+function PoweredBy({ tools }: { tools: Tool[] }) {
+  return (
+    <View style={styles.powered}>
+      <Text style={styles.poweredLabel}>POWERED BY</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poweredRow}>
+        {tools.map((t) => (
+          <View key={t.slug} style={styles.tool}>
+            {t.tileUrl ? <Image source={{ uri: t.tileUrl }} style={styles.toolIcon} /> : <View style={[styles.toolIcon, styles.toolIconBlank]} />}
+            <Text style={styles.toolName}>{t.name}</Text>
+          </View>
+        ))}
+        <Pressable onPress={() => router.push('/connections')} style={styles.addTool} accessibilityRole="button" accessibilityLabel="Add tool">
+          <Text style={styles.addToolText}>+ Add tool</Text>
+        </Pressable>
+      </ScrollView>
     </View>
   )
 }
@@ -385,11 +431,16 @@ const COLD_MIC = 84
 const ARROW = 36 // the → disc by Your ideas (202:15)
 const COLD_PAD = 32
 const TAP_SLOP = (size.tap - size.icon) / 2
+// 1468:128 — measured: the Powered by row 10 under the chip; tool chips 32 tall with a 24 logo.
+const POWERED_GAP = 10
+const TOOL_H = 32
+const TOOL_ICON = 24
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colour.Surface },
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.margin },
   secondary: { color: colour.Grey },
+  headerWrap: { backgroundColor: colour.Surface, zIndex: 1 },
   header: { height: size.tap, paddingHorizontal: space.margin, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: space.stack },
   body: { paddingHorizontal: space.margin },
@@ -397,7 +448,15 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.stack, marginTop: CHIP_GAP },
   private: { borderRadius: CHIP_R, paddingHorizontal: CHIP_PAD_H, paddingVertical: CHIP_PAD_V, backgroundColor: colour.Chip },
   count: { ...type['Body'], color: colour.Grey },
-  noTabs: { height: space.stack },
+  powered: { flexDirection: 'row', alignItems: 'center', gap: space.gutter, marginTop: POWERED_GAP },
+  poweredLabel: { ...type['Label / Overline'], color: colour.Grey },
+  poweredRow: { gap: space.gutter, alignItems: 'center' },
+  tool: { flexDirection: 'row', alignItems: 'center', gap: 6, height: TOOL_H, paddingLeft: 4, paddingRight: CHIP_PAD_H, borderRadius: TOOL_H / 2, backgroundColor: colour.Chip },
+  toolIcon: { width: TOOL_ICON, height: TOOL_ICON, borderRadius: TOOL_ICON / 2 },
+  toolIconBlank: { backgroundColor: colour.Shimmer },
+  toolName: { ...type['Label / Pill'] },
+  addTool: { height: TOOL_H, paddingHorizontal: CHIP_PAD_H, borderRadius: TOOL_H / 2, borderWidth: StyleSheet.hairlineWidth * 2, borderColor: '#E6E6E4', justifyContent: 'center' },
+  addToolText: { ...type['Label / Pill'], color: colour.Grey },
   // IvyNote pads itself to the margin; the body already has it.
   pinNote: { marginHorizontal: -space.margin },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

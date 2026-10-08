@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 // Job B revised: a card made before shapes still renders, and Ivy's line names new cards by their form (227:14)
 // with the cite shown after it (162:2).
-import { cardPicture, citeLabel, newShapesSentence, shapeOf, type CardItem } from '@/lib/home'
+import { cardPicture, citeLabel, ivyOnOpen, newShapesSentence, shapeOf, type CardItem } from '@/lib/home'
 
 const card = (over: Partial<CardItem>): CardItem =>
   ({
@@ -74,5 +74,26 @@ describe('newShapesSentence', () => {
     const s = newShapesSentence([card({ shape: 'text' })])
     expect(s?.cite).toEqual({ label: citeLabel('2026-10-01T22:00:00Z', 31_000), storagePath: 'u/r1.m4a', ms: 31_000 })
     expect(s?.cite?.label).toMatch(/^(Thu|Fri) 0:31$/)
+  })
+})
+
+describe('ivyOnOpen (Job I: a line on every open, 227:5)', () => {
+  const data = (items: CardItem[]) =>
+    ({ items, threads: [], lastOpenedAt: '2026-10-08T00:00:00Z', projects: [], links: {}, inFlight: 0, stuck: [], failed: [] }) as unknown as Parameters<typeof ivyOnOpen>[0]
+  it('with nothing new, names the newest recording’s cards, cited', () => {
+    const s = ivyOnOpen(
+      data([
+        card({ id: 'old', recordingId: 'r0', createdAt: '2026-10-01T00:00:00Z', shape: 'photo' }),
+        card({ id: 'a', recordingId: 'r1', createdAt: '2026-10-02T00:00:00Z', shape: 'quote' }),
+        card({ id: 'b', recordingId: 'r1', createdAt: '2026-10-02T00:00:01Z', shape: 'diagram' }),
+      ]),
+      new Date('2026-10-08T01:00:00Z')
+    )
+    expect(s).toHaveLength(1)
+    expect(s[0].text).toBe('A quote, and a comparison.') // newShapesSentence's own list style
+    expect(s[0].cites).toHaveLength(2)
+  })
+  it('says nothing before the first card', () => {
+    expect(ivyOnOpen(data([]))).toEqual([])
   })
 })

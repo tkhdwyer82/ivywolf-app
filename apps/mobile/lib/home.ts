@@ -490,6 +490,13 @@ export function ivyOnOpen(data: HomeData, now = new Date()): IvySentence[] {
   const fresh = since ? cards.filter((c) => (c.createdAt ?? c.at) > since) : []
   const shapes = newShapesSentence(fresh)
   if (shapes) out.push(shapes)
+  // Job I (227:5): she always has a line on open. With nothing due, returning or new, it's her newest recording's
+  // cards by their form ("From the drive: a quote, a comparison, and the board is ready."), cited like the rest.
+  if (out.length === 0 && cards.length > 0) {
+    const newest = cards.reduce((a, b) => ((b.createdAt ?? b.at) > (a.createdAt ?? a.at) ? b : a))
+    const last = newShapesSentence(cards.filter((c) => c.recordingId === newest.recordingId))
+    if (last) out.push(last)
+  }
   return out.slice(0, 3)
 }
 

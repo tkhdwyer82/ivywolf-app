@@ -198,16 +198,6 @@ function HomeScreen() {
     [data]
   )
 
-  async function createProject(name: string) {
-    if (!userId) return
-    const { data: row, error } = await supabase.from('projects').insert({ creator_id: userId, name }).select('id').single()
-    if (error) setError(error.code === '23505' ? `You already have “${name}”.` : error.message)
-    else {
-      await load()
-      setProject(row.id)
-    }
-  }
-
   async function retry(r: FailedRecording) {
     const token = await getToken()
     if (!token) return
@@ -271,7 +261,7 @@ function HomeScreen() {
             ) : (
               ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
             )}
-            <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
+            <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} />
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}
             <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
@@ -305,7 +295,7 @@ function Header() {
   return (
     <View style={styles.header}>
       <Text style={styles.wordmark} accessibilityRole="header">
-        IVY
+        Ivy <Text style={styles.wordmarkSoft}>Wolf</Text>
       </Text>
       <View style={styles.headerActions}>
         <Pressable onPress={() => router.push('/search')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Search">
@@ -352,7 +342,7 @@ function FirstOpen({ writing, failed }: { writing: boolean; failed: ReactNode })
   )
 }
 
-// L3b Home (Figma 209:2) — measured, not tokens: the wordmark is Bold 26 (no text style); the day overline sits 10
+// Home (Figma 227:5) — measured, not tokens: the wordmark "Ivy Wolf" is Bold 26 (no text style), Wolf in grey; the day overline sits 10
 // above its tiles. First open (L1, 170:5) keeps its own frame: headline Bold 28 at y 330, body Regular 16 at 374,
 // arrow 28 × 60 at y 660.
 const WORDMARK = 26
@@ -367,6 +357,7 @@ const styles = StyleSheet.create({
   error: { color: colour.Grey, paddingHorizontal: space.margin, paddingTop: space.gutter },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin },
   wordmark: { ...type['Title / Screen'], fontSize: WORDMARK, lineHeight: undefined, letterSpacing: 0 },
+  wordmarkSoft: { color: colour.Grey },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.stack },
   avatar: { width: size.icon, height: size.icon, alignItems: 'center', justifyContent: 'center' },
   avatarGlyph: { width: size.icon / 2, height: size.icon / 2 },

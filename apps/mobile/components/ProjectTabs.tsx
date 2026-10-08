@@ -1,7 +1,7 @@
 // apps/mobile/components/ProjectTabs.tsx
 // A project's tabs (P12b, Figma 202:11–13): All ideas · More ideas, Heading / Small, the selected one ink with a
-// 3-pt rule. More ideas exists only when the gate is open (a thread in the project with ≥ 3 returns,
-// lib/suggestions.ts) — otherwise there's nothing to choose between, and the row isn't drawn at all. Never greyed.
+// 3-pt rule. Both are always there (Job I, 165:5); More ideas holds suggestions once a thread has earned them
+// (≥ 3 returns, lib/suggestions.ts) and her own strip until then. Never greyed.
 
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { colour, size, space, type } from '@ivywolf/ui'
@@ -16,8 +16,7 @@ const RULE_H = 3
 const RULE_R = 2
 const RULE_GAP = 6
 
-export function ProjectTabs({ tab, moreIdeas, onChange }: { tab: ProjectTab; moreIdeas: boolean; onChange: (t: ProjectTab) => void }) {
-  if (!moreIdeas) return null
+export function ProjectTabs({ tab, onChange }: { tab: ProjectTab; onChange: (t: ProjectTab) => void }) {
   return (
     <View style={styles.tabs} accessibilityRole="tablist">
       <Tab label="All ideas" on={tab === 'all'} onPress={() => onChange('all')} />
