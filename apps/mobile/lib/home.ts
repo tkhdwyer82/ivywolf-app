@@ -120,12 +120,12 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 
 /** The columns every card tile needs. Callers add their own thread embedding (for size and stage). */
 export const CARD_COLUMNS =
-  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, shape, quote, diagram, board, frame_attribution, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, gradient)'
+  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, gradient)'
 
 export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
   confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
-  created_at: string; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
+  created_at: string; source?: string | null; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
   frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string } | null
   recordings: { recorded_at: string | null; storage_path?: string | null; source?: string } | null
   pinned_at?: string | null
@@ -134,10 +134,22 @@ export type CardRow = {
   projects?: { name: string; gradient?: GradientName | null; id?: string; kind?: string } | null
 }
 
-/** A card made before shapes (0033) has none: photo while its frame is coming or there, else text. */
-export function shapeOf(r: Pick<CardRow, 'shape' | 'frame_status' | 'frame_url'>): CardShape {
+/**
+ * The only pictures a card shows (Job I): an Unsplash photo with its credit, or her own picture (an import). Anything
+ * else in frame_url — the fal frames drawn for cards before Job B, a pinned suggestion's preview — is not shown; the
+ * card falls back to its project gradient or no picture at all.
+ */
+export function cardPicture(r: Pick<CardRow, 'frame_url' | 'frame_status' | 'frame_attribution'> & { source?: string | null }): string | null {
+  if (r.frame_status !== 'done' || !r.frame_url) return null
+  const a = r.frame_attribution
+  if (a?.provider === 'unsplash' && a.photographer && a.photographer_url && a.photo_url) return r.frame_url
+  return r.source === 'import' ? r.frame_url : null
+}
+
+/** A card made before shapes (0033) has none: photo while its photo is coming or there, else text. */
+export function shapeOf(r: Pick<CardRow, 'shape' | 'frame_status' | 'frame_url' | 'frame_attribution'> & { source?: string | null }): CardShape {
   if (r.shape) return r.shape
-  if (r.frame_status === 'done') return r.frame_url ? 'photo' : 'text'
+  if (r.frame_status === 'done') return cardPicture(r) ? 'photo' : 'text'
   return r.frame_status === 'none' || r.frame_status === 'queued' ? 'photo' : 'text'
 }
 
@@ -152,7 +164,7 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     gist: c.gist,
     playFromMs: c.play_from_ms,
     confidence: c.confidence,
-    frameUrl: c.frame_url,
+    frameUrl: cardPicture(c),
     frameStatus: c.frame_status,
     frameAt: c.frame_at,
     at: c.recordings?.recorded_at ?? c.created_at,
