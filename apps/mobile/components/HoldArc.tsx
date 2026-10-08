@@ -209,12 +209,16 @@ export function Hold({
   // The finger is still down: measuring is async, and a hold whose finger has already lifted mustn't open.
   const down = useRef(false)
 
-  // A hold that's still open when this tile goes (a reload under it) closes, without running anything.
+  // A hold that's still open when this tile goes (a reload under it) closes, without running anything. Only on
+  // unmount: the context value changes when a hold begins, and keying the cleanup on it cancelled every hold the
+  // frame after it opened (Job I: "long-press isn't firing").
+  const holdRef = useRef(hold)
+  holdRef.current = hold
   useEffect(
     () => () => {
-      if (active.current) hold?.end(true)
+      if (active.current) holdRef.current?.end(true)
     },
-    [hold]
+    []
   )
 
   const onLongPress = useCallback(
