@@ -77,23 +77,27 @@ describe('newShapesSentence', () => {
   })
 })
 
-describe('ivyOnOpen (Job I: a line on every open, 227:5)', () => {
-  const data = (items: CardItem[]) =>
-    ({ items, threads: [], lastOpenedAt: '2026-10-08T00:00:00Z', projects: [], links: {}, inFlight: 0, stuck: [], failed: [] }) as unknown as Parameters<typeof ivyOnOpen>[0]
-  it('with nothing new, names the newest recording’s cards, cited', () => {
-    const s = ivyOnOpen(
-      data([
-        card({ id: 'old', recordingId: 'r0', createdAt: '2026-10-01T00:00:00Z', shape: 'photo' }),
-        card({ id: 'a', recordingId: 'r1', createdAt: '2026-10-02T00:00:00Z', shape: 'quote' }),
-        card({ id: 'b', recordingId: 'r1', createdAt: '2026-10-02T00:00:01Z', shape: 'diagram' }),
-      ]),
-      new Date('2026-10-08T01:00:00Z')
-    )
+describe('ivyOnOpen (Job I: one line, only when something changed since her last look)', () => {
+  const data = (items: CardItem[], lastOpenedAt: string | null) =>
+    ({ items, threads: [], lastOpenedAt, projects: [], links: {}, inFlight: 0, stuck: [], failed: [] }) as unknown as Parameters<typeof ivyOnOpen>[0]
+  const cards = [
+    card({ id: 'old', recordingId: 'r0', createdAt: '2026-10-01T00:00:00Z', shape: 'photo' }),
+    card({ id: 'a', recordingId: 'r1', createdAt: '2026-10-02T00:00:00Z', shape: 'quote' }),
+    card({ id: 'b', recordingId: 'r1', createdAt: '2026-10-02T00:00:01Z', shape: 'diagram' }),
+  ]
+  it('is silent when nothing landed since her last look', () => {
+    expect(ivyOnOpen(data(cards, '2026-10-05T00:00:00Z'))).toEqual([])
+  })
+  it('names the cards that landed since, in one line', () => {
+    const s = ivyOnOpen(data(cards, '2026-10-01T12:00:00Z'))
     expect(s).toHaveLength(1)
-    expect(s[0].text).toBe('A quote, and a comparison.') // newShapesSentence's own list style
+    expect(s[0].text).toBe('A quote and a comparison.')
     expect(s[0].cites).toHaveLength(2)
   })
+  it('on her first look, names her newest recording’s cards', () => {
+    expect(ivyOnOpen(data(cards, null)).map((x) => x.text)).toEqual(['A quote and a comparison.'])
+  })
   it('says nothing before the first card', () => {
-    expect(ivyOnOpen(data([]))).toEqual([])
+    expect(ivyOnOpen(data([], null))).toEqual([])
   })
 })

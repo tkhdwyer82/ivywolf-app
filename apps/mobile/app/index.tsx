@@ -4,8 +4,8 @@
 // nav trio is Home · ⊕ · Mini (launch UI 170:5, 145:5).
 // No blank state (rule 1): before the first card exists Home is First open (L1, 170:5) — Ivy's one line, "Say an
 // idea out loud.", and a lime arrow down to the ⊕. No grid, no setup.
-// Ivy on open (162:2): up to three sentences from the graph, written in above the chips with their cite; tap to hear
-// that moment; gone after ~6 s or on scroll.
+// Ivy on open (162:2): one line from the graph, only when something changed since her last look, written in above the
+// chips with its cite; tap to hear that moment; gone after ~6 s or on scroll.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
 // Job C+: pinned cards sit in a Pinned row above Today (and leave the days); hold any card for its arc (Like · Link
@@ -30,7 +30,7 @@ import {
   type DayGroup,
   ivyOnOpen,
   loadHome,
-  markOpened,
+  markSeen,
   metaLine,
   type HomeData,
   type Item,
@@ -106,12 +106,21 @@ function HomeScreen() {
     }, [load])
   )
 
-  // Ivy on open: composed once, from the first load, then "new" is measured from now.
+  // Ivy on open: composed once, from the first load Home is actually on screen for (not mounted under the recorder
+  // from a deep link). Her last look then moves to the newest card she has had on screen, and keeps up while she's
+  // here — a card landing in front of her isn't news next time.
+  const [focused, setFocused] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true)
+      return () => setFocused(false)
+    }, [])
+  )
   useEffect(() => {
-    if (!data || ivy !== null || !userId) return
-    setIvy(data.items.some((i) => i.kind === 'card') ? ivyOnOpen(data) : [])
-    markOpened(supabase, userId)
-  }, [data, ivy, supabase, userId])
+    if (!data || !focused || !userId) return
+    if (ivy === null) setIvy(ivyOnOpen(data))
+    markSeen(supabase, userId, data.items).catch(() => {})
+  }, [data, focused, ivy, supabase, userId])
 
   // A recording whose process request never arrived (server down, no signal): ask again, once per open.
   useEffect(() => {

@@ -4,8 +4,7 @@
 // bar (Talk, scoped to this project).
 // More ideas (Job G, P12b 202:2): a tab only when a thread in the project has come back ≥ 3 times — "Your ideas" (a
 // strip of her thumbs, → All ideas) and "More ideas for this thread" (up to five suggestions, each a frame with a
-// lime pin: tap opens it, long-press hides it). The action bar gains More ideas with the tab. Create joins the bar
-// once there's a Create flow.
+// lime pin: tap opens it, long-press hides it).
 // No blank state (rule 1): a project with no ideas yet is one prompt to talk to it.
 // Job I (165:5, 1468:128): the header is fixed under the status bar — back; add people (private in the pilot, and
 // says so), share, •••; POWERED BY her connected tools and + Add tool; All ideas · More ideas always (More ideas is
@@ -190,7 +189,7 @@ function ProjectScreen() {
   const talk = () => router.push({ pathname: '/record', params: { projectId: project.id } })
   const own = project.kind === 'user'
   // Add people (165:5). Projects are private in the pilot: the icon is there, and says so.
-  const people = () => Alert.alert('Private project', 'Only you can see this project for now.')
+  const people = () => Alert.alert('Private project', 'Only you can view this project.')
   const pinned = pinnedOf(ideas)
   const [left, right] = masonry(ideas.filter((i) => !i.pinnedAt))
 
@@ -317,12 +316,8 @@ function ProjectScreen() {
       </ScrollView>
 
       {actions.layer(
-        <ActionBar
-          verbs={[
-            ...(more ? [{ key: 'more', label: 'More ideas', icon: 'square.grid.2x2' as const, onPress: () => setTab('more') }] : []),
-            { key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk },
-          ]}
-        />
+        // Talk only for now (Job I). 165:5's five verbs are the full set; each joins as it's earned — Create with Job D.
+        <ActionBar verbs={[{ key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk }]} />
       )}
 
       {menu && <ProjectMenu top={insets.top + MENU_OFFSET} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}

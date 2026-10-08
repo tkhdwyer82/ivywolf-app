@@ -271,8 +271,14 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
 }
 
 /** Home was opened: what's "new" next time is measured from now. */
-export async function markOpened(supabase: SupabaseClient, userId: string) {
-  await supabase.from('creators').update({ last_opened_at: new Date().toISOString() }).eq('id', userId)
+/**
+ * Her last look (Job I): creators.last_opened_at moves to the newest card she has had on screen — never "now", and
+ * never backwards — so a card that lands after she looked is still new next time. Home calls it only while focused.
+ */
+export async function markSeen(supabase: SupabaseClient, userId: string, items: Item[]) {
+  const newest = items.reduce<string | null>((m, i) => (i.kind === 'card' && (!m || (i.createdAt ?? i.at) > m) ? (i.createdAt ?? i.at) : m), null)
+  if (!newest) return
+  await supabase.from('creators').update({ last_opened_at: newest }).eq('id', userId).or(`last_opened_at.is.null,last_opened_at.lt.${newest}`)
 }
 
 // ── Days ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -423,7 +429,9 @@ const ORDER: CardItem['shape'][] = ['quote', 'diagram', 'photo', 'text', 'board'
 /** Where the new cards came from, when they all came from one place: "From your Mini: …". */
 const FROM: Record<string, string> = { mini: 'From your Mini', note_taker: 'From the note taker', muse: 'From Muse', dji_import: 'From the import' }
 
-const list = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`)
+/** "a", "a and b", "a, b, and c". */
+const list = (parts: string[]) =>
+  parts.length < 2 ? parts.join('') : parts.length === 2 ? parts.join(' and ') : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`
 
 /**
  * The cards said since she last opened Home, named by the form each took (Figma 227:5: "From the drive: a quote, a
@@ -458,46 +466,23 @@ export function newShapesSentence(cards: CardItem[]): IvySentence | null {
 }
 
 /**
- * At most three sentences, in this order: what's due today, a thread she keeps coming back to (≥ 3 returns), and
- * the cards said since she last opened Home, by form. Nothing new → no sentences (Ivy stays silent).
+ * Ivy on open (rule 2, Job I): one line, only when something changed since her last look — her first look (no
+ * last_opened_at yet: her newest recording's cards), or the cards that landed since. Otherwise she stays silent.
  */
-export function ivyOnOpen(data: HomeData, now = new Date()): IvySentence[] {
-  const today = localDay(now.toISOString())
-  const out: IvySentence[] = []
+export function ivyOnOpen(data: HomeData): IvySentence[] {
   const cards = data.items.filter((i): i is CardItem => i.kind === 'card')
-  const cardOf = new Map(cards.map((c) => [c.id, c]))
-
-  const due = data.items.filter((i): i is ActionItem => i.kind === 'action' && !i.done && i.dueDate === today)
-  if (due.length === 1) {
-    out.push({ text: `“${due[0].text}” is due today.`, cites: [{ recordingId: due[0].recordingId, ms: 0 }], cite: { label: citeLabel(due[0].at, null), storagePath: null, ms: 0 } })
-  } else if (due.length > 1) {
-    out.push({ text: `${cap(count(due.length))} things are due today.`, cites: due.map((d) => ({ recordingId: d.recordingId, ms: 0 })) })
-  }
-
+  if (cards.length === 0) return []
   const since = data.lastOpenedAt
-  const returning = [...data.threads].filter((t) => t.returnCount >= COMEBACK).sort((a, b) => b.returnCount - a.returnCount)[0]
-  if (returning) {
-    const of = returning.cardIds.map((id) => cardOf.get(id)).filter((c): c is CardItem => !!c)
-    const latest = [...of].sort((a, b) => (a.at < b.at ? 1 : -1))[0]
-    out.push({
-      text: `You’ve come back to ${returning.title} ${count(returning.returnCount)} times.`,
-      cites: of.map((c) => ({ recordingId: c.recordingId, ms: c.playFromMs })),
-      cite: latest ? citeOf(latest) : undefined,
-    })
+  const landed = (c: CardItem) => c.createdAt ?? c.at
+  let said: CardItem[]
+  if (!since) {
+    const newest = cards.reduce((a, b) => (landed(b) > landed(a) ? b : a))
+    said = cards.filter((c) => c.recordingId === newest.recordingId)
+  } else {
+    said = cards.filter((c) => landed(c) > since)
   }
-
-  // Said since she last looked (by when the card landed, so a recording processed later still counts once).
-  const fresh = since ? cards.filter((c) => (c.createdAt ?? c.at) > since) : []
-  const shapes = newShapesSentence(fresh)
-  if (shapes) out.push(shapes)
-  // Job I (227:5): she always has a line on open. With nothing due, returning or new, it's her newest recording's
-  // cards by their form ("From the drive: a quote, a comparison, and the board is ready."), cited like the rest.
-  if (out.length === 0 && cards.length > 0) {
-    const newest = cards.reduce((a, b) => ((b.createdAt ?? b.at) > (a.createdAt ?? a.at) ? b : a))
-    const last = newShapesSentence(cards.filter((c) => c.recordingId === newest.recordingId))
-    if (last) out.push(last)
-  }
-  return out.slice(0, 3)
+  const line = newShapesSentence(said)
+  return line ? [line] : []
 }
 
 /** Meta line under a tile: "0:31 · Launch video", "0:31 · 2 cards", "My things · Thu", "My things · done". */
