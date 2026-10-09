@@ -20,11 +20,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params
   const supabase = await supabaseAsUser()
-  const { data: card, error } = await supabase.from('cards').select('id, frame_url, frame_status').eq('id', id).maybeSingle()
+  const { data: card, error } = await supabase.from('cards').select('id, frame_url, frame_status, frame_attribution, source').eq('id', id).maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  // Already has a picture (an earlier photo, or one she imported): never replace it with a search.
-  if (card.frame_status === 'done' && card.frame_url) return NextResponse.json({ photo: true })
+  // Already has a picture (a credited Unsplash photo, or one she imported): never replace it with a search. A frame
+  // drawn before Job B isn't one — the app never shows it (Job I, cardPicture) — so it doesn't block the search; its
+  // URL stays in frame_generations and its file in storage.
+  const credited = (card.frame_attribution as { provider?: string } | null)?.provider === 'unsplash'
+  if (card.frame_status === 'done' && card.frame_url && (credited || card.source === 'import')) return NextResponse.json({ photo: true })
 
   try {
     return NextResponse.json({ photo: await photoForCard(userId, id) })
