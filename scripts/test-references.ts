@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto'
 import { contentWords, dedupe, findReferences, interleave, orientationFor, referenceQuery } from '../packages/pipeline/references'
 import { pinReference, pinScore, pinterestReferences, type Pin } from '../packages/pipeline/references/pinterest'
 import { onTopic, pixabayQ, type Hit } from '../packages/pipeline/references/pixabay'
-import { sharesWord } from '../packages/pipeline/references/query'
+import { sharedWords, sharesWord } from '../packages/pipeline/references/query'
 import type { Reference, ReferenceProvider } from '../packages/pipeline/references/types'
 import { generate } from '../packages/pipeline/generate'
 import { refusePinterest } from '../packages/schema/pinterest'
@@ -70,13 +70,20 @@ async function main() {
   const dd = dedupe([ref('unsplash', '1'), ref('unsplash', '1'), ref('unsplash', '9', 'https://img.example/shared.jpg'), same])
   check('dedupes the same id and the same image across sources', dd.map((r) => `${r.source}:${r.id}`).join() === 'unsplash:1,unsplash:9', dd.map((r) => r.id).join())
 
-  // ── findReferences ──
-  const u = provider('unsplash', [ref('unsplash', '1'), ref('unsplash', '2'), ref('unsplash', '3'), ref('unsplash', '4')])
+  // ── findReferences: priority fill (Unsplash, then her pins, then Pixabay) ──
+  const u = provider('unsplash', [ref('unsplash', '1'), ref('unsplash', '2'), ref('unsplash', '3'), ref('unsplash', '4'), ref('unsplash', '5'), ref('unsplash', '6'), ref('unsplash', '7')])
   const px = provider('pixabay', [ref('pixabay', 'a'), ref('pixabay', 'b'), ref('pixabay', 'c'), ref('pixabay', 'd')])
   const out = await findReferences(card, { providers: { unsplash: u, pixabay: px, pinterest: provider('pinterest', [], false) } })
-  check('default limit is 6, interleaved', out.map((r) => r.id).join() === '1,a,2,b,3,c', out.map((r) => r.id).join())
+  check('default limit is 6, all Unsplash when it has 6', out.map((r) => r.id).join() === '1,2,3,4,5,6', out.map((r) => r.id).join())
+  check('Pixabay isn’t even asked when Unsplash fills', px.calls === 0)
+  const u2 = provider('unsplash', [ref('unsplash', '1'), ref('unsplash', '2')])
+  const topped = await findReferences(card, { providers: { unsplash: u2, pixabay: px, pinterest: provider('pinterest', [], false) } })
+  check('Pixabay tops up after Unsplash (2 + 4)', topped.map((r) => r.id).join() === '1,2,a,b,c,d', topped.map((r) => r.id).join())
+  const pins = provider('pinterest', [ref('pinterest', 'p1')])
+  const withPins = await findReferences(card, { providers: { unsplash: u2, pixabay: provider('pixabay', [ref('pixabay', 'a'), ref('pixabay', 'b'), ref('pixabay', 'c'), ref('pixabay', 'd')]), pinterest: pins } })
+  check('her pins top up before Pixabay', withPins.map((r) => r.id).join() === '1,2,p1,a,b,c', withPins.map((r) => r.id).join())
   const failing = await findReferences(card, { providers: { unsplash: provider('unsplash', new Error('503')), pixabay: px, pinterest: provider('pinterest', [], false) }, limit: 3 })
-  check('a failing source is skipped, never fatal', failing.map((r) => r.id).join() === 'a,b,c', failing.map((r) => r.id).join())
+  check('a failing source is skipped, never fatal (the next fills)', failing.map((r) => r.id).join() === 'a,b,c', failing.map((r) => r.id).join())
   const onlyPix = await findReferences(card, { sources: ['pixabay'], limit: 2, providers: { unsplash: u, pixabay: px } })
   check('sources limits which run', onlyPix.every((r) => r.source === 'pixabay') && onlyPix.length === 2)
   check('an empty query asks nobody', (await findReferences({ title: 'the of', gist: null }, { providers: { unsplash: u, pixabay: px } })).length === 0)
@@ -86,14 +93,11 @@ async function main() {
   check('Pixabay gets the first 3 words, "+"-joined to AND them', pixabayQ('person stepping bathroom scale') === 'person+stepping+bathroom', pixabayQ('person stepping bathroom scale'))
   check('each Pixabay word is encoded, the "+" isn’t', pixabayQ('café au lait') === 'caf%C3%A9+au+lait')
   const hit = (id: number, tags: string): Hit => ({ id, tags, pageURL: '', webformatURL: '', largeImageURL: '', imageWidth: 1, imageHeight: 1 })
-  const kept = onTopic([hit(1, 'lizard, reptile, animal, monitor'), hit(2, 'kitchen scale, kitchen scales, weighing'), hit(3, 'bathroom, tiles')], 'person stepping bathroom scale')
-  check('a Pixabay result whose tags share no query word is dropped (the lizard)', kept.map((h) => h.id).join() === '2,3', kept.map((h) => h.id).join())
+  const q = 'person stepping bathroom scale'
+  const kept = onTopic([hit(1, 'lizard, reptile, animal, monitor'), hit(2, 'kitchen scale, kitchen scales, weighing'), hit(3, 'bathroom, scale, weight'), hit(4, 'person, eye, woman'), hit(5, 'woman, person, bathroom')], q)
+  check('Pixabay keeps only tags sharing 2 non-generic query words', kept.map((h) => h.id).join() === '3', kept.map((h) => h.id).join())
+  check('generic words don’t count ("person", "woman", "background")', sharedWords('person, woman, background, bathroom', q) === 1)
   check('plurals match ("scales" ~ "scale"), "glass" isn’t "glas"', sharesWord('scales', 'scale') && !sharesWord('glas', 'glass'))
-  const many = provider('unsplash', ['1', '2', '3', '4', '5', '6'].map((i) => ref('unsplash', i)))
-  const one = await findReferences(card, { providers: { unsplash: many, pixabay: provider('pixabay', [ref('pixabay', 'a')]), pinterest: provider('pinterest', [], false) } })
-  check('a source with 1 on-topic result is filled from the other (1 + 5)', one.map((r) => r.id).join() === '1,a,2,3,4,5', one.map((r) => r.id).join())
-  const none = await findReferences(card, { providers: { unsplash: many, pixabay: provider('pixabay', []), pinterest: provider('pinterest', [], false) } })
-  check('a source with none on-topic leaves the other to fill all 6', none.length === 6 && none.every((r) => r.source === 'unsplash'))
   const short = await findReferences(card, { providers: { unsplash: provider('unsplash', [ref('unsplash', '1'), ref('unsplash', '2')]), pixabay: provider('pixabay', [ref('pixabay', 'a')]), pinterest: provider('pinterest', [], false) } })
   check('never padded: 3 on-topic in all → 3 come back, not 6', short.length === 3, String(short.length))
 

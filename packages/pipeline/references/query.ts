@@ -49,8 +49,19 @@ export function orientationFor(shape: ReferenceCard['shape']): Orientation {
 /** A word's stem for matching: lowercase, a plural "s" off ("scales" → "scale", not "glass" → "glas"). */
 const stem = (w: string) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
 
-/** True when the text shares at least one content word with the query (plurals count). */
+/**
+ * Words too common to show a picture is about the query: a tag of "person" or "woman" matches half of Pixabay. Ignored
+ * when matching tags (H.0c follow-up).
+ */
+export const GENERIC = new Set(['person', 'people', 'man', 'men', 'woman', 'women', 'girl', 'boy', 'background'].map(stem))
+
+/** How many distinct content words the text shares with the query, plurals counted, generic words ignored. */
+export function sharedWords(text: string, query: string, ignore: Set<string> = GENERIC): number {
+  const q = new Set(contentWords(query).map(stem).filter((w) => !ignore.has(w)))
+  return new Set(contentWords(text).map(stem).filter((w) => q.has(w))).size
+}
+
+/** True when the text shares at least one non-generic content word with the query. */
 export function sharesWord(text: string, query: string): boolean {
-  const q = new Set(contentWords(query).map(stem))
-  return contentWords(text).some((w) => q.has(stem(w)))
+  return sharedWords(text, query) > 0
 }

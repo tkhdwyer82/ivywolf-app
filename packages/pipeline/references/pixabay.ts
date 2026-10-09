@@ -4,13 +4,16 @@
 // are served for a limited time, which suits references: they're fetched live on every call and never kept.
 //
 // Relevance (H.0c follow-up): Pixabay matches loosely, so it gets only the first 3 query words, joined with "+" so it
-// ANDs them, and a result whose tags share no word with the query is dropped — it is never kept as padding (index.ts
-// fills from the other source instead). It asks for more than it needs so the filter has something to choose from.
+// ANDs them, and a result is kept only if its tags share at least MIN_SHARED words with the query, generic words
+// ("person", "woman", "background" …) not counting. It's never kept as padding, and it's only asked at all when
+// Unsplash (and her pins) came up short (index.ts). It asks for more than it needs so the filter has room.
 
-import { sharesWord } from './query'
+import { sharedWords } from './query'
 import type { Reference, ReferenceProvider } from './types'
 
 const API = 'https://pixabay.com/api/'
+/** Non-generic words a result's tags must share with the query. */
+export const MIN_SHARED = 2
 /** Words of the query Pixabay gets, ANDed. */
 export const PIXABAY_WORDS = 3
 /** Candidates fetched so the tag filter can still find `limit` on-topic ones. */
@@ -62,7 +65,7 @@ export const pixabayReferences: ReferenceProvider = {
   },
 }
 
-/** Only hits whose tags share a word with the query (plurals count: "scales" ~ "scale"). */
+/** Only hits whose tags share MIN_SHARED non-generic words with the query (plurals count: "scales" ~ "scale"). */
 export function onTopic(hits: Hit[], query: string): Hit[] {
-  return hits.filter((h) => sharesWord(h.tags ?? '', query))
+  return hits.filter((h) => sharedWords(h.tags ?? '', query) >= MIN_SHARED)
 }
