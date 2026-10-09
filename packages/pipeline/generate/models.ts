@@ -3,9 +3,8 @@
 // or a direct API for a model, append a route with the same `version` and the gateway starts estimating it too.
 // Only Higgsfield is live in Job H.0a (routes/index.ts).
 //
-// Tiers (Job H.0a): Kling 3.0 Standard is the default video model; Seedance 2.5 is premium and shown with its price
-// (≈ 6.5× Kling for 5 s). price is a reference from a real run at the defaults, not a quote: generate() always
-// estimates before it runs.
+// Tiers (Job H.0b): Seedance 2.5 is the default video model; Kling 3.0 Standard is fast (≈ 1/6 the price, ~4× quicker
+// in H.0a). price is a reference from a real run at the defaults, not a quote: generate() always estimates first.
 //
 // Endpoints and fields: docs.higgsfield.ai, read 2026-10-09 —
 //   Kling 3.0 Standard · Text to video   kling-video/v3.0/std/text-to-video   duration 3–15 (default 5), aspect 16:9|9:16|1:1
@@ -23,7 +22,7 @@ export const MODELS: Record<string, Model> = {
     key: 'kling-3.0-std-t2v',
     label: 'Kling 3.0 · Standard · text to video',
     kind: 'video',
-    tier: 'default',
+    tier: 'fast',
     price: { usd: 0.357, for: '5 s, 9:16, no audio', source: 'provider', checked: '2026-10-09' },
     version: 'kling-3.0-std',
     defaults: { duration: 5, aspect_ratio: '9:16', sound: 'off' },
@@ -40,7 +39,7 @@ export const MODELS: Record<string, Model> = {
     key: 'seedance-2.5-t2v',
     label: 'Seedance 2.5 · text to video',
     kind: 'video',
-    tier: 'premium',
+    tier: 'default',
     price: { usd: 2.3112, for: '5 s, 720p 9:16, no audio', source: 'pricing_formula', checked: '2026-10-09' },
     version: 'seedance-2.5',
     defaults: { duration: 5, aspect_ratio: '9:16', resolution: '720p', generate_audio: false },

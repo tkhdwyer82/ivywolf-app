@@ -39,8 +39,11 @@ export interface ModelRoute {
   body: (brief: string, refs: Ref[], params: Record<string, unknown>) => Record<string, unknown> | null
 }
 
-/** default: what Ivy uses unless asked. premium: offered with its price shown, never chosen silently. */
-export type Tier = 'default' | 'premium'
+/**
+ * default: what Ivy uses unless asked — exactly one per kind. fast: quicker and cheaper, offered as such.
+ * premium: offered with its price shown, never chosen silently.
+ */
+export type Tier = 'default' | 'fast' | 'premium'
 
 /** A reference price for showing next to a premium model: what one run at the defaults cost, and how we know. */
 export interface PriceNote {

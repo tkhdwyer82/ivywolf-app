@@ -71,9 +71,10 @@ let threw = false
 try { tokenPrice('Something else entirely.', { duration: 5 }) } catch { threw = true }
 check('unrecognised wording refuses to price', threw)
 
-// Tiers: one default per kind; Kling is the default video, Seedance premium with a price.
-check('Kling 3.0 Standard is the default video model', defaultModel('video').key === 'kling-3.0-std-t2v')
-check('Seedance 2.5 is premium, price shown', MODELS['seedance-2.5-t2v'].tier === 'premium' && MODELS['seedance-2.5-t2v'].price.usd > 0)
+// Tiers: one default per kind; Seedance 2.5 is the default video, Kling 3.0 Standard fast.
+check('Seedance 2.5 is the default video model', defaultModel('video').key === 'seedance-2.5-t2v')
+check('Kling 3.0 Standard is fast', MODELS['kling-3.0-std-t2v'].tier === 'fast')
+check('every model carries a reference price', Object.values(MODELS).every((m) => m.price.usd > 0))
 check('exactly one default per kind', (['video', 'image'] as const).every((k) => Object.values(MODELS).filter((m) => m.kind === k && m.tier === 'default').length === 1))
 
 // The brief: the idea wins on time of day, weather and light; the style pack fills the rest.
