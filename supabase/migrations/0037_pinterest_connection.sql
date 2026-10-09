@@ -4,15 +4,15 @@
 -- creator_connections row, as for any tool. Nothing else from Pinterest is stored (packages/schema/pinterest.ts).
 --
 -- The app keeps Pinterest out of the "tools Ivy can hand your ideas to" list (it's read from, never handed to) and
--- shows it as its own Connect row instead. verb_line is required; its copy is a placeholder until Tim writes it.
+-- shows it as its own Connect row instead. Copy by Tim (9 Oct 2026).
 
 insert into connections (slug, name, verb_line, what_it_does, privacy_line, sort_weight)
 values (
   'pinterest',
   'Pinterest',
-  'your pins → references',
-  '{}',
-  'Only your OAuth token is kept. Your pins are fetched live when Ivy shows them and never stored.',
+  'Your boards, beside your ideas',
+  array['Shows pins from your own boards as references. Fetched live, never stored, never used to make anything.'],
+  null,
   0
 )
 on conflict (slug) do nothing;

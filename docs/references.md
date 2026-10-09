@@ -57,7 +57,8 @@ The rules are in `packages/schema/pinterest.ts` and `docs/pinterest.md`.
 screen shows "Connect Pinterest · coming soon", `start` refuses, and `findReferences` skips Pinterest.
 
 **Migration 0037** adds the `pinterest` row to the `connections` catalogue, because `creator_connections.slug`
-references it. It's written but **not applied**. Its `verb_line` ("your pins → references") is placeholder copy.
+references it. Tagline "Your boards, beside your ideas"; description "Shows pins from your own boards as references.
+Fetched live, never stored, never used to make anything." Applied 9 Oct 2026.
 
 ## API
 `GET /api/references?card_id=<uuid>` → `Reference[]`.

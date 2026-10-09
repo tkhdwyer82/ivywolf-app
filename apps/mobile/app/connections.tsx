@@ -110,7 +110,7 @@ function PinterestRow() {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={text.headingSmall}>{soon ? 'Connect Pinterest · coming soon' : status?.connected ? 'Pinterest connected' : 'Connect Pinterest'}</Text>
-        <Text style={[text.caption, styles.secondary]}>your pins as references — fetched live, never stored</Text>
+        <Text style={[text.caption, styles.secondary]}>Your boards, beside your ideas</Text>
       </View>
       {status && !soon && (
         <Pressable onPress={toggle} disabled={busy} style={styles.action} accessibilityRole="button" accessibilityLabel={`${action} Pinterest`}>
