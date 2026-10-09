@@ -4,7 +4,7 @@
 
 import { candidates, cheapest, MODELS, type Priced } from '../packages/pipeline/generate'
 import type { Model } from '../packages/pipeline/generate/types'
-import { credentials } from '../packages/pipeline/generate/routes/higgsfield'
+import { credentials, dimensions, tokenPrice } from '../packages/pipeline/generate/routes/higgsfield'
 
 let failed = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -34,8 +34,8 @@ check('params override defaults', candidates(model, 'a', [], { duration: 8 }, al
 check('a route that is not live is skipped', candidates(model, 'a', [], {}, (r) => r !== 'higgsfield').map((x) => x.route).join() === 'fal')
 
 const priced = (hf: number | null, fal: number | null): Priced[] => [
-  hf === null ? { ...c[0], error: 'down' } : { ...c[0], estimate: { usd: hf, credits: null } },
-  fal === null ? { ...c[1], error: 'down' } : { ...c[1], estimate: { usd: fal, credits: null } },
+  hf === null ? { ...c[0], error: 'down' } : { ...c[0], estimate: { usd: hf, credits: null, source: 'provider' } },
+  fal === null ? { ...c[1], error: 'down' } : { ...c[1], estimate: { usd: fal, credits: null, source: 'provider' } },
 ]
 check('cheapest wins', cheapest(priced(0.5, 0.3))?.route === 'fal')
 check('a tie goes to the first listed', cheapest(priced(0.3, 0.3))?.route === 'higgsfield')
@@ -56,6 +56,15 @@ const id = '0b6f3c2a-1d4e-4f5a-9b8c-7d6e5f4a3b2c'
 check('credentials: id:secret passes through', credentials(`${id}:s3cret`) === `${id}:s3cret`)
 check('credentials: a label in front is dropped', credentials(`abcd:${id}:s3cret`) === `${id}:s3cret`)
 check('credentials: whitespace trimmed', credentials(` ${id}:s3cret\n`) === `${id}:s3cret`)
+
+// Seedance 2.5's estimate is a pricing description (2026-10-09 wording).
+const SEEDANCE = 'For 16:9 video without video input, your request costs roughly $0.2056 per second of generated video at 480p, $0.4622 at 720p, and $1.1372 at 1080p. Each 1,000 video tokens costs $0.0214 at 480p or 720p and $0.0234 at 1080p. Billable video tokens = ceil(output height × output width × (input video duration + generated video duration) × 24 / 1024). Image and audio references do not count as video input.'
+check('720p 9:16 is 720 × 1280', JSON.stringify(dimensions('720p', '9:16')) === JSON.stringify({ width: 720, height: 1280 }))
+check('5 s 720p 9:16 Seedance ≈ $2.3112 (= its $0.4622/s)', tokenPrice(SEEDANCE, { duration: 5, resolution: '720p', aspect_ratio: '9:16' }) === 2.3112, String(tokenPrice(SEEDANCE, { duration: 5, resolution: '720p', aspect_ratio: '9:16' })))
+check('1080p uses the 1080p rate', tokenPrice(SEEDANCE, { duration: 5, resolution: '1080p', aspect_ratio: '16:9' }) > 5)
+let threw = false
+try { tokenPrice('Something else entirely.', { duration: 5 }) } catch { threw = true }
+check('unrecognised wording refuses to price', threw)
 
 if (failed) {
   console.error(`${failed} failed`)

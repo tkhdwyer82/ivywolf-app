@@ -122,7 +122,7 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
       brief,
       refs,
       request_body: pick.body,
-      estimates: priced.map((p) => ({ route: p.route, endpoint: p.endpoint, usd: p.estimate?.usd ?? null, credits: p.estimate?.credits ?? null, error: p.error ?? null })),
+      estimates: priced.map((p) => ({ route: p.route, endpoint: p.endpoint, usd: p.estimate?.usd ?? null, credits: p.estimate?.credits ?? null, source: p.estimate?.source ?? null, error: p.error ?? null })),
       estimate_usd: pick.estimate.usd,
       estimate_credits: pick.estimate.credits,
       status: 'submitting',
@@ -175,7 +175,7 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
     provider_output_url: outcome.outputUrl,
     actual_usd: actualUsd,
     actual_credits: actualCredits,
-    actual_source: 'estimate_on_completion',
+    actual_source: pick.estimate.source === 'provider' ? 'estimate_on_completion' : 'pricing_formula_on_completion',
   })
   await creditEvent(supabase, a.creatorId, runId, pick, model, outcome.status, actualUsd, actualCredits)
 

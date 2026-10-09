@@ -33,6 +33,32 @@ async function json<T>(res: Response, what: string): Promise<T> {
   return JSON.parse(text) as T
 }
 
+/** Output size for a resolution tier and aspect ratio: the short side is the tier (720p 9:16 → 720 × 1280). */
+export function dimensions(resolution: string, aspect: string): { width: number; height: number } {
+  const short = Number(resolution.replace(/p$/, ''))
+  const [w, h] = aspect.split(':').map(Number)
+  if (!short || !w || !h) throw new Error(`can't size ${resolution} ${aspect}`)
+  const long = Math.round((short * Math.max(w, h)) / Math.min(w, h))
+  return w >= h ? { width: long, height: short } : { width: short, height: long }
+}
+
+/**
+ * Some endpoints (Seedance 2.5) answer the estimate with a pricing description instead of a figure: video tokens =
+ * ceil(height × width × seconds × 24 / 1024), priced per 1,000 tokens by resolution tier. The rate is read from the
+ * description; if its wording changes the route refuses to price (and so never runs) rather than guess.
+ */
+export function tokenPrice(description: string, body: Record<string, unknown>): number {
+  const resolution = String(body.resolution ?? '720p')
+  if (!/ceil\(output height × output width × \(input video duration \+ generated video duration\) × 24 \/ 1024\)/.test(description))
+    throw new Error('higgsfield estimate: unrecognised token formula')
+  const m = /Each 1,000 video tokens costs \$([\d.]+) at 480p or 720p and \$([\d.]+) at 1080p/.exec(description)
+  if (!m) throw new Error('higgsfield estimate: unrecognised token rates')
+  const rate = resolution === '1080p' ? Number(m[2]) : Number(m[1])
+  const { width, height } = dimensions(resolution, String(body.aspect_ratio ?? '16:9'))
+  const tokens = Math.ceil((height * width * Number(body.duration ?? 5) * 24) / 1024)
+  return Math.round(((tokens / 1000) * rate) * 10_000) / 10_000
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export const higgsfield: Route = {
@@ -41,10 +67,11 @@ export const higgsfield: Route = {
 
   async estimate(endpoint, body): Promise<Estimate> {
     const res = await fetch(`${BASE}/estimate/${endpoint}`, { method: 'POST', headers: headers(), body: JSON.stringify(body), signal: AbortSignal.timeout(30_000) })
-    const e = await json<{ usd: string | number; credits?: string | number }>(res, 'estimate')
+    const e = await json<{ usd?: string | number; credits?: string | number; type?: string; pricing_description?: string }>(res, 'estimate')
+    if (e.type === 'description' && e.pricing_description) return { usd: tokenPrice(e.pricing_description, body), credits: null, source: 'pricing_formula' }
     const usd = Number(e.usd)
     if (!Number.isFinite(usd)) throw new Error(`higgsfield estimate: no usd in ${JSON.stringify(e).slice(0, 200)}`)
-    return { usd, credits: e.credits == null ? null : Number(e.credits) }
+    return { usd, credits: e.credits == null ? null : Number(e.credits), source: 'provider' }
   },
 
   async submit(endpoint, body, idempotencyKey) {

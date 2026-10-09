@@ -18,6 +18,8 @@ export interface Estimate {
   usd: number
   /** The route's own unit, when it has one (Higgsfield credits). */
   credits: number | null
+  /** 'provider': the route priced this request. 'pricing_formula': computed from the route's published formula. */
+  source: 'provider' | 'pricing_formula'
 }
 
 export type Terminal = 'completed' | 'failed' | 'nsfw' | 'canceled'
