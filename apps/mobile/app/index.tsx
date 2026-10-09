@@ -1,10 +1,12 @@
 // apps/mobile/app/index.tsx
 // Home (P1). Cards and to-dos in a two-column masonry, newest first, with a divider per local day; project chips
 // filter it, except My things, which opens its room (P4); the header has search and the avatar (Voice notes); the
-// nav trio is Home · ⊕ · Mini (launch UI 170:5, 145:5).
+// nav trio is Home · ⊕ · Mini (launch UI 170:5, 145:5). The header collapses Pinterest-style
+// (components/CollapsingHeader.tsx): the logo row slides away on scroll-down and back on any scroll-up; the chips
+// stay, under an always-opaque status bar.
 // No blank state (rule 1): before the first card exists Home is First open (L1, 170:5) — Ivy's one line, "Say an
 // idea out loud.", and a lime arrow down to the ⊕. No grid, no setup.
-// Ivy on open (162:2): up to three sentences from the graph, written in above the chips with their cite; tap to hear
+// Ivy on open (162:2): up to three sentences from the graph, written in under the chips with their cite; tap to hear
 // that moment; gone after ~6 s or on scroll.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
@@ -13,6 +15,7 @@
 // Ivy's line was, a mark on every tile, Done in the nav's place.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Animated, { useSharedValue } from 'react-native-reanimated'
 import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { FlashList, type FlashListRef } from '@shopify/flash-list'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
@@ -40,6 +43,7 @@ import { colour, space, size, type } from '@ivywolf/ui'
 import { IvyNote } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
 import { ProjectChips } from '@/components/HomeChrome'
+import { CollapsingHeader, LOGO_ROW_H, useCollapsingHeader, useHeaderInset } from '@/components/CollapsingHeader'
 import { Nav } from '@/components/Nav'
 import { BAR_BOTTOM } from '@/components/ActionBar'
 import { FailedRecordings } from '@/components/FailedRecordings'
@@ -48,6 +52,9 @@ import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
 import { useCardActions } from '@/components/CardActions'
 import { LinkBanner } from '@/components/LinkMode'
 import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
+
+// The masonry, driven by the collapsing header's UI-thread scroll handler.
+const AnimatedFlashList = Animated.createAnimatedComponent(FlashList<Row>)
 
 const POLL_MS = 4000
 const FRAME_WAIT_MS = 5 * 60 * 1000 // keep polling for a frame this long after a card lands
@@ -65,7 +72,6 @@ function HomeScreen() {
   const holding = useHolding()
   const { userId, getToken } = useAuth()
   const asked = useRef(new Set<string>())
-  const insets = useSafeAreaInsets()
   const [data, setData] = useState<HomeData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [project, setProject] = useState<string | null>(null)
@@ -149,6 +155,9 @@ function HomeScreen() {
     findCard: (id) => data?.items.find((i) => i.kind === 'card' && i.id === id) as never,
   })
   const linking = actions.linking
+  const startScroll = useCallback(() => setDissolve(true), [])
+  const header = useCollapsingHeader({ onScroll: linking ? actions.remeasure : undefined, onBeginDrag: startScroll })
+  const headerInset = useHeaderInset()
 
   // An idea's ••• → Link ideas (My things, Ivy Mini): link mode from that idea, once Home has it.
   const { linkFrom } = useLocalSearchParams<{ linkFrom?: string }>()
@@ -243,13 +252,14 @@ function HomeScreen() {
 
   return (
     <View style={styles.screen}>
-      <FlashList
+      <AnimatedFlashList
         ref={list}
         data={rows}
         extraData={[playing, linking]}
         scrollEnabled={!holding}
-        onScroll={linking ? actions.remeasure : undefined}
+        onScroll={header.onScroll}
         scrollEventThrottle={16}
+        scrollIndicatorInsets={{ top: headerInset }}
         masonry
         numColumns={2}
         keyExtractor={(r) => r.key}
@@ -258,20 +268,17 @@ function HomeScreen() {
           if (r.kind === 'day') layout.span = 2
         }}
         contentContainerStyle={{
-          paddingTop: insets.top,
+          paddingTop: headerInset,
           paddingHorizontal: space.margin - space.gutter / 2,
           paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section,
         }}
-        onScrollBeginDrag={() => setDissolve(true)}
         ListHeaderComponent={
           <View style={styles.listHeader}>
-            <Header />
             {linking ? (
               <LinkBanner title={linking.from.title} />
             ) : (
               ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
             )}
-            <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}
             <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
@@ -284,6 +291,13 @@ function HomeScreen() {
             <View style={styles.cell}>{tile(r.item)}</View>
           )
         }
+      />
+
+      <CollapsingHeader
+        hidden={header.hidden}
+        logo={<Wordmark />}
+        right={<HeaderActions />}
+        chips={<ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />}
       />
 
       {actions.layer(<Nav room="home" listening={data.inFlight > 0} onHome={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />)}
@@ -300,23 +314,26 @@ function toRows(groups: DayGroup[]): Row[] {
   ])
 }
 
-/** Wordmark, then search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
-function Header() {
+function Wordmark() {
   return (
-    <View style={styles.header}>
-      <Text style={styles.wordmark} accessibilityRole="header">
-        IVY
-      </Text>
-      <View style={styles.headerActions}>
-        <Pressable onPress={() => router.push('/search')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Search">
-          <SymbolView name="magnifyingglass" tintColor={colour.Ink} size={size.icon} />
-        </Pressable>
-        <Pressable onPress={() => router.push('/notes')} hitSlop={TAP_SLOP} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Voice notes">
-          <Image source={require('@/assets/figma/l1-profile.svg')} style={StyleSheet.absoluteFill} />
-          <Image source={require('@/assets/figma/l1-profile-glyph.svg')} style={styles.avatarGlyph} />
-        </Pressable>
-      </View>
-    </View>
+    <Text style={styles.wordmark} accessibilityRole="header">
+      IVY
+    </Text>
+  )
+}
+
+/** The logo row's right: search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
+function HeaderActions() {
+  return (
+    <>
+      <Pressable onPress={() => router.push('/search')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Search">
+        <SymbolView name="magnifyingglass" tintColor={colour.Ink} size={size.icon} />
+      </Pressable>
+      <Pressable onPress={() => router.push('/notes')} hitSlop={TAP_SLOP} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Voice notes">
+        <Image source={require('@/assets/figma/l1-profile.svg')} style={StyleSheet.absoluteFill} />
+        <Image source={require('@/assets/figma/l1-profile-glyph.svg')} style={styles.avatarGlyph} />
+      </Pressable>
+    </>
   )
 }
 
@@ -331,10 +348,10 @@ const FIRST_LINE: IvySentence[] = [{ text: 'Tap the lime mic and talk. Ideas lan
 function FirstOpen({ writing, failed }: { writing: boolean; failed: ReactNode }) {
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
+  const still = useSharedValue(0) // nothing scrolls here; the logo row stays
   return (
     <View style={styles.screen}>
-      <View style={{ paddingTop: insets.top }}>
-        <Header />
+      <View style={{ paddingTop: insets.top + LOGO_ROW_H }}>
         <IvyNote sentences={FIRST_LINE} dissolve={false} onGone={() => {}} />
         {failed}
       </View>
@@ -347,6 +364,7 @@ function FirstOpen({ writing, failed }: { writing: boolean; failed: ReactNode })
         </Text>
       </View>
       {!writing && <Image source={require('@/assets/figma/l1-arrow.svg')} style={styles.arrow} accessibilityElementsHidden />}
+      <CollapsingHeader hidden={still} logo={<Wordmark />} right={<HeaderActions />} />
       <Nav room="home" listening={writing} />
     </View>
   )
@@ -365,13 +383,11 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.margin },
   secondary: { color: colour.Grey, textAlign: 'center' },
   error: { color: colour.Grey, paddingHorizontal: space.margin, paddingTop: space.gutter },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin },
   wordmark: { ...type['Title / Screen'], fontSize: WORDMARK, lineHeight: undefined, letterSpacing: 0 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.stack },
   avatar: { width: size.icon, height: size.icon, alignItems: 'center', justifyContent: 'center' },
   avatarGlyph: { width: size.icon / 2, height: size.icon / 2 },
   // The list is inset by margin − gutter/2 and every cell pads gutter/2, so tiles sit at the margin, a gutter apart;
-  // the header undoes the inset.
+  // the list header undoes the inset.
   listHeader: { marginHorizontal: -(space.margin - space.gutter / 2), paddingBottom: space.section - space.stack },
   cell: { paddingHorizontal: space.gutter / 2, paddingBottom: space.gutter },
   divider: { ...type['Label / Overline'], color: colour.Grey, textTransform: 'uppercase', marginHorizontal: space.gutter / 2, marginTop: space.stack, marginBottom: OVERLINE_GAP },
