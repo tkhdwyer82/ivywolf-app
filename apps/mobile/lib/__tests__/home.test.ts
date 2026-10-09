@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 // Job B revised: a card made before shapes still renders, and Ivy's line names new cards by their form (227:14)
 // with the cite shown after it (162:2).
-import { citeLabel, newShapesSentence, shapeOf, type CardItem } from '@/lib/home'
+import { cardPicture, citeLabel, ivyOnOpen, newShapesSentence, shapeOf, type CardItem } from '@/lib/home'
 
 const card = (over: Partial<CardItem>): CardItem =>
   ({
@@ -17,15 +17,38 @@ const card = (over: Partial<CardItem>): CardItem =>
     ...over,
   }) as CardItem
 
+const unsplash = { provider: 'unsplash', photographer: 'A', photographer_url: 'https://u/a', photo_url: 'https://u/p' }
+
 describe('shapeOf', () => {
   it('keeps the shape Ivy or she chose', () => {
-    expect(shapeOf({ shape: 'quote', frame_status: 'typographic', frame_url: null })).toBe('quote')
+    expect(shapeOf({ shape: 'quote', frame_status: 'typographic', frame_url: null, frame_attribution: null })).toBe('quote')
   })
-  it('a card from before shapes: photo while its frame is coming or there, else text', () => {
-    expect(shapeOf({ shape: null, frame_status: 'done', frame_url: 'https://x/y.jpg' })).toBe('photo')
-    expect(shapeOf({ shape: null, frame_status: 'queued', frame_url: null })).toBe('photo')
-    expect(shapeOf({ shape: null, frame_status: 'typographic', frame_url: null })).toBe('text')
-    expect(shapeOf({ shape: null, frame_status: 'failed', frame_url: null })).toBe('text')
+  it('a card from before shapes: photo while its photo is coming or there, else text', () => {
+    expect(shapeOf({ shape: null, frame_status: 'done', frame_url: 'https://x/y.jpg', frame_attribution: unsplash })).toBe('photo')
+    expect(shapeOf({ shape: null, frame_status: 'queued', frame_url: null, frame_attribution: null })).toBe('photo')
+    expect(shapeOf({ shape: null, frame_status: 'typographic', frame_url: null, frame_attribution: null })).toBe('text')
+    expect(shapeOf({ shape: null, frame_status: 'failed', frame_url: null, frame_attribution: null })).toBe('text')
+  })
+  it('a card from before shapes with a generated frame is text, not photo (Job I)', () => {
+    expect(shapeOf({ shape: null, frame_status: 'done', frame_url: 'https://x/frames/u/c.jpg', frame_attribution: null, source: 'voice' })).toBe('text')
+  })
+})
+
+describe('cardPicture (Job I: Unsplash with credit, her own picture, or nothing)', () => {
+  const base = { frame_status: 'done' as const, frame_url: 'https://x/frames/u/c.jpg' }
+  it('shows a credited Unsplash photo', () => {
+    expect(cardPicture({ ...base, frame_attribution: unsplash })).toBe(base.frame_url)
+  })
+  it('shows her own import', () => {
+    expect(cardPicture({ ...base, frame_attribution: null, source: 'import' })).toBe(base.frame_url)
+  })
+  it('never shows a generated frame or an uncredited pin preview', () => {
+    expect(cardPicture({ ...base, frame_attribution: null, source: 'voice' })).toBeNull()
+    expect(cardPicture({ ...base, frame_attribution: null, source: 'youtube' })).toBeNull()
+    expect(cardPicture({ ...base, frame_attribution: { provider: 'unsplash' }, source: 'voice' })).toBeNull()
+  })
+  it('shows nothing until the photo is done', () => {
+    expect(cardPicture({ ...base, frame_status: 'queued', frame_attribution: unsplash })).toBeNull()
   })
 })
 
@@ -51,5 +74,30 @@ describe('newShapesSentence', () => {
     const s = newShapesSentence([card({ shape: 'text' })])
     expect(s?.cite).toEqual({ label: citeLabel('2026-10-01T22:00:00Z', 31_000), storagePath: 'u/r1.m4a', ms: 31_000 })
     expect(s?.cite?.label).toMatch(/^(Thu|Fri) 0:31$/)
+  })
+})
+
+describe('ivyOnOpen (Job I: one line, only when something changed since her last look)', () => {
+  const data = (items: CardItem[], lastOpenedAt: string | null) =>
+    ({ items, threads: [], lastOpenedAt, projects: [], links: {}, inFlight: 0, stuck: [], failed: [] }) as unknown as Parameters<typeof ivyOnOpen>[0]
+  const cards = [
+    card({ id: 'old', recordingId: 'r0', createdAt: '2026-10-01T00:00:00Z', shape: 'photo' }),
+    card({ id: 'a', recordingId: 'r1', createdAt: '2026-10-02T00:00:00Z', shape: 'quote' }),
+    card({ id: 'b', recordingId: 'r1', createdAt: '2026-10-02T00:00:01Z', shape: 'diagram' }),
+  ]
+  it('is silent when nothing landed since her last look', () => {
+    expect(ivyOnOpen(data(cards, '2026-10-05T00:00:00Z'))).toEqual([])
+  })
+  it('names the cards that landed since, in one line', () => {
+    const s = ivyOnOpen(data(cards, '2026-10-01T12:00:00Z'))
+    expect(s).toHaveLength(1)
+    expect(s[0].text).toBe('A quote and a comparison.')
+    expect(s[0].cites).toHaveLength(2)
+  })
+  it('on her first look, names her newest recording’s cards', () => {
+    expect(ivyOnOpen(data(cards, null)).map((x) => x.text)).toEqual(['A quote and a comparison.'])
+  })
+  it('says nothing before the first card', () => {
+    expect(ivyOnOpen(data([], null))).toEqual([])
   })
 })

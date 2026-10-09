@@ -145,6 +145,9 @@ export function CardFace({
         )
       break
     case 'photo':
+      // Job I: a photo card is an Unsplash photo with its credit or her own picture (lib/home.ts cardPicture). The
+      // Shimmer stands in only while one is coming; done with nothing to show, it falls through to the gradient.
+      if (!card.frameUrl && card.frameStatus !== 'none' && card.frameStatus !== 'queued') break
       return (
         <View style={style}>
           <View style={[styles.photo, { height: photoHeight }]}>

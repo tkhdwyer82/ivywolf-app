@@ -4,7 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CardShape } from '@ivywolf/schema'
 import type { GradientName } from '@ivywolf/ui'
-import { toCardItem, type CardItem, type CardRow, type ThreadStage } from '@/lib/home'
+import { cardPicture, toCardItem, type CardItem, type CardRow, type ThreadStage } from '@/lib/home'
 import { writeStyleSignal } from '@/lib/styleSignals'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL!
@@ -87,16 +87,16 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
       'thread',
       await supabase
         .from('thread_cards')
-        .select('cards(id, title, frame_url, frame_status, play_from_ms, created_at, recordings(storage_path, recorded_at))')
+        .select('cards(id, title, source, frame_url, frame_status, frame_attribution, play_from_ms, created_at, recordings(storage_path, recorded_at))')
         .eq('thread_id', thread.id)
-    ) as unknown as { cards: { id: string; title: string; frame_url: string | null; frame_status: string; play_from_ms: number; created_at: string; recordings: { storage_path: string; recorded_at: string | null } | null } | null }[]
+    ) as unknown as { cards: { id: string; title: string; source: string; frame_url: string | null; frame_status: CardRow['frame_status']; frame_attribution: CardRow['frame_attribution']; play_from_ms: number; created_at: string; recordings: { storage_path: string; recorded_at: string | null } | null } | null }[]
     siblings = rows
       .map((r) => r.cards)
       .filter((c): c is NonNullable<typeof c> => !!c && c.id !== id)
       .map((c) => ({
         id: c.id,
         title: c.title,
-        frameUrl: c.frame_url,
+        frameUrl: cardPicture(c),
         frameStatus: c.frame_status,
         playFromMs: c.play_from_ms,
         storagePath: c.recordings?.storage_path ?? null,
@@ -110,7 +110,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     gist: row.gist,
     confidence: row.confidence,
     playFromMs: row.play_from_ms,
-    frameUrl: row.frame_url,
+    frameUrl: cardPicture(row),
     frameStatus: row.frame_status,
     source: row.source,
     sourceUrl: row.source_url,

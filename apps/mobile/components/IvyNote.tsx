@@ -1,7 +1,8 @@
 // apps/mobile/components/IvyNote.tsx
 // Ivy on open (v3.2, Figma 162:2 "Ivy thinks alongside, then gets out of the way"; Home in 227:5). A lime dot, then
-// the line written in word by word at WORDS_PER_MINUTE with a lime caret, pushing the chips and grid down as it lands,
-// then the cite in grey — " · Thu 0:31", the recording and the moment it's about (rule 2). Tap the line to hear that
+// the line written in word by word at WORDS_PER_MINUTE with a lime caret, into room kept for the whole line from the
+// first frame — typing never moves the chips or the grid, so a card held while she writes stays under the finger
+// (Job I: the reflow cancelled the hold arc's long-press). Then the cite in grey — " · Thu 0:31", the recording and the moment it's about (rule 2). Tap the line to hear that
 // moment. DISSOLVE_AFTER_MS after the last word — or as soon as she scrolls — the words fade out, the timestamp last,
 // then the note collapses and the grid slides back up (≈400 ms, ease-out). Nothing is stored.
 
@@ -24,9 +25,6 @@ function tone(i: number, n: number) {
   if (i === n - 1) return TONES[2]
   return i === 0 ? TONES[0] : TONES[1]
 }
-
-const lineChange = () =>
-  LayoutAnimation.configureNext({ duration: 220, update: { type: LayoutAnimation.Types.easeInEaseOut } })
 
 export function IvyNote({
   sentences,
@@ -67,10 +65,7 @@ export function IvyNote({
       const t = setTimeout(leave, DISSOLVE_AFTER_MS)
       return () => clearTimeout(t)
     }
-    const t = setTimeout(() => {
-      lineChange()
-      setShown((n) => n + 1)
-    }, 60_000 / WORDS_PER_MINUTE)
+    const t = setTimeout(() => setShown((n) => n + 1), 60_000 / WORDS_PER_MINUTE)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shown, words.length])
@@ -96,11 +91,14 @@ export function IvyNote({
       accessibilityLiveRegion="polite"
     >
       <View style={styles.dot} />
-      {/* Two identical layers so the cite stays inline yet fades on its own: words show in the first, the cite in the
-          second (nested Text spans can't animate opacity on iOS). */}
+      {/* The whole line and its cite, clear, hold the note at its final height from the start. Over it: the words
+          written so far with the caret, then the cite in its own layer so it fades on its own (nested Text spans
+          can't animate opacity on iOS). Each layer lays out the same text from the same start, so the words land
+          exactly where the room was kept. */}
       <View style={styles.layers}>
-        <Animated.View style={{ opacity: wordsOpacity }}>
-          <Line words={words.slice(0, shown)} n={sentences.length} cite={writing ? null : cite?.label ?? null} show="words" caret={writing} />
+        <Line words={words} n={sentences.length} cite={cite?.label ?? null} show="none" caret={false} />
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: wordsOpacity }]} pointerEvents="none">
+          <Line words={words.slice(0, shown)} n={sentences.length} cite={null} show="words" caret={writing} />
         </Animated.View>
         {!writing && cite && (
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: citeOpacity }]} pointerEvents="none">
@@ -114,7 +112,7 @@ export function IvyNote({
 
 const CLEAR = 'transparent'
 
-function Line({ words, n, cite, show, caret }: { words: { w: string; si: number }[]; n: number; cite: string | null; show: 'words' | 'cite'; caret: boolean }) {
+function Line({ words, n, cite, show, caret }: { words: { w: string; si: number }[]; n: number; cite: string | null; show: 'words' | 'cite' | 'none'; caret: boolean }) {
   return (
     <Text style={styles.words}>
       {words.map(({ w, si }, i) => (

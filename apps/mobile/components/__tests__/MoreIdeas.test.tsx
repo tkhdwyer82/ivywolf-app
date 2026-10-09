@@ -26,14 +26,9 @@ const count = (type: string) => {
 }
 
 describe('More ideas', () => {
-  it('has no tab when the gate is closed — nothing drawn, not greyed', async () => {
-    await render(<ProjectTabs tab="all" moreIdeas={false} onChange={() => {}} />)
-    expect(screen.queryByText('More ideas')).toBeNull()
-    expect(screen.queryByText('All ideas')).toBeNull()
-    expect(screen.toJSON()).toBeNull()
-  })
-  it('has the tab when the gate is open', async () => {
-    await render(<ProjectTabs tab="all" moreIdeas onChange={() => {}} />)
+  it('always has both tabs (Job I, 165:5), never greyed', async () => {
+    await render(<ProjectTabs tab="all" onChange={() => {}} />)
+    expect(screen.getByRole('tab', { name: 'All ideas' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'More ideas' })).toBeTruthy()
   })
   it('draws a suggestion as a frame and one pin — no text', async () => {

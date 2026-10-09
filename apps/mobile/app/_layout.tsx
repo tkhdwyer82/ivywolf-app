@@ -44,6 +44,8 @@ function Routes() {
       </Stack.Protected>
       <Stack.Protected guard={!isSignedIn}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
+        {/* Dev builds only (app/dev-sign-in.tsx): the simulator's ticket sign-in. */}
+        <Stack.Screen name="dev-sign-in" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>
   )

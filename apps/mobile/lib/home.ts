@@ -120,12 +120,12 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 
 /** The columns every card tile needs. Callers add their own thread embedding (for size and stage). */
 export const CARD_COLUMNS =
-  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, shape, quote, diagram, board, frame_attribution, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, gradient)'
+  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, gradient)'
 
 export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
   confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
-  created_at: string; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
+  created_at: string; source?: string | null; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
   frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string } | null
   recordings: { recorded_at: string | null; storage_path?: string | null; source?: string } | null
   pinned_at?: string | null
@@ -134,10 +134,22 @@ export type CardRow = {
   projects?: { name: string; gradient?: GradientName | null; id?: string; kind?: string } | null
 }
 
-/** A card made before shapes (0033) has none: photo while its frame is coming or there, else text. */
-export function shapeOf(r: Pick<CardRow, 'shape' | 'frame_status' | 'frame_url'>): CardShape {
+/**
+ * The only pictures a card shows (Job I): an Unsplash photo with its credit, or her own picture (an import). Anything
+ * else in frame_url — the fal frames drawn for cards before Job B, a pinned suggestion's preview — is not shown; the
+ * card falls back to its project gradient or no picture at all.
+ */
+export function cardPicture(r: Pick<CardRow, 'frame_url' | 'frame_status' | 'frame_attribution'> & { source?: string | null }): string | null {
+  if (r.frame_status !== 'done' || !r.frame_url) return null
+  const a = r.frame_attribution
+  if (a?.provider === 'unsplash' && a.photographer && a.photographer_url && a.photo_url) return r.frame_url
+  return r.source === 'import' ? r.frame_url : null
+}
+
+/** A card made before shapes (0033) has none: photo while its photo is coming or there, else text. */
+export function shapeOf(r: Pick<CardRow, 'shape' | 'frame_status' | 'frame_url' | 'frame_attribution'> & { source?: string | null }): CardShape {
   if (r.shape) return r.shape
-  if (r.frame_status === 'done') return r.frame_url ? 'photo' : 'text'
+  if (r.frame_status === 'done') return cardPicture(r) ? 'photo' : 'text'
   return r.frame_status === 'none' || r.frame_status === 'queued' ? 'photo' : 'text'
 }
 
@@ -152,7 +164,7 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     gist: c.gist,
     playFromMs: c.play_from_ms,
     confidence: c.confidence,
-    frameUrl: c.frame_url,
+    frameUrl: cardPicture(c),
     frameStatus: c.frame_status,
     frameAt: c.frame_at,
     at: c.recordings?.recorded_at ?? c.created_at,
@@ -259,8 +271,14 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
 }
 
 /** Home was opened: what's "new" next time is measured from now. */
-export async function markOpened(supabase: SupabaseClient, userId: string) {
-  await supabase.from('creators').update({ last_opened_at: new Date().toISOString() }).eq('id', userId)
+/**
+ * Her last look (Job I): creators.last_opened_at moves to the newest card she has had on screen — never "now", and
+ * never backwards — so a card that lands after she looked is still new next time. Home calls it only while focused.
+ */
+export async function markSeen(supabase: SupabaseClient, userId: string, items: Item[]) {
+  const newest = items.reduce<string | null>((m, i) => (i.kind === 'card' && (!m || (i.createdAt ?? i.at) > m) ? (i.createdAt ?? i.at) : m), null)
+  if (!newest) return
+  await supabase.from('creators').update({ last_opened_at: newest }).eq('id', userId).or(`last_opened_at.is.null,last_opened_at.lt.${newest}`)
 }
 
 // ── Days ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -411,7 +429,9 @@ const ORDER: CardItem['shape'][] = ['quote', 'diagram', 'photo', 'text', 'board'
 /** Where the new cards came from, when they all came from one place: "From your Mini: …". */
 const FROM: Record<string, string> = { mini: 'From your Mini', note_taker: 'From the note taker', muse: 'From Muse', dji_import: 'From the import' }
 
-const list = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`)
+/** "a", "a and b", "a, b, and c". */
+const list = (parts: string[]) =>
+  parts.length < 2 ? parts.join('') : parts.length === 2 ? parts.join(' and ') : `${parts.slice(0, -1).join(', ')}, and ${parts[parts.length - 1]}`
 
 /**
  * The cards said since she last opened Home, named by the form each took (Figma 227:5: "From the drive: a quote, a
@@ -446,39 +466,23 @@ export function newShapesSentence(cards: CardItem[]): IvySentence | null {
 }
 
 /**
- * At most three sentences, in this order: what's due today, a thread she keeps coming back to (≥ 3 returns), and
- * the cards said since she last opened Home, by form. Nothing new → no sentences (Ivy stays silent).
+ * Ivy on open (rule 2, Job I): one line, only when something changed since her last look — her first look (no
+ * last_opened_at yet: her newest recording's cards), or the cards that landed since. Otherwise she stays silent.
  */
-export function ivyOnOpen(data: HomeData, now = new Date()): IvySentence[] {
-  const today = localDay(now.toISOString())
-  const out: IvySentence[] = []
+export function ivyOnOpen(data: HomeData): IvySentence[] {
   const cards = data.items.filter((i): i is CardItem => i.kind === 'card')
-  const cardOf = new Map(cards.map((c) => [c.id, c]))
-
-  const due = data.items.filter((i): i is ActionItem => i.kind === 'action' && !i.done && i.dueDate === today)
-  if (due.length === 1) {
-    out.push({ text: `“${due[0].text}” is due today.`, cites: [{ recordingId: due[0].recordingId, ms: 0 }], cite: { label: citeLabel(due[0].at, null), storagePath: null, ms: 0 } })
-  } else if (due.length > 1) {
-    out.push({ text: `${cap(count(due.length))} things are due today.`, cites: due.map((d) => ({ recordingId: d.recordingId, ms: 0 })) })
-  }
-
+  if (cards.length === 0) return []
   const since = data.lastOpenedAt
-  const returning = [...data.threads].filter((t) => t.returnCount >= COMEBACK).sort((a, b) => b.returnCount - a.returnCount)[0]
-  if (returning) {
-    const of = returning.cardIds.map((id) => cardOf.get(id)).filter((c): c is CardItem => !!c)
-    const latest = [...of].sort((a, b) => (a.at < b.at ? 1 : -1))[0]
-    out.push({
-      text: `You’ve come back to ${returning.title} ${count(returning.returnCount)} times.`,
-      cites: of.map((c) => ({ recordingId: c.recordingId, ms: c.playFromMs })),
-      cite: latest ? citeOf(latest) : undefined,
-    })
+  const landed = (c: CardItem) => c.createdAt ?? c.at
+  let said: CardItem[]
+  if (!since) {
+    const newest = cards.reduce((a, b) => (landed(b) > landed(a) ? b : a))
+    said = cards.filter((c) => c.recordingId === newest.recordingId)
+  } else {
+    said = cards.filter((c) => landed(c) > since)
   }
-
-  // Said since she last looked (by when the card landed, so a recording processed later still counts once).
-  const fresh = since ? cards.filter((c) => (c.createdAt ?? c.at) > since) : []
-  const shapes = newShapesSentence(fresh)
-  if (shapes) out.push(shapes)
-  return out.slice(0, 3)
+  const line = newShapesSentence(said)
+  return line ? [line] : []
 }
 
 /** Meta line under a tile: "0:31 · Launch video", "0:31 · 2 cards", "My things · Thu", "My things · done". */

@@ -4,8 +4,8 @@
 // nav trio is Home · ⊕ · Mini (launch UI 170:5, 145:5).
 // No blank state (rule 1): before the first card exists Home is First open (L1, 170:5) — Ivy's one line, "Say an
 // idea out loud.", and a lime arrow down to the ⊕. No grid, no setup.
-// Ivy on open (162:2): up to three sentences from the graph, written in above the chips with their cite; tap to hear
-// that moment; gone after ~6 s or on scroll.
+// Ivy on open (162:2): one line from the graph, only when something changed since her last look, written in above the
+// chips with its cite; tap to hear that moment; gone after ~6 s or on scroll.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
 // Job C+: pinned cards sit in a Pinned row above Today (and leave the days); hold any card for its arc (Like · Link
@@ -30,7 +30,7 @@ import {
   type DayGroup,
   ivyOnOpen,
   loadHome,
-  markOpened,
+  markSeen,
   metaLine,
   type HomeData,
   type Item,
@@ -106,12 +106,21 @@ function HomeScreen() {
     }, [load])
   )
 
-  // Ivy on open: composed once, from the first load, then "new" is measured from now.
+  // Ivy on open: composed once, from the first load Home is actually on screen for (not mounted under the recorder
+  // from a deep link). Her last look then moves to the newest card she has had on screen, and keeps up while she's
+  // here — a card landing in front of her isn't news next time.
+  const [focused, setFocused] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true)
+      return () => setFocused(false)
+    }, [])
+  )
   useEffect(() => {
-    if (!data || ivy !== null || !userId) return
-    setIvy(data.items.some((i) => i.kind === 'card') ? ivyOnOpen(data) : [])
-    markOpened(supabase, userId)
-  }, [data, ivy, supabase, userId])
+    if (!data || !focused || !userId) return
+    if (ivy === null) setIvy(ivyOnOpen(data))
+    markSeen(supabase, userId, data.items).catch(() => {})
+  }, [data, focused, ivy, supabase, userId])
 
   // A recording whose process request never arrived (server down, no signal): ask again, once per open.
   useEffect(() => {
@@ -198,16 +207,6 @@ function HomeScreen() {
     [data]
   )
 
-  async function createProject(name: string) {
-    if (!userId) return
-    const { data: row, error } = await supabase.from('projects').insert({ creator_id: userId, name }).select('id').single()
-    if (error) setError(error.code === '23505' ? `You already have “${name}”.` : error.message)
-    else {
-      await load()
-      setProject(row.id)
-    }
-  }
-
   async function retry(r: FailedRecording) {
     const token = await getToken()
     if (!token) return
@@ -271,7 +270,7 @@ function HomeScreen() {
             ) : (
               ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
             )}
-            <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} onCreate={createProject} />
+            <ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} />
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}
             <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
@@ -305,7 +304,7 @@ function Header() {
   return (
     <View style={styles.header}>
       <Text style={styles.wordmark} accessibilityRole="header">
-        IVY
+        Ivy <Text style={styles.wordmarkSoft}>Wolf</Text>
       </Text>
       <View style={styles.headerActions}>
         <Pressable onPress={() => router.push('/search')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Search">
@@ -352,7 +351,7 @@ function FirstOpen({ writing, failed }: { writing: boolean; failed: ReactNode })
   )
 }
 
-// L3b Home (Figma 209:2) — measured, not tokens: the wordmark is Bold 26 (no text style); the day overline sits 10
+// Home (Figma 227:5) — measured, not tokens: the wordmark "Ivy Wolf" is Bold 26 (no text style), Wolf in grey; the day overline sits 10
 // above its tiles. First open (L1, 170:5) keeps its own frame: headline Bold 28 at y 330, body Regular 16 at 374,
 // arrow 28 × 60 at y 660.
 const WORDMARK = 26
@@ -367,6 +366,7 @@ const styles = StyleSheet.create({
   error: { color: colour.Grey, paddingHorizontal: space.margin, paddingTop: space.gutter },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin },
   wordmark: { ...type['Title / Screen'], fontSize: WORDMARK, lineHeight: undefined, letterSpacing: 0 },
+  wordmarkSoft: { color: colour.Grey },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.stack },
   avatar: { width: size.icon, height: size.icon, alignItems: 'center', justifyContent: 'center' },
   avatarGlyph: { width: size.icon / 2, height: size.icon / 2 },

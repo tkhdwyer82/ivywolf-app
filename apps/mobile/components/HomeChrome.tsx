@@ -1,7 +1,7 @@
 // apps/mobile/components/HomeChrome.tsx
 // Home's project chips (P1). The nav trio is components/Nav.tsx.
 
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { colour, space, size, type } from '@ivywolf/ui'
 import type { Project } from '@/lib/home'
 
@@ -12,21 +12,17 @@ const RULE_H = 3
 const RULE_R = 2
 const RULE_GAP = 6
 
-/** All · My things · … · + — Heading / Small; the selected chip is ink with a rule under it, the rest grey. */
+/** All · My things · … — Heading / Small (no +: a new project is the ⊕'s long-press, 227:5); the selected chip is ink with a rule under it, the rest grey. */
 export function ProjectChips({
   projects,
   selected,
   onSelect,
-  onCreate,
 }: {
   projects: Project[]
   selected: string | null
   onSelect: (id: string | null) => void
-  onCreate: (name: string) => void
 }) {
   const chips: { id: string | null; name: string }[] = [{ id: null, name: 'All' }, ...projects]
-  const create = () =>
-    Alert.prompt('New project', undefined, (name) => name?.trim() && onCreate(name.trim()), 'plain-text', '', 'default')
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -39,10 +35,6 @@ export function ProjectChips({
           </Pressable>
         )
       })}
-      <Pressable onPress={create} accessibilityRole="button" accessibilityLabel="New project" style={styles.hit}>
-        <Text style={styles.chip}>+</Text>
-        <View style={[styles.rule, { opacity: 0 }]} />
-      </Pressable>
     </ScrollView>
   )
 }
