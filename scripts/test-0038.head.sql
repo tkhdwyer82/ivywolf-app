@@ -1,0 +1,3 @@
+-- Rolled-back test for 0038 (write, test in a rolled-back transaction, dry-run, push). Job H: directions.
+--
+--   node scripts/build-sql-test.mjs 0038 && supabase db query --linked -f scripts/test-0038.sql

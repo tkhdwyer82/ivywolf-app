@@ -147,6 +147,31 @@ export const ShapeOutput = z.object({
 })
 export type ShapeOutput = z.infer<typeof ShapeOutput>
 
+/** The forms a direction can take (Job H): a card's forms plus video. */
+export const DirectionFormat = z.enum(['photo', 'quote', 'board', 'diagram', 'text', 'video'])
+export type DirectionFormat = z.infer<typeof DirectionFormat>
+
+/** direction_v1's structured output (packages/pipeline/prompts/direction_v1.md). */
+export const DirectionOutput = z.object({
+  directions: z.array(
+    z.object({
+      title: z.string(),
+      gist: z.string(),
+      cite_card_index: z.number().int(),
+      cite_quote: z.string(),
+      format: DirectionFormat,
+      stretch: z.boolean(),
+      visual_query: z.string(),
+      board_hook: z.string(),
+      board_beats: z.array(z.string()),
+      quote_text: z.string(),
+      diagram_title: z.string(),
+      diagram_rows: z.array(z.object({ from: z.string(), to: z.string() })),
+    })
+  ),
+})
+export type DirectionOutput = z.infer<typeof DirectionOutput>
+
 // ── Graph rows (as read by the app under RLS) ────────────────────────────────────
 // Column names and nullability follow supabase/migrations/0001_graph.sql. Only the columns the app selects.
 export const RecordingRow = z.object({
