@@ -6,7 +6,10 @@
 //   1. The query: the card's visual_query, else its title + gist, with names stripped (query.ts).
 //   2. Every requested source that's available runs in parallel; one that fails or times out is skipped, never fatal.
 //   3. Results interleave across sources (one from each in turn), duplicates drop (same source+id, or the same image),
-//      and the first `limit` come back (default 6).
+//      and the first `limit` come back (default 6). Each source returns only on-topic results (Pixabay filters by
+//      tags; Unsplash's own ranking is trusted), and each is asked for the full `limit`, so a source with fewer than
+//      two on-topic results is filled from the other source — never padded with off-topic ones. Fewer than `limit`
+//      on-topic results across every source means fewer come back.
 // Pinterest is a source only when the connector is configured and she has connected (pinterestReferences(token)).
 
 import { refusePinterest } from '@ivywolf/schema'
@@ -17,7 +20,7 @@ import { pinterestReferences } from './pinterest'
 import type { Reference, ReferenceCard, ReferenceProvider, ReferenceSource } from './types'
 
 export type { Reference, ReferenceCard, ReferenceSource } from './types'
-export { referenceQuery, orientationFor, contentWords } from './query'
+export { referenceQuery, orientationFor, contentWords, sharesWord } from './query'
 export { trackReferenceUse } from './unsplash'
 export { pinterestAvailable, pinterestReferences } from './pinterest'
 

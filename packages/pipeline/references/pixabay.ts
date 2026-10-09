@@ -2,13 +2,29 @@
 // Pixabay references (pixabay.com/api). PIXABAY_API_KEY (Vercel ivywolf-api). Photos only, safesearch on, the
 // orientation the card's form suits. Credit "via Pixabay", linking to the image's Pixabay page. Pixabay's image URLs
 // are served for a limited time, which suits references: they're fetched live on every call and never kept.
+//
+// Relevance (H.0c follow-up): Pixabay matches loosely, so it gets only the first 3 query words, joined with "+" so it
+// ANDs them, and a result whose tags share no word with the query is dropped — it is never kept as padding (index.ts
+// fills from the other source instead). It asks for more than it needs so the filter has something to choose from.
 
+import { sharesWord } from './query'
 import type { Reference, ReferenceProvider } from './types'
 
 const API = 'https://pixabay.com/api/'
+/** Words of the query Pixabay gets, ANDed. */
+export const PIXABAY_WORDS = 3
+/** Candidates fetched so the tag filter can still find `limit` on-topic ones. */
+const CANDIDATES = 20
 
-interface Hit {
+/** Pixabay's q: the first PIXABAY_WORDS words, each URL-encoded, joined by a literal "+" (its AND). */
+export function pixabayQ(query: string): string {
+  return query.split(/\s+/).filter(Boolean).slice(0, PIXABAY_WORDS).map(encodeURIComponent).join('+')
+}
+
+export interface Hit {
   id: number
+  /** Comma-separated, e.g. "kitchen scale, kitchen scales, weighing". */
+  tags: string
   pageURL: string
   webformatURL: string
   largeImageURL: string
@@ -22,16 +38,16 @@ export const pixabayReferences: ReferenceProvider = {
   async find(query, { orientation, limit }) {
     const params = new URLSearchParams({
       key: process.env.PIXABAY_API_KEY ?? '',
-      q: query.slice(0, 100), // Pixabay's limit on q
       image_type: 'photo',
       safesearch: 'true',
       orientation: orientation === 'portrait' ? 'vertical' : orientation === 'landscape' ? 'horizontal' : 'all',
-      per_page: String(Math.min(200, Math.max(3, limit))), // Pixabay takes 3–200
+      per_page: String(Math.min(200, Math.max(3, CANDIDATES))), // Pixabay takes 3–200
     })
-    const res = await fetch(`${API}?${params}`, { signal: AbortSignal.timeout(15_000) })
+    // q is added by hand: URLSearchParams would turn the "+" that ANDs the words into %2B.
+    const res = await fetch(`${API}?${params}&q=${pixabayQ(query)}`, { signal: AbortSignal.timeout(15_000) })
     if (!res.ok) throw new Error(`pixabay ${res.status}: ${(await res.text()).slice(0, 200)}`)
     const body = (await res.json()) as { hits?: Hit[] }
-    return (body.hits ?? []).slice(0, limit).map(
+    return onTopic(body.hits ?? [], query).slice(0, limit).map(
       (h): Reference => ({
         source: 'pixabay',
         id: String(h.id),
@@ -44,4 +60,9 @@ export const pixabayReferences: ReferenceProvider = {
       })
     )
   },
+}
+
+/** Only hits whose tags share a word with the query (plurals count: "scales" ~ "scale"). */
+export function onTopic(hits: Hit[], query: string): Hit[] {
+  return hits.filter((h) => sharesWord(h.tags ?? '', query))
 }

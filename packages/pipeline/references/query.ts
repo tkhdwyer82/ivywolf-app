@@ -45,3 +45,12 @@ export function orientationFor(shape: ReferenceCard['shape']): Orientation {
   if (shape === 'board' || shape === 'diagram') return 'landscape'
   return 'any'
 }
+
+/** A word's stem for matching: lowercase, a plural "s" off ("scales" → "scale", not "glass" → "glas"). */
+const stem = (w: string) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
+
+/** True when the text shares at least one content word with the query (plurals count). */
+export function sharesWord(text: string, query: string): boolean {
+  const q = new Set(contentWords(query).map(stem))
+  return contentWords(text).some((w) => q.has(stem(w)))
+}

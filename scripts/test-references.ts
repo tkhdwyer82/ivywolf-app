@@ -5,6 +5,8 @@
 import { randomBytes } from 'node:crypto'
 import { contentWords, dedupe, findReferences, interleave, orientationFor, referenceQuery } from '../packages/pipeline/references'
 import { pinReference, pinScore, pinterestReferences, type Pin } from '../packages/pipeline/references/pinterest'
+import { onTopic, pixabayQ, type Hit } from '../packages/pipeline/references/pixabay'
+import { sharesWord } from '../packages/pipeline/references/query'
 import type { Reference, ReferenceProvider } from '../packages/pipeline/references/types'
 import { generate } from '../packages/pipeline/generate'
 import { refusePinterest } from '../packages/schema/pinterest'
@@ -79,6 +81,21 @@ async function main() {
   check('sources limits which run', onlyPix.every((r) => r.source === 'pixabay') && onlyPix.length === 2)
   check('an empty query asks nobody', (await findReferences({ title: 'the of', gist: null }, { providers: { unsplash: u, pixabay: px } })).length === 0)
   check('a card that came from Pinterest is never searched with', await throws(() => findReferences({ ...card, source: 'pinterest' }, { providers: { unsplash: u } })))
+
+  // ── Relevance (H.0c follow-up) ──
+  check('Pixabay gets the first 3 words, "+"-joined to AND them', pixabayQ('person stepping bathroom scale') === 'person+stepping+bathroom', pixabayQ('person stepping bathroom scale'))
+  check('each Pixabay word is encoded, the "+" isn’t', pixabayQ('café au lait') === 'caf%C3%A9+au+lait')
+  const hit = (id: number, tags: string): Hit => ({ id, tags, pageURL: '', webformatURL: '', largeImageURL: '', imageWidth: 1, imageHeight: 1 })
+  const kept = onTopic([hit(1, 'lizard, reptile, animal, monitor'), hit(2, 'kitchen scale, kitchen scales, weighing'), hit(3, 'bathroom, tiles')], 'person stepping bathroom scale')
+  check('a Pixabay result whose tags share no query word is dropped (the lizard)', kept.map((h) => h.id).join() === '2,3', kept.map((h) => h.id).join())
+  check('plurals match ("scales" ~ "scale"), "glass" isn’t "glas"', sharesWord('scales', 'scale') && !sharesWord('glas', 'glass'))
+  const many = provider('unsplash', ['1', '2', '3', '4', '5', '6'].map((i) => ref('unsplash', i)))
+  const one = await findReferences(card, { providers: { unsplash: many, pixabay: provider('pixabay', [ref('pixabay', 'a')]), pinterest: provider('pinterest', [], false) } })
+  check('a source with 1 on-topic result is filled from the other (1 + 5)', one.map((r) => r.id).join() === '1,a,2,3,4,5', one.map((r) => r.id).join())
+  const none = await findReferences(card, { providers: { unsplash: many, pixabay: provider('pixabay', []), pinterest: provider('pinterest', [], false) } })
+  check('a source with none on-topic leaves the other to fill all 6', none.length === 6 && none.every((r) => r.source === 'unsplash'))
+  const short = await findReferences(card, { providers: { unsplash: provider('unsplash', [ref('unsplash', '1'), ref('unsplash', '2')]), pixabay: provider('pixabay', [ref('pixabay', 'a')]), pinterest: provider('pinterest', [], false) } })
+  check('never padded: 3 on-topic in all → 3 come back, not 6', short.length === 3, String(short.length))
 
   // ── Pinterest degrades without the app secret ──
   const savedSecret = process.env.PINTEREST_APP_SECRET

@@ -13,12 +13,15 @@ generation input,** and nothing in the module writes to the database or storage.
 3. **Sources run in parallel.** A source that's unavailable is skipped without a call. One that fails or times out
    is logged and skipped, never fatal.
 4. **Results.** They interleave (one from each source in turn), duplicates drop (the same source and ID, or the same
-   image), and the first `limit` are returned (default 6).
+   image), and the first `limit` are returned (default 6). Every source returns only on-topic results: Pixabay
+   filters by its tags, and Unsplash's own ranking is trusted. Each source is asked for the full `limit`, so a source
+   with fewer than 2 on-topic results is filled from the other source, never padded with off-topic ones. If there
+   aren't `limit` on-topic results in all, fewer come back.
 
 | Source | Key | What it returns | Credit (`credit.name` → `credit.url`) | Link |
 |---|---|---|---|---|
 | Unsplash | `UNSPLASH_ACCESS_KEY` | the Job B client (`searchPhotos`), content filter high | "Photo by <name> on Unsplash" → photographer (utm) | photo page (utm) |
-| Pixabay | `PIXABAY_API_KEY` | photos only, safesearch on | "via Pixabay" → image page | image page |
+| Pixabay | `PIXABAY_API_KEY` | photos only, safesearch on; the first 3 query words ANDed (`a+b+c`); results whose tags share no query word dropped | "via Pixabay" → image page | image page |
 | Pinterest | `PINTEREST_APP_ID` + `PINTEREST_APP_SECRET` + her token | her own boards' pins, ranked locally against the query | the pin's board name → the pin | the pin |
 
 - **Unsplash download events.** `trackReferenceUse(ref)` sends the download event, for when she *uses* a reference
@@ -67,7 +70,7 @@ Fetched live, never stored, never used to make anything." Applied 9 Oct 2026.
   count.
 
 ## Tests
-- `npx tsx --tsconfig apps/web/tsconfig.json scripts/test-references.ts`: 38 checks, no network. Covers query
+- `npx tsx --tsconfig apps/web/tsconfig.json scripts/test-references.ts`: 45 checks, no network. Covers query
   building, orientation, interleave and dedupe, failing and missing sources, the missing-secret fallback, the sealed
   state and PKCE, unaltered pins, and the Pinterest guards (no `generate()`, no `style_signals`).
 - `npx tsx --env-file=.env.local scripts/smoke-references.ts`: live Unsplash and Pixabay for the test account's
