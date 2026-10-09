@@ -20,7 +20,7 @@ import { uploadBuffer } from '../storage'
 import { stripPeople } from '../redact'
 import { MODELS } from './models'
 import { ROUTES } from './routes'
-import type { Estimate, Model, ModelRoute, Ref, RouteName, Stage } from './types'
+import type { Estimate, Model, ModelRoute, Ref, RouteName } from './types'
 
 export { MODELS, defaultModel } from './models'
 export type { Ref } from './types'
@@ -112,16 +112,13 @@ export interface GenerateArgs {
    * run records that it was forced. It must still serve the model's version.
    */
   route?: RouteName
-  /**
-   * preview: a take to choose between, at the model's preview resolution; final: the render she keeps. Only models
-   * with resolution tiers differ (Seedance 2.5: 480p / 720p). An explicit params.resolution wins. Default: final.
-   */
-  stage?: Stage
 }
 
-/** The params a run actually uses: the stage's resolution, under any explicit params. */
-export function stageParams(model: Model, stage: Stage = 'final', params: Record<string, unknown> = {}): Record<string, unknown> {
-  return model.resolutions && params.resolution == null ? { ...params, resolution: model.resolutions[stage] } : params
+/** A resolution she picked must be one the model offers; otherwise the run is refused rather than silently changed. */
+export function checkResolution(model: Model, params: Record<string, unknown> = {}): void {
+  if (params.resolution == null) return
+  if (!model.resolutions) throw new Error(`${model.label} has a fixed resolution`)
+  if (!model.resolutions.some((r) => r.value === params.resolution)) throw new Error(`${model.label} offers ${model.resolutions.map((r) => r.value).join(' or ')}, not ${params.resolution}`)
 }
 
 export interface GenerateResult {
@@ -145,8 +142,8 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
   if (!brief) throw new Error('empty brief')
   const refs = a.refs ?? []
 
-  const params = stageParams(model, a.stage, a.params)
-  const found = candidates(model, brief, refs, params)
+  checkResolution(model, a.params)
+  const found = candidates(model, brief, refs, a.params)
   if (!found.length) throw new Error(`no live route for ${model.key} (${model.version}) that accepts these refs`)
   const priced: Priced[] = await Promise.all(
     found.map(async (c) => {
@@ -194,7 +191,6 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
         source: p.estimate?.source ?? null,
         units: p.units ?? null,
         latency_ms: latency[p.route] != null ? Math.round(latency[p.route]!) : null,
-        stage: a.stage ?? 'final',
         error: p.error ?? null,
         chosen: p.route === pick.route ? (a.route ? 'forced' : 'cheapest') : null,
       })),

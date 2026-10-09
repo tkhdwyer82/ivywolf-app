@@ -64,8 +64,11 @@ export interface PriceNote {
   checked: string
 }
 
-/** A run's stage: preview takes to choose between, or the final render. */
-export type Stage = 'preview' | 'final'
+/** One resolution she can pick at Create time, with a reference price to show next to it. */
+export interface ResolutionOption {
+  value: string
+  price: PriceNote
+}
 
 export interface Model {
   /** Registry key, e.g. 'kling-3.0-std-t2v'. */
@@ -76,8 +79,11 @@ export interface Model {
   price: PriceNote
   /** The version every route must serve. */
   version: string
-  /** Resolution per stage, for models that take one (Seedance 2.5: 480p preview, 720p final). Absent: fixed output. */
-  resolutions?: Record<Stage, string>
+  /**
+   * The resolutions she can choose between at Create time, each with its price; the model's defaults.resolution is
+   * the one used when she doesn't choose. Absent: the model has a fixed output (Kling 3.0 Standard: 720p).
+   */
+  resolutions?: ResolutionOption[]
   /** In order of preference; the cheapest estimate wins, and order breaks a tie. */
   routes: ModelRoute[]
   defaults: Record<string, unknown>

@@ -21,8 +21,10 @@ the first measured runs, from 9 Oct 2026. Re-run with `scripts/run-h0-tests.ts`;
    `frames/<creator>/generations/<run>.<ext>`. One `credit_events` row is written per run (separate from the
    creator's `credit_ledger`).
 
-**Resolution tiers.** Seedance 2.5 renders `preview` takes at 480p and the `final` at 720p (`stage`; default
-`final`). Kling 3.0 Standard has a fixed 720p output.
+**Resolution.** It's a single choice at Create time, with the price shown. Seedance 2.5 offers 480p ($1.03 per 5 s
+at 9:16) or 720p ($2.31). 720p is the default until it's decided after reviewing the 480p clip. There's no
+preview/final stage, no re-render and no parent run. A resolution the model doesn't offer is refused. Kling 3.0
+Standard has a fixed 720p output.
 
 **Model tiers.** Seedance 2.5 is the `default` video model and Kling 3.0 Standard is `fast`. SOUL V2 is the
 `default` image model (not run yet: its Soul ID is pending).
@@ -82,10 +84,9 @@ longer adds a second full stop after a quoted line. The brief used for the fixed
 > rooftops chased by bad guys and ends by holding up Ivy Mini saying "I have it." Look: warm, film grain.
 
 ## Open
-- **Re-rendering a picked take.** Neither route's Seedance text-to-video takes a seed, so a 720p re-run makes a
-  different video. fal's Seedance 2.5 `draft: true` renders a 480p draft with a `draft_id`, and
-  `bytedance/seedance-2.5/draft/complete` finishes that same take, but only at 1080p (≈ $5.20 per 5 s at 9:16;
-  draft IDs last 7 days). Undecided.
+- **Default resolution for Seedance 2.5** (480p or 720p): to be decided after reviewing the 480p clip.
+- **Re-rendering a picked take: not building it.** For the record, neither route's Seedance text-to-video takes a
+  seed. fal's draft → `draft/complete` keeps a take, but only completes at 1080p.
 - **SOUL V2** waits on a Soul ID trained from images chosen deliberately.
 - **Higgsfield key:** `HIGGSFIELD_API_KEY` must be exactly `<key id>:<secret>`. The Vercel value was re-entered in
   that form on 9 Oct.

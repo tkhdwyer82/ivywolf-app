@@ -2,7 +2,7 @@
 // Route choice in the generation gateway (packages/pipeline/generate), no network:
 //   npx tsx scripts/test-gateway.ts
 
-import { candidates, cheapest, defaultModel, MODELS, stageParams, type Priced } from '../packages/pipeline/generate'
+import { candidates, checkResolution, cheapest, defaultModel, MODELS, type Priced } from '../packages/pipeline/generate'
 import type { Model } from '../packages/pipeline/generate/types'
 import { credentials, tokenPrice } from '../packages/pipeline/generate/routes/higgsfield'
 import { dimensions } from '../packages/pipeline/generate/pricing'
@@ -86,12 +86,15 @@ check('Seedance on fal: 108 units of 1,000 tokens at 5 s 720p 9:16', sd[1].units
 check('Seedance bitrate set the same on both routes', sd[0].body.bitrate_mode === 'high' && sd[1].body.bitrate_mode === 'high')
 check('Seedance 480p is cheaper in units', (candidates(MODELS['seedance-2.5-t2v'], 'a', [], { resolution: '480p' })[1].units ?? 0) < 108)
 
-// Resolution tiers: Seedance 2.5 previews at 480p, finals at 720p; Kling has no resolution to set.
+// Resolution: one choice at Create time, price shown. Seedance 2.5 offers 480p and 720p (720p until decided).
 const sdm = MODELS['seedance-2.5-t2v']
-check('Seedance preview stage is 480p', stageParams(sdm, 'preview').resolution === '480p')
-check('Seedance final stage is 720p, and final is the default', stageParams(sdm).resolution === '720p')
-check('an explicit resolution wins over the stage', stageParams(sdm, 'preview', { resolution: '1080p' }).resolution === '1080p')
-check('Kling has no resolution tiers', stageParams(MODELS['kling-3.0-std-t2v'], 'preview').resolution === undefined)
+check('Seedance offers 480p and 720p, each with a price', sdm.resolutions?.map((r) => `${r.value} ${r.price.usd}`).join() === '480p 1.0268,720p 2.3112')
+check('Seedance defaults to 720p', sdm.defaults.resolution === '720p' && candidates(sdm, 'a', [])[0].body.resolution === '720p')
+check('a chosen 480p reaches both routes', candidates(sdm, 'a', [], { resolution: '480p' }).every((c) => c.body.resolution === '480p'))
+let refused = 0
+try { checkResolution(sdm, { resolution: '1080p' }) } catch { refused++ }
+try { checkResolution(MODELS['kling-3.0-std-t2v'], { resolution: '480p' }) } catch { refused++ }
+check('a resolution the model doesn’t offer is refused, not changed', refused === 2)
 
 // Tiers: one default per kind; Seedance 2.5 is the default video, Kling 3.0 Standard fast.
 check('Seedance 2.5 is the default video model', defaultModel('video').key === 'seedance-2.5-t2v')
