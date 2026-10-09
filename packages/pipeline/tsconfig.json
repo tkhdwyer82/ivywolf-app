@@ -9,5 +9,5 @@
     "esModuleInterop": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "eval/*.ts", "../schema/*.ts"]
+  "include": ["*.ts", "eval/*.ts", "generate/**/*.ts", "../schema/*.ts"]
 }
