@@ -1,0 +1,3 @@
+-- Rolled-back test for 0036 (write, test in a rolled-back transaction, dry-run, push). Pinterest developer terms.
+--
+--   node scripts/build-sql-test.mjs 0036 && supabase db query --linked -f scripts/test-0036.sql

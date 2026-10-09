@@ -11,6 +11,9 @@
 //      is the pre-submit estimate when it completed and 0 when it failed / nsfw / canceled (its documented billing),
 //      marked actual_source 'estimate_on_completion' to reconcile against the console.
 //
+// Pins are never inputs (Pinterest developer terms, packages/schema/pinterest.ts): a Pinterest card, a Pinterest
+// image ref or a pin link in the brief is refused before anything is estimated or sent.
+//
 // Never sends another creator's data: the brief and refs are this creator's, and character ids are scoped to the
 // provider account (Soul IDs belong to the calling account).
 
@@ -21,6 +24,7 @@ import { stripPeople } from '../redact'
 import { MODELS } from './models'
 import { ROUTES } from './routes'
 import type { Estimate, Model, ModelRoute, Ref, RouteName } from './types'
+import { refusePinterest } from '@ivywolf/schema'
 
 export { MODELS, defaultModel } from './models'
 export type { Ref } from './types'
@@ -141,6 +145,12 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
   const brief = guarded.text
   if (!brief) throw new Error('empty brief')
   const refs = a.refs ?? []
+  // Pinterest terms, rule 2: pins are never inputs to generation.
+  refusePinterest('generate', null, [...refs.map((r) => (r.kind === 'image' ? r.url : null)), ...(brief.match(/https?:\/\/\S+/g) ?? [])])
+  if (a.cardId) {
+    const { data: card } = await db().from('cards').select('source, source_url').eq('id', a.cardId).maybeSingle()
+    refusePinterest('generate', card?.source as string | undefined, [card?.source_url as string | undefined])
+  }
 
   checkResolution(model, a.params)
   const found = candidates(model, brief, refs, a.params)

@@ -209,3 +209,5 @@ export type LooseEndRow = z.infer<typeof LooseEndRow>
 
 /** Below this a card is shown greyed with "Ivy isn't sure" (CLAUDE.md pipeline invariants). */
 export const LOW_CONFIDENCE = 0.6
+
+export { PINTEREST, isPinterestSource, isPinterestUrl, refusePinterest } from './pinterest'
