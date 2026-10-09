@@ -4,7 +4,8 @@
 
 import { candidates, cheapest, defaultModel, MODELS, type Priced } from '../packages/pipeline/generate'
 import type { Model } from '../packages/pipeline/generate/types'
-import { credentials, dimensions, tokenPrice } from '../packages/pipeline/generate/routes/higgsfield'
+import { credentials, tokenPrice } from '../packages/pipeline/generate/routes/higgsfield'
+import { dimensions } from '../packages/pipeline/generate/pricing'
 import { aspectsOf, buildBrief } from '../packages/pipeline/generate/brief'
 
 let failed = 0
@@ -71,6 +72,16 @@ let threw = false
 try { tokenPrice('Something else entirely.', { duration: 5 }) } catch { threw = true }
 check('unrecognised wording refuses to price', threw)
 
+// fal (H.0b): both video models on both routes, same version; fal gets billing units.
+const k = candidates(MODELS['kling-3.0-std-t2v'], 'a', [])
+check('Kling 3.0 Standard: higgsfield then fal', k.map((x) => x.route).join() === 'higgsfield,fal')
+check('Kling on fal: duration as a string, audio off, 5 billed seconds', k[1].body.duration === '5' && k[1].body.generate_audio === false && k[1].units === 5)
+const sd = candidates(MODELS['seedance-2.5-t2v'], 'a', [])
+check('Seedance 2.5: higgsfield then fal', sd.map((x) => x.route).join() === 'higgsfield,fal')
+check('Seedance on fal: 108 units of 1,000 tokens at 5 s 720p 9:16', sd[1].units === 108, String(sd[1].units))
+check('Seedance bitrate set the same on both routes', sd[0].body.bitrate_mode === 'high' && sd[1].body.bitrate_mode === 'high')
+check('Seedance 480p is cheaper in units', (candidates(MODELS['seedance-2.5-t2v'], 'a', [], { resolution: '480p' })[1].units ?? 0) < 108)
+
 // Tiers: one default per kind; Seedance 2.5 is the default video, Kling 3.0 Standard fast.
 check('Seedance 2.5 is the default video model', defaultModel('video').key === 'seedance-2.5-t2v')
 check('Kling 3.0 Standard is fast', MODELS['kling-3.0-std-t2v'].tier === 'fast')
@@ -89,6 +100,8 @@ const rain = buildBrief({ idea: ['Street interview in the rain'], tone: ['sunny'
 check('weather in the idea drops the pack’s weather', rain.dropped.map((d) => d.word).join() === 'sunny')
 const neon = buildBrief({ idea: ['Neon-lit alley walk'], tone: ['soft daylight', 'warm'] })
 check('light in the idea drops the pack’s light', neon.dropped.some((d) => d.word === 'soft daylight' && d.because.includes('light')))
+const quoted = buildBrief({ idea: ['Rooftop chase, at night', 'Ends holding it up saying "I have it."'], tone: ['film grain'] })
+check('no double full stop after a quote', quoted.text === 'Rooftop chase, at night. Ends holding it up saying "I have it." Look: film grain.', quoted.text)
 check('whole words only: "Sunday" is not "sun…", "daytrip" not "day"', aspectsOf('Sunday daytrip').size === 0)
 
 if (failed) {

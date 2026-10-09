@@ -51,7 +51,7 @@ export interface Brief {
 }
 
 export function buildBrief({ idea, tone }: BriefInput): Brief {
-  const parts = idea.map((s) => s.trim().replace(/[.\s]+$/, '')).filter(Boolean)
+  const parts = idea.map((s) => s.trim()).filter(Boolean)
   const named = aspectsOf(parts.join(' '))
   const kept: string[] = []
   const dropped: Brief['dropped'] = []
@@ -60,6 +60,8 @@ export function buildBrief({ idea, tone }: BriefInput): Brief {
     if (clash.length) dropped.push({ word, because: clash })
     else kept.push(word)
   }
-  const text = [...parts, kept.length ? `Look: ${kept.join(', ')}` : ''].filter(Boolean).join('. ') + '.'
+  // Each part ends once: a part already ending in . ! ? (or one inside a closing quote) gets no extra full stop.
+  const sentence = (t: string) => (/[.!?]["”’')]*$/.test(t) ? t : `${t}.`)
+  const text = [...parts, kept.length ? `Look: ${kept.join(', ')}` : ''].filter(Boolean).map(sentence).join(' ')
   return { text, kept, dropped }
 }

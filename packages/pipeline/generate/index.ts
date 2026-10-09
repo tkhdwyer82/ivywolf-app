@@ -34,6 +34,8 @@ export interface Candidate {
   route: RouteName
   endpoint: string
   body: Record<string, unknown>
+  /** Billing units for routes that price per unit (fal). */
+  units?: number
 }
 export type Priced = Candidate & ({ estimate: Estimate; error?: never } | { estimate?: never; error: string })
 
@@ -44,7 +46,7 @@ export function candidates(model: Model, brief: string, refs: Ref[], params: Rec
     .filter((r: ModelRoute) => r.version === model.version && live(r.route))
     .flatMap((r) => {
       const body = r.body(brief, refs, p)
-      return body ? [{ route: r.route, endpoint: r.endpoint, body }] : []
+      return body ? [{ route: r.route, endpoint: r.endpoint, body, ...(r.units ? { units: r.units(p) } : {}) }] : []
     })
 }
 
@@ -65,6 +67,11 @@ export interface GenerateArgs {
   cardId?: string | null
   /** Names to strip from the brief (peopleFor()); the guard runs even when empty. */
   people?: string[]
+  /**
+   * Run on this route even if another is cheaper (side-by-side comparisons). Every route is still estimated and the
+   * run records that it was forced. It must still serve the model's version.
+   */
+  route?: RouteName
 }
 
 export interface GenerateResult {
@@ -93,14 +100,19 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
   const priced: Priced[] = await Promise.all(
     found.map(async (c) => {
       try {
-        return { ...c, estimate: await ROUTES[c.route]!.estimate(c.endpoint, c.body) }
+        return { ...c, estimate: await ROUTES[c.route]!.estimate(c.endpoint, c.body, c.units) }
       } catch (e) {
         return { ...c, error: e instanceof Error ? e.message : String(e) }
       }
     })
   )
-  const pick = cheapest(priced)
-  if (!pick) throw new Error(`no route could be priced: ${priced.map((p) => `${p.route}: ${p.error}`).join('; ')}`)
+  const pick = a.route ? (priced.find((p) => p.route === a.route && p.estimate) as (Candidate & { estimate: Estimate }) | undefined) ?? null : cheapest(priced)
+  if (!pick)
+    throw new Error(
+      a.route
+        ? `route ${a.route} can't run ${model.key}: ${priced.find((p) => p.route === a.route)?.error ?? 'not a candidate'}`
+        : `no route could be priced: ${priced.map((p) => `${p.route}: ${p.error}`).join('; ')}`
+    )
   const route = ROUTES[pick.route]!
 
   const runId = randomUUID()
@@ -122,7 +134,16 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
       brief,
       refs,
       request_body: pick.body,
-      estimates: priced.map((p) => ({ route: p.route, endpoint: p.endpoint, usd: p.estimate?.usd ?? null, credits: p.estimate?.credits ?? null, source: p.estimate?.source ?? null, error: p.error ?? null })),
+      estimates: priced.map((p) => ({
+        route: p.route,
+        endpoint: p.endpoint,
+        usd: p.estimate?.usd ?? null,
+        credits: p.estimate?.credits ?? null,
+        source: p.estimate?.source ?? null,
+        units: p.units ?? null,
+        error: p.error ?? null,
+        chosen: p.route === pick.route ? (a.route ? 'forced' : 'cheapest') : null,
+      })),
       estimate_usd: pick.estimate.usd,
       estimate_credits: pick.estimate.credits,
       status: 'submitting',
@@ -131,22 +152,25 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
   }
 
   const submittedAt = Date.now()
-  let requestId: string
+  let handle: Awaited<ReturnType<typeof route.submit>>
   try {
-    requestId = (await route.submit(pick.endpoint, pick.body, runId)).requestId // the run id is the idempotency key
+    handle = await route.submit(pick.endpoint, pick.body, runId) // the run id is the idempotency key, where the route takes one
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     await update({ status: 'failed', error: message.slice(0, 2000), actual_usd: 0, actual_credits: 0, actual_source: 'not_submitted' })
     await creditEvent(supabase, a.creatorId, runId, pick, model, 'failed', 0, 0)
     throw e
   }
-  await update({ status: 'queued', request_id: requestId, submitted_at: new Date(submittedAt).toISOString() })
+  await update({ status: 'queued', request_id: handle.requestId, submitted_at: new Date(submittedAt).toISOString() })
 
-  const outcome = await route.wait(requestId, TIMEOUT_MS[model.kind])
+  const outcome = await route.wait(handle, TIMEOUT_MS[model.kind])
   const doneAt = Date.now()
   const charged = outcome.status === 'completed'
-  const actualUsd = charged ? pick.estimate.usd : 0
-  const actualCredits = charged ? pick.estimate.credits : 0
+  // What the route says it charged, when it can say (fal with an admin key); else the estimate on completion.
+  const reported = charged && route.actualCost ? await route.actualCost(handle.requestId).catch(() => null) : null
+  const actualUsd = !charged ? 0 : reported ?? pick.estimate.usd
+  const actualCredits = charged ? (reported != null ? null : pick.estimate.credits) : 0
+  const actualSource = !charged ? 'not_charged' : reported != null ? 'provider_billing' : pick.estimate.source === 'provider' ? 'estimate_on_completion' : 'pricing_formula_on_completion'
 
   let outputUrl: string | null = null
   let copyError: string | null = null
@@ -175,7 +199,7 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
     provider_output_url: outcome.outputUrl,
     actual_usd: actualUsd,
     actual_credits: actualCredits,
-    actual_source: pick.estimate.source === 'provider' ? 'estimate_on_completion' : 'pricing_formula_on_completion',
+    actual_source: actualSource,
   })
   await creditEvent(supabase, a.creatorId, runId, pick, model, outcome.status, actualUsd, actualCredits)
 

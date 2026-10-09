@@ -6,6 +6,9 @@
 // billing-and-retention). Webhooks (hf_webhook) come with the server route; polling stays as recovery.
 
 import type { Estimate, Outcome, Route, Terminal } from '../types'
+import { videoTokens } from '../pricing'
+
+export { dimensions } from '../pricing'
 
 const BASE = 'https://api.higgsfield.ai'
 const TERMINAL = new Set<Terminal>(['completed', 'failed', 'nsfw', 'canceled'])
@@ -31,15 +34,6 @@ async function json<T>(res: Response, what: string): Promise<T> {
   return JSON.parse(text) as T
 }
 
-/** Output size for a resolution tier and aspect ratio: the short side is the tier (720p 9:16 → 720 × 1280). */
-export function dimensions(resolution: string, aspect: string): { width: number; height: number } {
-  const short = Number(resolution.replace(/p$/, ''))
-  const [w, h] = aspect.split(':').map(Number)
-  if (!short || !w || !h) throw new Error(`can't size ${resolution} ${aspect}`)
-  const long = Math.round((short * Math.max(w, h)) / Math.min(w, h))
-  return w >= h ? { width: long, height: short } : { width: short, height: long }
-}
-
 /**
  * Some endpoints (Seedance 2.5) answer the estimate with a pricing description instead of a figure: video tokens =
  * ceil(height × width × seconds × 24 / 1024), priced per 1,000 tokens by resolution tier. The rate is read from the
@@ -52,8 +46,7 @@ export function tokenPrice(description: string, body: Record<string, unknown>): 
   const m = /Each 1,000 video tokens costs \$([\d.]+) at 480p or 720p and \$([\d.]+) at 1080p/.exec(description)
   if (!m) throw new Error('higgsfield estimate: unrecognised token rates')
   const rate = resolution === '1080p' ? Number(m[2]) : Number(m[1])
-  const { width, height } = dimensions(resolution, String(body.aspect_ratio ?? '16:9'))
-  const tokens = Math.ceil((height * width * Number(body.duration ?? 5) * 24) / 1024)
+  const tokens = videoTokens(body)
   return Math.round(((tokens / 1000) * rate) * 10_000) / 10_000
 }
 
@@ -84,7 +77,7 @@ export const higgsfield: Route = {
     return { requestId: r.request_id }
   },
 
-  async wait(requestId, timeoutMs): Promise<Outcome> {
+  async wait({ requestId }, timeoutMs): Promise<Outcome> {
     const until = Date.now() + timeoutMs
     let delay = 2000
     for (;;) {

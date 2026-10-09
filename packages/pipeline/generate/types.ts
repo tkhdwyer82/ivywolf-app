@@ -31,12 +31,23 @@ export interface Outcome {
   error: string | null
 }
 
-/** One way to run one model version. `body` builds the provider's request from the brief, refs and params. */
+/**
+ * One way to run one model version. `body` builds the provider's request from the brief, refs and params. `units`
+ * is how many of the route's billing units the request is (fal prices per unit: seconds, 1,000 video tokens, …).
+ */
 export interface ModelRoute {
   route: RouteName
   endpoint: string
   version: string
   body: (brief: string, refs: Ref[], params: Record<string, unknown>) => Record<string, unknown> | null
+  units?: (params: Record<string, unknown>) => number
+}
+
+/** What submit hands to wait: the request id, and where to poll and fetch the result when the route says. */
+export interface Submitted {
+  requestId: string
+  statusUrl?: string
+  resultUrl?: string
 }
 
 /**
@@ -71,8 +82,10 @@ export interface Model {
 export interface Route {
   name: RouteName
   live: boolean
-  estimate(endpoint: string, body: Record<string, unknown>): Promise<Estimate>
-  submit(endpoint: string, body: Record<string, unknown>, idempotencyKey: string): Promise<{ requestId: string }>
+  estimate(endpoint: string, body: Record<string, unknown>, units?: number): Promise<Estimate>
+  submit(endpoint: string, body: Record<string, unknown>, idempotencyKey: string): Promise<Submitted>
   /** Until a terminal state or the timeout (then 'failed' with the reason). */
-  wait(requestId: string, timeoutMs: number): Promise<Outcome>
+  wait(handle: Submitted, timeoutMs: number): Promise<Outcome>
+  /** What the provider actually charged for a finished request, when it can say. Null: unknown (use the estimate). */
+  actualCost?(requestId: string): Promise<number | null>
 }
