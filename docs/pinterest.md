@@ -12,7 +12,7 @@ touchpoint imports. Its guards enforce them.
 4. **Disconnect deletes the token.** Delete the Vault secret and the `creator_connections` row in the same request.
    Nothing else needs deleting, because rule 1 means nothing else was kept.
 
-## Enforced in code (9 Oct 2026)
+## In code (9 Oct 2026)
 | Where | What |
 |---|---|
 | `packages/schema/pinterest.ts` | The rules; `isPinterestUrl` (pinterest.*, pinimg.com, pin.it), `isPinterestSource`, `refusePinterest` |
@@ -25,16 +25,17 @@ touchpoint imports. Its guards enforce them.
 Tests: `npx tsx scripts/test-pinterest.ts` (11 checks), `scripts/test-gateway.ts` (two `generate()` refusals), and
 `apps/mobile/lib/__tests__/pinterest.test.ts`.
 
-## Not done yet (needs a production schema/data change)
-Today production holds **2 stored Pinterest suggestions**. They're the seeded placeholders, with images copied
-into `frames/<test account>/fixture/`. Nothing Pinterest-sourced is in `cards`, `style_signals`,
-`suggestion_signals` or `generation_runs`. Proposed migration 0036:
+## In the schema (0036, applied 9 Oct 2026)
+- Deleted the 2 stored Pinterest `suggestions`. They were the seeded placeholders on the test account. Their images
+  in `frames/<test account>/fixture/` were removed through the storage API, and the PNGs are gone from
+  `scripts/seed/frames`.
+- `suggestions.source` and `cards.source` no longer allow `pinterest`, so a stored row or a card can't hold a pin.
+  `cards_recording_unless_pinned` no longer exempts Pinterest.
+- `style_signals_not_pinterest`: a style signal can never have source `pinterest`.
+- `write_style_signal()` refuses a Pinterest source. `bridge_suggestion_signal()` skips one. `pin_suggestion()`
+  refuses one.
 
-- Delete the 2 Pinterest `suggestions` rows and their image files in `frames/`.
-- `suggestions`: `check (source <> 'pinterest')`, since a stored row is a cached pin.
-- `cards.source`: drop `pinterest` from the allowed values, so no pin becomes a card.
-- `pin_suggestion()`: refuse a Pinterest suggestion.
-- `bridge_suggestion_signal()` (0032) and `write_style_signal()`: skip or refuse source `pinterest`.
+Tested in a rolled-back transaction first (`scripts/test-0036.sql`, 8 checks, all pass).
 
 The Pinterest connector itself (OAuth, live fetch, disconnect) isn't built. When it is, it follows rules 1–4 and
 uses the helpers above.
