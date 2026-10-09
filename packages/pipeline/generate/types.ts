@@ -64,6 +64,9 @@ export interface PriceNote {
   checked: string
 }
 
+/** A run's stage: preview takes to choose between, or the final render. */
+export type Stage = 'preview' | 'final'
+
 export interface Model {
   /** Registry key, e.g. 'kling-3.0-std-t2v'. */
   key: string
@@ -73,6 +76,8 @@ export interface Model {
   price: PriceNote
   /** The version every route must serve. */
   version: string
+  /** Resolution per stage, for models that take one (Seedance 2.5: 480p preview, 720p final). Absent: fixed output. */
+  resolutions?: Record<Stage, string>
   /** In order of preference; the cheapest estimate wins, and order breaks a tie. */
   routes: ModelRoute[]
   defaults: Record<string, unknown>

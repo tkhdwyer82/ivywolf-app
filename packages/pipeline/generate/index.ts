@@ -20,7 +20,7 @@ import { uploadBuffer } from '../storage'
 import { stripPeople } from '../redact'
 import { MODELS } from './models'
 import { ROUTES } from './routes'
-import type { Estimate, Model, ModelRoute, Ref, RouteName } from './types'
+import type { Estimate, Model, ModelRoute, Ref, RouteName, Stage } from './types'
 
 export { MODELS, defaultModel } from './models'
 export type { Ref } from './types'
@@ -50,11 +50,51 @@ export function candidates(model: Model, brief: string, refs: Ref[], params: Rec
     })
 }
 
-/** The cheapest priced candidate; the first listed wins a tie. Null when none could be priced. */
-export function cheapest(priced: Priced[]): (Candidate & { estimate: Estimate }) | null {
+/** Prices this close are equal (estimates are kept to 4 dp). */
+const SAME_PRICE = 0.00005
+/** How many recent completed runs of a model on a route make its rolling latency. */
+export const LATENCY_WINDOW = 10
+
+/**
+ * The cheapest priced candidate. Equal prices go to the route with the lower measured latency for this model (rolling
+ * average, `latency`), then to the first listed — a route with no measurements yet loses a tie to one that has them
+ * only on list order. Null when none could be priced.
+ */
+export function cheapest(priced: Priced[], latency: Partial<Record<RouteName, number>> = {}): (Candidate & { estimate: Estimate }) | null {
   let best: (Candidate & { estimate: Estimate }) | null = null
-  for (const p of priced) if (p.estimate && (!best || p.estimate.usd < best.estimate.usd)) best = p as Candidate & { estimate: Estimate }
+  for (const p of priced) {
+    if (!p.estimate) continue
+    const c = p as Candidate & { estimate: Estimate }
+    if (!best) best = c
+    else if (c.estimate.usd < best.estimate.usd - SAME_PRICE) best = c
+    else if (Math.abs(c.estimate.usd - best.estimate.usd) <= SAME_PRICE) {
+      const lc = latency[c.route]
+      const lb = latency[best.route]
+      if (lc != null && lb != null && lc < lb) best = c
+    }
+  }
   return best
+}
+
+/** Rolling average latency (ms) of the last LATENCY_WINDOW completed runs of a model, per route. */
+export async function routeLatency(supabase: SupabaseClient, model: string, routes: RouteName[]): Promise<Partial<Record<RouteName, number>>> {
+  const out: Partial<Record<RouteName, number>> = {}
+  await Promise.all(
+    routes.map(async (route) => {
+      const { data } = await supabase
+        .from('generation_runs')
+        .select('latency_ms')
+        .eq('model', model)
+        .eq('route', route)
+        .eq('status', 'completed')
+        .not('latency_ms', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(LATENCY_WINDOW)
+      const ms = (data ?? []).map((r) => r.latency_ms as number)
+      if (ms.length) out[route] = ms.reduce((a, b) => a + b, 0) / ms.length
+    })
+  )
+  return out
 }
 
 export interface GenerateArgs {
@@ -72,6 +112,16 @@ export interface GenerateArgs {
    * run records that it was forced. It must still serve the model's version.
    */
   route?: RouteName
+  /**
+   * preview: a take to choose between, at the model's preview resolution; final: the render she keeps. Only models
+   * with resolution tiers differ (Seedance 2.5: 480p / 720p). An explicit params.resolution wins. Default: final.
+   */
+  stage?: Stage
+}
+
+/** The params a run actually uses: the stage's resolution, under any explicit params. */
+export function stageParams(model: Model, stage: Stage = 'final', params: Record<string, unknown> = {}): Record<string, unknown> {
+  return model.resolutions && params.resolution == null ? { ...params, resolution: model.resolutions[stage] } : params
 }
 
 export interface GenerateResult {
@@ -95,7 +145,8 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
   if (!brief) throw new Error('empty brief')
   const refs = a.refs ?? []
 
-  const found = candidates(model, brief, refs, a.params)
+  const params = stageParams(model, a.stage, a.params)
+  const found = candidates(model, brief, refs, params)
   if (!found.length) throw new Error(`no live route for ${model.key} (${model.version}) that accepts these refs`)
   const priced: Priced[] = await Promise.all(
     found.map(async (c) => {
@@ -106,7 +157,9 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
       }
     })
   )
-  const pick = a.route ? (priced.find((p) => p.route === a.route && p.estimate) as (Candidate & { estimate: Estimate }) | undefined) ?? null : cheapest(priced)
+  const supabase = db()
+  const latency = a.route ? {} : await routeLatency(supabase, model.key, priced.filter((p) => p.estimate).map((p) => p.route))
+  const pick = a.route ? (priced.find((p) => p.route === a.route && p.estimate) as (Candidate & { estimate: Estimate }) | undefined) ?? null : cheapest(priced, latency)
   if (!pick)
     throw new Error(
       a.route
@@ -116,7 +169,6 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
   const route = ROUTES[pick.route]!
 
   const runId = randomUUID()
-  const supabase = db()
   const update = async (fields: Record<string, unknown>) => {
     const { error } = await supabase.from('generation_runs').update(fields).eq('id', runId)
     if (error) throw new Error(`generation_runs ${runId}: ${error.message}`)
@@ -141,6 +193,8 @@ export async function generate(a: GenerateArgs): Promise<GenerateResult> {
         credits: p.estimate?.credits ?? null,
         source: p.estimate?.source ?? null,
         units: p.units ?? null,
+        latency_ms: latency[p.route] != null ? Math.round(latency[p.route]!) : null,
+        stage: a.stage ?? 'final',
         error: p.error ?? null,
         chosen: p.route === pick.route ? (a.route ? 'forced' : 'cheapest') : null,
       })),

@@ -2,7 +2,7 @@
 // Route choice in the generation gateway (packages/pipeline/generate), no network:
 //   npx tsx scripts/test-gateway.ts
 
-import { candidates, cheapest, defaultModel, MODELS, type Priced } from '../packages/pipeline/generate'
+import { candidates, cheapest, defaultModel, MODELS, stageParams, type Priced } from '../packages/pipeline/generate'
 import type { Model } from '../packages/pipeline/generate/types'
 import { credentials, tokenPrice } from '../packages/pipeline/generate/routes/higgsfield'
 import { dimensions } from '../packages/pipeline/generate/pricing'
@@ -45,6 +45,10 @@ check('cheapest wins', cheapest(priced(0.5, 0.3))?.route === 'fal')
 check('a tie goes to the first listed', cheapest(priced(0.3, 0.3))?.route === 'higgsfield')
 check('an unpriced route is never chosen', cheapest(priced(null, 0.9))?.route === 'fal')
 check('nothing priced → null', cheapest(priced(null, null)) === null)
+check('a tie goes to the lower measured latency', cheapest(priced(0.3, 0.3), { higgsfield: 200_000, fal: 60_000 })?.route === 'fal')
+check('a tie with latency for one route only goes to list order', cheapest(priced(0.3, 0.3), { fal: 60_000 })?.route === 'higgsfield')
+check('latency never beats a lower price', cheapest(priced(0.3, 0.5), { higgsfield: 900_000, fal: 1 })?.route === 'higgsfield')
+check('prices within 4 dp are a tie', cheapest(priced(1.02680, 1.026804), { higgsfield: 9, fal: 1 })?.route === 'fal')
 
 // The registry: text-to-video takes no refs; Soul V2 takes a Soul ID and nothing else.
 const soul = MODELS['soul-2']
@@ -81,6 +85,13 @@ check('Seedance 2.5: higgsfield then fal', sd.map((x) => x.route).join() === 'hi
 check('Seedance on fal: 108 units of 1,000 tokens at 5 s 720p 9:16', sd[1].units === 108, String(sd[1].units))
 check('Seedance bitrate set the same on both routes', sd[0].body.bitrate_mode === 'high' && sd[1].body.bitrate_mode === 'high')
 check('Seedance 480p is cheaper in units', (candidates(MODELS['seedance-2.5-t2v'], 'a', [], { resolution: '480p' })[1].units ?? 0) < 108)
+
+// Resolution tiers: Seedance 2.5 previews at 480p, finals at 720p; Kling has no resolution to set.
+const sdm = MODELS['seedance-2.5-t2v']
+check('Seedance preview stage is 480p', stageParams(sdm, 'preview').resolution === '480p')
+check('Seedance final stage is 720p, and final is the default', stageParams(sdm).resolution === '720p')
+check('an explicit resolution wins over the stage', stageParams(sdm, 'preview', { resolution: '1080p' }).resolution === '1080p')
+check('Kling has no resolution tiers', stageParams(MODELS['kling-3.0-std-t2v'], 'preview').resolution === undefined)
 
 // Tiers: one default per kind; Seedance 2.5 is the default video, Kling 3.0 Standard fast.
 check('Seedance 2.5 is the default video model', defaultModel('video').key === 'seedance-2.5-t2v')

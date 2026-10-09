@@ -54,6 +54,8 @@ export const MODELS: Record<string, Model> = {
     tier: 'default',
     price: { usd: 2.3112, for: '5 s, 720p 9:16, no audio', source: 'pricing_formula', checked: '2026-10-09' },
     version: 'seedance-2.5',
+    // Resolution tiers (H.0b): takes to choose between at 480p (44% of the 720p price), the final at 720p.
+    resolutions: { preview: '480p', final: '720p' },
     defaults: { duration: 5, aspect_ratio: '9:16', resolution: '720p', generate_audio: false, bitrate_mode: 'high' },
     routes: [
       {
