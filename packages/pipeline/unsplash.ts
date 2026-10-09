@@ -25,11 +25,13 @@ export interface UnsplashPhoto {
   }
 }
 
-interface ApiPhoto {
+export interface ApiPhoto {
   id: string
   color: string | null
   likes: number
-  urls: { regular: string }
+  width: number
+  height: number
+  urls: { regular: string; small: string }
   links: { html: string; download_location: string }
   user: { name: string; links: { html: string } }
 }
@@ -63,13 +65,25 @@ export function score(p: Pick<ApiPhoto, 'color' | 'likes'>, palette: string[]): 
   return (1 - paletteDistance(p.color, palette)) * 2 + Math.log10(1 + Math.max(0, p.likes)) / 4
 }
 
-/** The best portrait photo for a query, or null when Unsplash has nothing. Throws on a missing key or API error. */
-export async function searchPhoto(query: string, palette: string[]): Promise<UnsplashPhoto | null> {
-  const params = new URLSearchParams({ query, orientation: 'portrait', content_filter: 'high', per_page: String(PER_PAGE) })
+/**
+ * A page of photos for a query (also the references lane, Job H.0c). content_filter high always. Throws on a missing
+ * key or an API error.
+ */
+export async function searchPhotos(
+  query: string,
+  { orientation = 'portrait', perPage = PER_PAGE }: { orientation?: 'portrait' | 'landscape' | 'squarish' | null; perPage?: number } = {}
+): Promise<ApiPhoto[]> {
+  const params = new URLSearchParams({ query, content_filter: 'high', per_page: String(perPage) })
+  if (orientation) params.set('orientation', orientation)
   const res = await fetch(`${API}/search/photos?${params}`, { headers: headers(), signal: AbortSignal.timeout(15_000) })
   if (!res.ok) throw new Error(`unsplash ${res.status}: ${(await res.text()).slice(0, 200)}`)
   const body = (await res.json()) as { results?: ApiPhoto[] }
-  const best = [...(body.results ?? [])].sort((a, b) => score(b, palette) - score(a, palette))[0]
+  return body.results ?? []
+}
+
+/** The best portrait photo for a query, or null when Unsplash has nothing. Throws on a missing key or API error. */
+export async function searchPhoto(query: string, palette: string[]): Promise<UnsplashPhoto | null> {
+  const best = [...(await searchPhotos(query))].sort((a, b) => score(b, palette) - score(a, palette))[0]
   if (!best) return null
   return {
     url: best.urls.regular,

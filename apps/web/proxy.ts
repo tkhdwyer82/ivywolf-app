@@ -17,6 +17,8 @@
 //   /oauth/token      client-authenticated, not session-authenticated
 //   /oauth/revoke     likewise
 //   /api/health       liveness probe, must answer before auth
+//   /api/pinterest/callback  Pinterest's OAuth redirect (Job H.0c): the consent browser has no Clerk session; the sealed,
+//                     expiring state it carries is the authentication (lib/pinterest.ts)
 //   /idea/<id>        Copy link (Job C+): a card she has shared is public, the card alone (title, form, credit), via
 //                     shared_card() (0034). The page decides for itself: her own card → the full view; a shared card →
 //                     the card; otherwise, signed out → /sign-in and back (as before), signed in → 404.
@@ -47,6 +49,7 @@ const isPublicRoute = createRouteMatcher([
   '/oauth/token',
   '/oauth/revoke',
   '/api/health',
+  '/api/pinterest/callback',
   '/idea/(.*)',
 ])
 
