@@ -54,7 +54,7 @@ export const MODELS: Record<string, Model> = {
     tier: 'default',
     price: { usd: 2.3112, for: '5 s, 720p 9:16, no audio', source: 'pricing_formula', checked: '2026-10-09' },
     version: 'seedance-2.5',
-    // A single choice at Create time, price shown (H.0b). 720p is the default until it's decided (defaults.resolution).
+    // A single choice at Create time, price shown (H.0b). 720p is the default (decided 9 Oct 2026, after viewing the 480p clip).
     resolutions: [
       { value: '480p', price: { usd: 1.0268, for: '5 s, 480p 9:16, no audio', source: 'pricing_formula', checked: '2026-10-09' } },
       { value: '720p', price: { usd: 2.3112, for: '5 s, 720p 9:16, no audio', source: 'pricing_formula', checked: '2026-10-09' } },

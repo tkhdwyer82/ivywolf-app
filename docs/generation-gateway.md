@@ -22,7 +22,7 @@ the first measured runs, from 9 Oct 2026. Re-run with `scripts/run-h0-tests.ts`;
    creator's `credit_ledger`).
 
 **Resolution.** It's a single choice at Create time, with the price shown. Seedance 2.5 offers 480p ($1.03 per 5 s
-at 9:16) or 720p ($2.31). 720p is the default until it's decided after reviewing the 480p clip. There's no
+at 9:16) or 720p ($2.31). **720p is the default** (decided 9 Oct 2026, after viewing the 480p clip). There's no
 preview/final stage, no re-render and no parent run. A resolution the model doesn't offer is refused. Kling 3.0
 Standard has a fixed 720p output.
 
@@ -84,7 +84,6 @@ longer adds a second full stop after a quoted line. The brief used for the fixed
 > rooftops chased by bad guys and ends by holding up Ivy Mini saying "I have it." Look: warm, film grain.
 
 ## Open
-- **Default resolution for Seedance 2.5** (480p or 720p): to be decided after reviewing the 480p clip.
 - **Re-rendering a picked take: not building it.** For the record, neither route's Seedance text-to-video takes a
   seed. fal's draft → `draft/complete` keeps a take, but only completes at 1080p.
 - **SOUL V2** waits on a Soul ID trained from images chosen deliberately.
