@@ -23,7 +23,8 @@ async function main() {
   if (card.creator_id !== TEST_ACCOUNT) throw new Error('Refusing: that card is not the test account’s (never send another creator’s data).')
   const { data: pack } = await supabase.from('style_packs').select('tone_words').eq('creator_id', TEST_ACCOUNT).maybeSingle()
   const tone = ((pack?.tone_words as string[] | undefined) ?? []).join(', ')
-  const brief = [card.title, card.gist, tone && `Look: ${tone}`].filter(Boolean).join('. ')
+  // Job H.0a: the Figma idea is "Rooftop chase, night"; this card is its test-account twin, so night is added.
+  const brief = [`${card.title}, at night`, card.gist, tone && `Look: ${tone}`].filter(Boolean).join('. ')
   const people = await peopleFor(supabase, TEST_ACCOUNT, card.recording_id as string | null)
 
   const soulId = process.env.SOUL_ID

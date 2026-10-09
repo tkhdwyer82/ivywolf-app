@@ -10,10 +10,21 @@ import type { Estimate, Outcome, Route, Terminal } from '../types'
 const BASE = 'https://api.higgsfield.ai'
 const TERMINAL = new Set<Terminal>(['completed', 'failed', 'nsfw', 'canceled'])
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * "<key id>:<secret>". The stored value may carry a short label in front ("<label>:<key id>:<secret>", as the
+ * ivywolf-api env does) — the API rejects that with 401, so the label is dropped when the middle part is a key id.
+ */
+export function credentials(raw: string): string {
+  const parts = raw.trim().split(':')
+  return parts.length === 3 && UUID.test(parts[1]) ? `${parts[1]}:${parts[2]}` : raw.trim()
+}
+
 function headers(extra: Record<string, string> = {}) {
   const key = process.env.HIGGSFIELD_API_KEY
   if (!key) throw new Error('HIGGSFIELD_API_KEY is not set')
-  return { Authorization: `Key ${key}`, 'Content-Type': 'application/json', ...extra }
+  return { Authorization: `Key ${credentials(key)}`, 'Content-Type': 'application/json', ...extra }
 }
 
 async function json<T>(res: Response, what: string): Promise<T> {

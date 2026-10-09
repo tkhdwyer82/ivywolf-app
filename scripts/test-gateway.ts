@@ -4,6 +4,7 @@
 
 import { candidates, cheapest, MODELS, type Priced } from '../packages/pipeline/generate'
 import type { Model } from '../packages/pipeline/generate/types'
+import { credentials } from '../packages/pipeline/generate/routes/higgsfield'
 
 let failed = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -50,6 +51,11 @@ check('Soul V2 refuses an image URL ref rather than drop it', candidates(soul, '
 check('Kling text-to-video refuses refs', candidates(MODELS['kling-3.0-std-t2v'], 'a', [{ kind: 'image', url: 'https://x' }]).length === 0)
 check('Kling defaults: 5 s, vertical', candidates(MODELS['kling-3.0-std-t2v'], 'a', [])[0]?.body.duration === 5)
 check('every registry route serves its model version', Object.values(MODELS).every((m) => m.routes.every((r) => r.version === m.version)))
+
+const id = '0b6f3c2a-1d4e-4f5a-9b8c-7d6e5f4a3b2c'
+check('credentials: id:secret passes through', credentials(`${id}:s3cret`) === `${id}:s3cret`)
+check('credentials: a label in front is dropped', credentials(`abcd:${id}:s3cret`) === `${id}:s3cret`)
+check('credentials: whitespace trimmed', credentials(` ${id}:s3cret\n`) === `${id}:s3cret`)
 
 if (failed) {
   console.error(`${failed} failed`)
