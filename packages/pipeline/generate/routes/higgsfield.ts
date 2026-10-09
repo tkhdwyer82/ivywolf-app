@@ -10,15 +10,13 @@ import type { Estimate, Outcome, Route, Terminal } from '../types'
 const BASE = 'https://api.higgsfield.ai'
 const TERMINAL = new Set<Terminal>(['completed', 'failed', 'nsfw', 'canceled'])
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[A-Za-z0-9]+$/i
 
-/**
- * "<key id>:<secret>". The stored value may carry a short label in front ("<label>:<key id>:<secret>", as the
- * ivywolf-api env does) — the API rejects that with 401, so the label is dropped when the middle part is a key id.
- */
+/** HIGGSFIELD_API_KEY is "<key id>:<secret>" exactly — anything else (a label in front) is rejected here, not sent. */
 export function credentials(raw: string): string {
-  const parts = raw.trim().split(':')
-  return parts.length === 3 && UUID.test(parts[1]) ? `${parts[1]}:${parts[2]}` : raw.trim()
+  const v = raw.trim()
+  if (!KEY.test(v)) throw new Error('HIGGSFIELD_API_KEY must be "<key id>:<secret>" (no label in front)')
+  return v
 }
 
 function headers(extra: Record<string, string> = {}) {

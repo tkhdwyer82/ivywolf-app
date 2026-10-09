@@ -22,7 +22,7 @@ import { MODELS } from './models'
 import { ROUTES } from './routes'
 import type { Estimate, Model, ModelRoute, Ref, RouteName } from './types'
 
-export { MODELS } from './models'
+export { MODELS, defaultModel } from './models'
 export type { Ref } from './types'
 
 const TIMEOUT_MS: Record<Model['kind'], number> = { image: 5 * 60_000, video: 20 * 60_000 }

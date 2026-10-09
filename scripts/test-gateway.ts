@@ -2,9 +2,10 @@
 // Route choice in the generation gateway (packages/pipeline/generate), no network:
 //   npx tsx scripts/test-gateway.ts
 
-import { candidates, cheapest, MODELS, type Priced } from '../packages/pipeline/generate'
+import { candidates, cheapest, defaultModel, MODELS, type Priced } from '../packages/pipeline/generate'
 import type { Model } from '../packages/pipeline/generate/types'
 import { credentials, dimensions, tokenPrice } from '../packages/pipeline/generate/routes/higgsfield'
+import { aspectsOf, buildBrief } from '../packages/pipeline/generate/brief'
 
 let failed = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -17,6 +18,8 @@ const model: Model = {
   key: 'x',
   label: 'x',
   kind: 'video',
+  tier: 'default',
+  price: { usd: 0, for: '', source: 'provider', checked: '' },
   version: 'v2',
   defaults: { duration: 5 },
   routes: [
@@ -54,7 +57,9 @@ check('every registry route serves its model version', Object.values(MODELS).eve
 
 const id = '0b6f3c2a-1d4e-4f5a-9b8c-7d6e5f4a3b2c'
 check('credentials: id:secret passes through', credentials(`${id}:s3cret`) === `${id}:s3cret`)
-check('credentials: a label in front is dropped', credentials(`abcd:${id}:s3cret`) === `${id}:s3cret`)
+let labelled = false
+try { credentials(`abcd:${id}:s3cret`) } catch { labelled = true }
+check('credentials: a label in front is refused, not sent', labelled)
 check('credentials: whitespace trimmed', credentials(` ${id}:s3cret\n`) === `${id}:s3cret`)
 
 // Seedance 2.5's estimate is a pricing description (2026-10-09 wording).
@@ -65,6 +70,25 @@ check('1080p uses the 1080p rate', tokenPrice(SEEDANCE, { duration: 5, resolutio
 let threw = false
 try { tokenPrice('Something else entirely.', { duration: 5 }) } catch { threw = true }
 check('unrecognised wording refuses to price', threw)
+
+// Tiers: one default per kind; Kling is the default video, Seedance premium with a price.
+check('Kling 3.0 Standard is the default video model', defaultModel('video').key === 'kling-3.0-std-t2v')
+check('Seedance 2.5 is premium, price shown', MODELS['seedance-2.5-t2v'].tier === 'premium' && MODELS['seedance-2.5-t2v'].price.usd > 0)
+check('exactly one default per kind', (['video', 'image'] as const).every((k) => Object.values(MODELS).filter((m) => m.kind === k && m.tier === 'default').length === 1))
+
+// The brief: the idea wins on time of day, weather and light; the style pack fills the rest.
+const TONE = ['warm', 'film grain', 'soft daylight']
+const night = buildBrief({ idea: ['Rooftop chase ending with Ivy Mini, at night', 'A performer leaps across rooftops.'], tone: TONE })
+check('night drops "soft daylight"', night.dropped.map((d) => d.word).join() === 'soft daylight', JSON.stringify(night.dropped))
+check('night keeps the rest of the pack', night.kept.join() === 'warm,film grain')
+check('the brief reads idea, then look', night.text === 'Rooftop chase ending with Ivy Mini, at night. A performer leaps across rooftops. Look: warm, film grain.', night.text)
+const silent = buildBrief({ idea: ['Unboxing with 20 creators'], tone: TONE })
+check('an idea that names none keeps the whole pack', silent.kept.length === 3 && silent.dropped.length === 0)
+const rain = buildBrief({ idea: ['Street interview in the rain'], tone: ['sunny', 'film grain'] })
+check('weather in the idea drops the pack’s weather', rain.dropped.map((d) => d.word).join() === 'sunny')
+const neon = buildBrief({ idea: ['Neon-lit alley walk'], tone: ['soft daylight', 'warm'] })
+check('light in the idea drops the pack’s light', neon.dropped.some((d) => d.word === 'soft daylight' && d.because.includes('light')))
+check('whole words only: "Sunday" is not "sun…", "daytrip" not "day"', aspectsOf('Sunday daytrip').size === 0)
 
 if (failed) {
   console.error(`${failed} failed`)

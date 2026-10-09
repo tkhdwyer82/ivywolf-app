@@ -12,6 +12,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { generate, type Ref } from '../packages/pipeline/generate'
 import { peopleFor } from '../packages/pipeline/redact'
+import { buildBrief } from '../packages/pipeline/generate/brief'
 
 const TEST_ACCOUNT = 'user_3JfYR4D8eJVCL3yieXStYYoqwaH'
 const CARD_ID = process.env.CARD_ID ?? '9f449fb5-6068-4915-bc53-f1d9127379b1'
@@ -22,9 +23,11 @@ async function main() {
   if (error || !card) throw new Error(`card ${CARD_ID}: ${error?.message ?? 'missing'}`)
   if (card.creator_id !== TEST_ACCOUNT) throw new Error('Refusing: that card is not the test account’s (never send another creator’s data).')
   const { data: pack } = await supabase.from('style_packs').select('tone_words').eq('creator_id', TEST_ACCOUNT).maybeSingle()
-  const tone = ((pack?.tone_words as string[] | undefined) ?? []).join(', ')
-  // Job H.0a: the Figma idea is "Rooftop chase, night"; this card is its test-account twin, so night is added.
-  const brief = [`${card.title}, at night`, card.gist, tone && `Look: ${tone}`].filter(Boolean).join('. ')
+  // Job H.0a: the Figma idea is "Rooftop chase, night"; this card is its test-account twin, so night is added. The
+  // style pack fills gaps and never contradicts the idea (brief.ts): "soft daylight" goes, "film grain" stays.
+  const built = buildBrief({ idea: [`${card.title}, at night`, card.gist as string], tone: (pack?.tone_words as string[] | undefined) ?? [] })
+  if (built.dropped.length) console.log(`brief: dropped ${built.dropped.map((d) => `"${d.word}" (${d.because.join('/')})`).join(', ')}`)
+  const brief = built.text
   const people = await peopleFor(supabase, TEST_ACCOUNT, card.recording_id as string | null)
 
   const soulId = process.env.SOUL_ID
