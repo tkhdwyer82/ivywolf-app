@@ -19,13 +19,23 @@ import {
   type ClassifyOutput,
 } from '@ivywolf/schema'
 
-export type ShapeVersion = 'shape_v1'
-/** The version that ships. A new version ships through the same ratchet as classify (CLAUDE.md). */
-export const SHAPE_VERSION: ShapeVersion = 'shape_v1'
+export type ShapeVersion = 'shape_v1' | 'shape_v2'
+/**
+ * The version that ships. A new version ships through the same ratchet as classify (CLAUDE.md).
+ * shape_v1 — Job B revised, 2026-10-05: visual_query names the photographic subject, no style words.
+ * shape_v2 — ratcheted over shape_v1, 2026-10-09 (H.0c): visual_query says what the picture should feel like (light,
+ *   textures, setting, telling details), not the literal action — "morning light, bare feet, bathroom tiles", not
+ *   "person stepping on bathroom scale". Only the shape pass differs, so both ran on the stored classify_v6 output of
+ *   the 3 memos (thomas-st, milton-st, rooftop-chase), 3 runs each, same diff() and expected.json
+ *   (eval/shape-ratchet.ts): 79 checks, every pass rate equal, v2 worse on none. A first draft with a rooftop example
+ *   was dropped: the rooftop memo copied it verbatim in 2 of 3 runs.
+ */
+export const SHAPE_VERSION: ShapeVersion = 'shape_v2'
 const MODEL = 'claude-opus-5'
 
 const PROMPT_FILES: Record<ShapeVersion, URL> = {
   shape_v1: new URL('./prompts/shape_v1.md', import.meta.url),
+  shape_v2: new URL('./prompts/shape_v2.md', import.meta.url),
 }
 const loadPrompt = (v: ShapeVersion) => readFileSync(fileURLToPath(PROMPT_FILES[v]), 'utf8')
 

@@ -75,3 +75,47 @@ Fetched live, never stored, never used to make anything." Applied 9 Oct 2026.
   state and PKCE, unaltered pins, and the Pinterest guards (no `generate()`, no `style_signals`).
 - `npx tsx --env-file=.env.local scripts/smoke-references.ts`: live Unsplash and Pixabay for the test account's
   rooftop card. Prints the 6 references with their credits.
+
+## Before / after: visual_query that says how the picture should feel (shape_v2, 9 Oct 2026)
+The references follow the card's `visual_query`. The classifier used to name the action literally ("person stepping
+on bathroom scale"). Unsplash took that literally and drifted after the first result, and Pixabay matched single
+words: a lizard, a running man, an eye close-up. `shape_v2` asks for what the picture should *feel* like (light,
+textures, setting, telling details) instead. It shipped through the ratchet against `shape_v1`: 3 memos, 3 runs each,
+79 checks, none worse (`packages/pipeline/eval/shape-ratchet.ts`; the record is above `SHAPE_VERSION` in `shape.ts`).
+The 15 test-account cards were re-queried with it (`scripts/backfill-shapes.ts --requery`, visual_query only; forms
+and photos unchanged).
+
+**The scale card** ("Get back under 10% again"), production `GET /api/references`:
+
+| | Query | What came back |
+|---|---|---|
+| Before 1 (interleaved, Pixabay unfiltered) | person stepping on bathroom scale | person on a digital scale ✓ · **lizard** · toddler in slippers · kitchen scale · woman by a doorway · **running man** |
+| Before 2 (Pixabay tags, 1 word) | person stepping on bathroom scale | person on a scale ✓ · hotel bathroom · toddler · **eye close-up** · woman by a doorway · **portrait** |
+| Before 3 (Unsplash first) | person stepping on bathroom scale | person on a scale ✓ · toddler · woman by a doorway · woman on a bed · feet in a shoe rack · "text" |
+| **After (shape_v2)** | early morning light, empty gym floor, chalk dust | empty indoor court · empty court with hoop · fire hydrant · abandoned gymnasium · dark gym with LED light · row of cardio machines |
+
+Before, one result showed the idea literally and the rest drifted. After, five of six share the feel of the idea
+(early, empty, the work about to start). One misses (the fire hydrant).
+
+**Every test-account card, before → after:**
+
+| Card | shape_v1 | shape_v2 |
+|---|---|---|
+| Rooftop chase ending with Ivy Mini | person leaping between city rooftops | city rooftops at dusk, gravel ledges, hazy skyline, wind |
+| Fashion walk that ends through the roof | model walking a runway holding phone | runway lights, glossy floor, soaring ceiling, dusk |
+| Unboxing videos with 20 creators | hands opening a packed box | colourful tissue paper, open box, soft daylight |
+| Higgs Field unboxing with matching profile | hands opening a product box on a table | plain cardboard box, tabletop, soft daylight |
+| Founder video on what makes us different | person speaking into small microphone | soft desk lamp, clean studio backdrop, quiet morning light |
+| I open it, then a special interview | two people talking across a table | warm studio light, two chairs, trailing cables |
+| First 20 people for unboxing and promos | hands opening a shipping box | unopened parcels, kraft paper, soft desk light |
+| Copy the energy drink content flywheel | cans of energy drink on a table | laptop screen glow, scattered notes, late night desk |
+| 3D printed design of everything | 3D printer making a small object | filament spools, workbench clutter, cool workshop light |
+| Huracan once this really takes off | sports car parked on city street | polished concrete garage, glossy low sports car, dramatic light |
+| Bank banner line spotted | bank advertising banner on street | city street banner, overcast daylight, glass facade |
+| Creating never felt so magic | large banner hanging on building exterior | wide banner mockup, soft studio light, clean typography |
+| We're the visual version of Granola | person recording video on phone tripod | warm desk light, open notebook, quiet workspace |
+| Link ideas together with a flow | sticky notes connected by string | pinned notes, string lines, corkboard, soft lamplight |
+| Get back under 10% again | person stepping on bathroom scale | early morning light, empty gym floor, chalk dust |
+
+Status: **Job H.0c is closed** (9 Oct 2026). The open item is Pinterest's app secret; until it's set, Pinterest
+stays "coming soon".
