@@ -31,10 +31,13 @@ export function IvyNote({
   dissolve,
   onGone,
   onPlay,
+  quiet = false,
 }: {
   sentences: IvySentence[]
   dissolve: boolean
   onGone: () => void
+  /** A grey dot instead of lime, on a screen whose one lime thing is something else (More ideas: the +). */
+  quiet?: boolean
   /** Tap the line: play the moment its cite points at. */
   onPlay?: (cite: NonNullable<IvySentence['cite']>) => void
 }) {
@@ -90,7 +93,7 @@ export function IvyNote({
       accessibilityHint={playable ? 'Plays that moment' : undefined}
       accessibilityLiveRegion="polite"
     >
-      <View style={styles.dot} />
+      <View style={[styles.dot, quiet && styles.dotQuiet]} />
       {/* The whole line and its cite, clear, hold the note at its final height from the start. Over it: the words
           written so far with the caret, then the cite in its own layer so it fades on its own (nested Text spans
           can't animate opacity on iOS). Each layer lays out the same text from the same start, so the words land
@@ -134,6 +137,7 @@ const DOT_TOP = (type['Body / Large'].lineHeight - DOT) / 2
 const styles = StyleSheet.create({
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: DOT, paddingHorizontal: space.margin, paddingTop: space.stack },
   dot: { width: DOT, height: DOT, borderRadius: DOT / 2, marginTop: DOT_TOP, backgroundColor: colour.Lime },
+  dotQuiet: { backgroundColor: colour.Grey },
   layers: { flex: 1 },
   words: type['Body / Large'],
   caret: { color: colour.Lime },

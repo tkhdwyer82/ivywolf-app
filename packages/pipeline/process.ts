@@ -18,6 +18,7 @@ export { claimRecording, markFailed } from './graph'
 // For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
 export { photoForCard } from './frames'
 export { findReferences, pinterestAvailable, trackReferenceUse, type Reference, type ReferenceSource } from './references'
+export { generateDirections, shouldGenerate, MIN_CARDS as DIRECTIONS_MIN_CARDS } from './suggest'
 export { transcribe } from './transcribe'
 // For the MCP server's search_ideas (apps/web/lib/mcp/handlers.ts): the same embedding and similarity threading uses.
 export { embed } from './embed'

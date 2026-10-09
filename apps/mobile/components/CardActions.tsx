@@ -16,6 +16,7 @@ import { setHeart } from '@/lib/idea'
 import { link, linkedLine, suggestedLinks, unlink, type Links } from '@/lib/links'
 import { changeDate, isoDay, loadTodo, setTodoDone } from '@/lib/todo'
 import { dismissSuggestion, pinSuggestion, type Suggestion } from '@/lib/suggestions'
+import { dismissDirection, heartDirection, saveDirection, type Direction } from '@/lib/directions'
 import type { HoldAction } from '@/components/HoldArc'
 import { LinkDone, LinkLines, Toast, type LinkLinesHandle, type LinkMark } from '@/components/LinkMode'
 import { ShareSheet } from '@/components/ShareSheet'
@@ -242,6 +243,62 @@ export function useCardActions({
     [supabase, reload, findCard, startLinking, say, fail]
   )
 
+  /**
+   * A direction's arc (Job H): ♥ · Save · Link to… · Not this — the same arc as every tile; the + on the tile is Save
+   * too. A direction isn't hers until she saves it: Link to… saves it, then links from its new card.
+   */
+  const directionActions = useCallback(
+    (d: Direction, onGone: (d: Direction) => void, onChanged: () => void): HoldAction[] => [
+      {
+        key: 'like',
+        label: d.hearted_at ? 'Unlike' : 'Like',
+        icon: d.hearted_at ? 'heart.slash' : 'heart',
+        run: () => heartDirection(supabase, d.id, !d.hearted_at).then(onChanged, fail),
+      },
+      {
+        key: 'save',
+        label: 'Save',
+        icon: 'plus',
+        run: async () => {
+          onGone(d)
+          try {
+            await saveDirection(supabase, d.id)
+            say('Saved to this project.')
+          } catch (e) {
+            fail(e)
+          }
+          reload()
+        },
+      },
+      {
+        key: 'link',
+        label: 'Link to…',
+        icon: 'link',
+        run: async () => {
+          onGone(d)
+          try {
+            const cardId = await saveDirection(supabase, d.id)
+            await reload()
+            const card = findCard?.(cardId)
+            if (card) startLinking(card)
+          } catch (e) {
+            fail(e)
+          }
+        },
+      },
+      {
+        key: 'not',
+        label: 'Not this',
+        icon: 'xmark',
+        run: () => {
+          onGone(d)
+          dismissDirection(supabase, d.id).then(() => reload(), fail)
+        },
+      },
+    ],
+    [supabase, reload, findCard, startLinking, say, fail]
+  )
+
   /** A tile's view, for the link lines. Stable per id. */
   const viewRef = useCallback(
     (id: string) => {
@@ -274,6 +331,7 @@ export function useCardActions({
       linking,
       actionsFor,
       suggestionActions,
+      directionActions,
       markFor,
       toggleLink,
       startLinking,
@@ -284,6 +342,6 @@ export function useCardActions({
       openContext: setContext,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [linking, actionsFor, suggestionActions, markFor, toggleLink, startLinking, viewRef, share, context, toast]
+    [linking, actionsFor, suggestionActions, directionActions, markFor, toggleLink, startLinking, viewRef, share, context, toast]
   )
 }
