@@ -8,6 +8,7 @@
 // the thread — never on a pull-to-refresh alone.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isPinterestSource, PINTEREST } from '@ivywolf/schema'
 
 export const GATE_RETURNS = 3
 export const MAX_SHOWN = 5
@@ -24,6 +25,7 @@ export interface Suggestion {
   threadId: string
   nearCardId: string | null
   field: 'format' | 'sound' | 'aesthetic' | 'topic' | 'graph'
+  /** 'pinterest' only ever live from the Pinterest API, never from a stored row (packages/schema/pinterest.ts). */
   source: 'youtube' | 'tiktok' | 'pinterest' | 'graph'
   sourceUrl: string | null
   sourceHandle: string | null
@@ -90,7 +92,9 @@ export async function loadMoreIdeas(
   if (!thread) return null
   const suggestions = need(
     'suggestions',
-    await supabase.from('suggestions').select(COLUMNS).eq('thread_id', thread.id).eq('status', 'shown').order('rank').limit(MAX_SHOWN)
+    // Pinterest terms (packages/schema/pinterest.ts): a stored Pinterest suggestion is a cached pin — never shown from
+    // our copy. Pinterest suggestions arrive live from its API (not built yet) and render unaltered, linked back.
+    await supabase.from('suggestions').select(COLUMNS).eq('thread_id', thread.id).eq('status', 'shown').neq('source', PINTEREST).order('rank').limit(MAX_SHOWN)
   ) as Row[]
   return { thread, suggestions: suggestions.map(toSuggestion) }
 }
@@ -129,7 +133,7 @@ export async function loadSuggestion(supabase: SupabaseClient, id: string): Prom
         why_rec: { storage_path: string | null; recorded_at: string | null } | null
       })
     | null
-  if (!row) return null
+  if (!row || isPinterestSource(row.source)) return null // a stored pin is never shown (see loadMoreIdeas)
   return {
     ...toSuggestion(row),
     status: row.status,

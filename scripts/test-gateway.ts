@@ -118,8 +118,17 @@ const quoted = buildBrief({ idea: ['Rooftop chase, at night', 'Ends holding it u
 check('no double full stop after a quote', quoted.text === 'Rooftop chase, at night. Ends holding it up saying "I have it." Look: film grain.', quoted.text)
 check('whole words only: "Sunday" is not "sun…", "daytrip" not "day"', aspectsOf('Sunday daytrip').size === 0)
 
+// Pinterest terms: generate() refuses a pin image ref or a pin link in the brief before anything is estimated or sent.
+import('../packages/pipeline/generate').then(async ({ generate }) => {
+  const refused = async (args: Parameters<typeof generate>[0]) => generate(args).then(() => false, (e: Error) => /Pinterest/.test(e.message))
+  check('generate refuses a Pinterest image ref', await refused({ creatorId: 'x', model: 'kling-3.0-std-t2v', brief: 'a', refs: [{ kind: 'image', url: 'https://i.pinimg.com/a.jpg' }] }))
+  check('generate refuses a pin link in the brief', await refused({ creatorId: 'x', model: 'kling-3.0-std-t2v', brief: 'like https://www.pinterest.com/pin/1/' }))
+  finish()
+})
+function finish() {
 if (failed) {
   console.error(`${failed} failed`)
   process.exit(1)
 }
 console.log('all passed')
+}

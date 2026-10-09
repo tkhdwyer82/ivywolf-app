@@ -10,6 +10,8 @@
 // The file: { "threads": [ { "creator_id", "thread_id" | "thread_title", "suggestions": [five of
 //   { field, source, source_url?, source_handle?, source_score?, title, why?, near_card_title?, frame_url? | frame_file? }] } ] }
 // frame_file is an image beside the JSON: uploaded to the frames bucket under <creator>/fixture/, its public URL used.
+// Never 'pinterest': Pinterest's terms allow storing only the OAuth token — no pins, pin images or board data
+// (packages/schema/pinterest.ts). Pinterest suggestions are fetched live and never seeded.
 // Rank is the order in the file. A thread is found by id, or by its exact title for that creator; the project is
 // the thread's. near_card_title names a card in that thread: it becomes near_card_id, and the why line's recording
 // and moment are that card's (why_recording_id, why_ms), so "…you said 'box tips over first' on Thu 0:31" plays from
@@ -25,7 +27,7 @@ const PER_THREAD = 5
 
 const Suggestion = z.object({
   field: z.enum(['format', 'sound', 'aesthetic', 'topic', 'graph']),
-  source: z.enum(['youtube', 'tiktok', 'pinterest', 'graph']),
+  source: z.enum(['youtube', 'tiktok', 'graph']), // no 'pinterest': see the header
   source_url: z.string().url().optional(),
   source_handle: z.string().optional(),
   source_score: z.number().positive().optional(),

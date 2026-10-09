@@ -55,7 +55,11 @@ export type Card = {
   cite: Cite
 } & Link
 
-/** Cards pinned from More ideas (0030/0031) — not hers to cite by recording, so not in these reads yet. */
+/**
+ * Cards pinned from More ideas (0030/0031) — not hers to cite by recording, so not in these reads yet. 'pinterest' is
+ * here for completeness only: no Pinterest pin is ever stored as a card, and none is sent to another tool through MCP
+ * (Pinterest developer terms, packages/schema/pinterest.ts).
+ */
 const PINNED_SOURCES = '(youtube,tiktok,pinterest,graph)'
 
 const CARD_COLUMNS =
