@@ -33,8 +33,9 @@ writeFileSync(
     `\nexport const colour = {\n${paints.join('\n')}\n} as const\n`
 )
 
-// SF Pro is the iOS system font: no fontFamily. Figma's variable weights map to iOS's: 590 semibold, 510 medium.
-const weight = (w: number) => String(w >= 650 ? 700 : w >= 560 ? 600 : w >= 460 ? 500 : 400)
+// SF Pro is the iOS system font: no fontFamily. Figma's variable weights map to iOS's: 590 semibold, 510 medium,
+// 800 heavy.
+const weight = (w: number) => String(w >= 750 ? 800 : w >= 650 ? 700 : w >= 560 ? 600 : w >= 460 ? 500 : 400)
 const styles = Object.entries(t.textStyles).map(([name, s]) => {
   const colour = s.colour ? `colour.${s.colour.split(' / ')[1]}` : 'colour.Ink'
   const lh = s.lineHeight === null ? '' : ` lineHeight: ${s.lineHeight},`

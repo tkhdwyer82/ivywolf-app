@@ -1,10 +1,10 @@
 // apps/mobile/components/CollapsingHeader.tsx
 // Home's header, Pinterest-style: a logo row over a chips row, floating over the feed.
 // - The status-bar strip is always opaque; tiles never show behind the clock.
-// - The logo row (49) moves up 1:1 with scroll-down and is faded out by half its travel; the chips row (41) rides up
-//   to sit directly under the status bar.
-// - Any scroll-up brings the logo row back (diff-clamp), wherever you are in the feed.
-// - On release, a half-shown logo row snaps open or closed (200 ms).
+// - After 120 of steady scroll-down, the logo row (49) moves up 1:1 and is faded out by half its travel; the chips
+//   row (41) rides up to sit directly under the status bar.
+// - Scroll-up past a 40 dead zone brings the logo row back (diff-clamp), wherever you are in the feed.
+// - On release, a half-shown logo row snaps open or closed (200 ms); near the top of the feed it always opens.
 // Wire useCollapsingHeader().onScroll to the feed (an Animated FlashList) and pad the feed by useHeaderInset().
 
 import type { ReactNode } from 'react'
@@ -29,6 +29,8 @@ export const LOGO_ROW_H = 49
 export const CHIP_ROW_H = 41
 const FEED_GAP = 8
 const SNAP_MS = 200
+const HIDE_AFTER = 120 // ~half a tile of steady scroll-down before the logo row starts to move
+const SHOW_AFTER = 40 // small dead zone on the way back so a thumb wobble doesn't reveal it
 const HAIRLINE = 'rgba(0,0,0,0.08)'
 
 /**
@@ -38,6 +40,7 @@ const HAIRLINE = 'rgba(0,0,0,0.08)'
 export function useCollapsingHeader({ onScroll, onBeginDrag }: { onScroll?: () => void; onBeginDrag?: () => void } = {}) {
   const hidden = useSharedValue(0)
   const lastY = useSharedValue(0)
+  const travel = useSharedValue(0) // distance scrolled in the current direction
 
   const handler = useAnimatedScrollHandler(
     {
@@ -51,9 +54,21 @@ export function useCollapsingHeader({ onScroll, onBeginDrag }: { onScroll?: () =
         const y = Math.min(Math.max(0, e.contentOffset.y), maxY)
         const dy = y - lastY.value
         lastY.value = y
-        // Near the very top the logo row is never more hidden than the distance scrolled.
-        hidden.value = Math.min(LOGO_ROW_H, Math.max(0, hidden.value + dy), y)
         if (onScroll) scheduleOnRN(onScroll)
+        if (dy === 0) return
+
+        // Direction flipped: start counting again.
+        if (Math.sign(dy) !== Math.sign(travel.value)) travel.value = 0
+        travel.value += dy
+
+        const gate = dy > 0 ? HIDE_AFTER : SHOW_AFTER
+        const over = Math.abs(travel.value) - gate
+        if (over > 0) {
+          const step = Math.sign(dy) * Math.min(Math.abs(dy), over)
+          hidden.value = Math.min(LOGO_ROW_H, Math.max(0, hidden.value + step))
+        }
+        // Near the top of the feed the logo row stays fully shown.
+        hidden.value = Math.min(hidden.value, Math.max(0, y - HIDE_AFTER))
       },
       onEndDrag: (e) => {
         if (Math.abs(e.velocity?.y ?? 0) < 0.2) snap(hidden, lastY) // no fling → snap now
@@ -70,7 +85,8 @@ export function useCollapsingHeader({ onScroll, onBeginDrag }: { onScroll?: () =
 
 function snap(hidden: SharedValue<number>, lastY: SharedValue<number>) {
   'worklet'
-  const target = hidden.value > LOGO_ROW_H / 2 && lastY.value > LOGO_ROW_H ? LOGO_ROW_H : 0
+  let target = hidden.value > LOGO_ROW_H / 2 ? LOGO_ROW_H : 0
+  if (lastY.value < HIDE_AFTER + LOGO_ROW_H / 2) target = 0
   hidden.value = withTiming(target, { duration: SNAP_MS, easing: Easing.out(Easing.cubic) })
 }
 

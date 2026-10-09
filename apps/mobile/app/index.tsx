@@ -370,10 +370,8 @@ function FirstOpen({ writing, failed }: { writing: boolean; failed: ReactNode })
   )
 }
 
-// L3b Home (Figma 209:2) — measured, not tokens: the wordmark is Bold 26 (no text style); the day overline sits 10
-// above its tiles. First open (L1, 170:5) keeps its own frame: headline Bold 28 at y 330, body Regular 16 at 374,
+// L3b Home (Figma 209:2) — measured, not tokens: the day overline sits 10 above its tiles. First open (L1, 170:5) keeps its own frame: headline Bold 28 at y 330, body Regular 16 at 374,
 // arrow 28 × 60 at y 660.
-const WORDMARK = 26
 const OVERLINE_GAP = 10
 const TAP_SLOP = (size.tap - size.icon) / 2
 const L1 = { frame: 852, heroTop: 330, title: 28, body: 16, bodyLine: 19, bodyWidth: 330, bodyGap: 10, arrowBottom: 132, arrowW: 28, arrowH: 60 }
@@ -383,7 +381,7 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.margin },
   secondary: { color: colour.Grey, textAlign: 'center' },
   error: { color: colour.Grey, paddingHorizontal: space.margin, paddingTop: space.gutter },
-  wordmark: { ...type['Title / Screen'], fontSize: WORDMARK, lineHeight: undefined, letterSpacing: 0 },
+  wordmark: type['Title / Wordmark'],
   avatar: { width: size.icon, height: size.icon, alignItems: 'center', justifyContent: 'center' },
   avatarGlyph: { width: size.icon / 2, height: size.icon / 2 },
   // The list is inset by margin − gutter/2 and every cell pads gutter/2, so tiles sit at the margin, a gutter apart;
