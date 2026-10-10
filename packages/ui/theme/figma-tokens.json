@@ -31,6 +31,7 @@
   },
   "textStyles": {
     "Title / Screen": { "style": "Bold", "size": 34, "weight": 700, "lineHeight": 36, "letterSpacing": -0.6 },
+    "Title / Wordmark": { "style": "Heavy", "size": 26, "weight": 800, "lineHeight": null, "letterSpacing": -0.8 },
     "Title / Section": { "style": "Bold", "size": 22, "weight": 700, "lineHeight": 28, "letterSpacing": -0.4 },
     "Heading / Small": { "style": "Semibold", "size": 18, "weight": 590, "lineHeight": 22, "letterSpacing": -0.2 },
     "Heading / Card": { "style": "Semibold", "size": 17, "weight": 590, "lineHeight": 24, "letterSpacing": -0.3 },

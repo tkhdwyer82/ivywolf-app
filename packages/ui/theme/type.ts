@@ -4,6 +4,7 @@ import { colour } from './metrics'
 
 export const type = {
   'Title / Screen': { fontSize: 34, fontWeight: '700', lineHeight: 36, letterSpacing: -0.6, color: colour.Ink },
+  'Title / Wordmark': { fontSize: 26, fontWeight: '800', letterSpacing: -0.8, color: colour.Ink },
   'Title / Section': { fontSize: 22, fontWeight: '700', lineHeight: 28, letterSpacing: -0.4, color: colour.Ink },
   'Heading / Small': { fontSize: 18, fontWeight: '600', lineHeight: 22, letterSpacing: -0.2, color: colour.Ink },
   'Heading / Card': { fontSize: 17, fontWeight: '600', lineHeight: 24, letterSpacing: -0.3, color: colour.Ink },
