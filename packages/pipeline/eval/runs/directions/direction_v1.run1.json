@@ -1,0 +1,147 @@
+{
+  "kept": [
+    {
+      "title": "Show what she actually got",
+      "gist": "After the rooftop and the radio call, open the screen: a spoken idea turning into a card. The chase was for a thought.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "dusk rooftop, screen glow, breath",
+      "why": "from Tue 0:05: “opens up the device in her hands and then radios through”",
+      "cite_card_ids": [
+        "2026-09-22_rooftop-chase#0"
+      ],
+      "cite_recording_id": "2026-09-22_rooftop-chase",
+      "cite_ms": 5440,
+      "payload": {
+        "board": {
+          "hook": "Everyone's chasing it. Nobody knows what.",
+          "beats": [
+            "Street sprint",
+            "Rooftop leap",
+            "Device opens",
+            "Idea becomes card",
+            "Logo"
+          ]
+        }
+      }
+    },
+    {
+      "title": "The device as a relay baton",
+      "gist": "One continuous run where the device is handed off at speed between different people, each adding a line before passing it on.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "motion blur, outstretched hands, city pavement",
+      "why": "from Mon 0:40: “different hands and different people”",
+      "cite_card_ids": [
+        "2026-09-21_thomas-st#1"
+      ],
+      "cite_recording_id": "2026-09-21_thomas-st",
+      "cite_ms": 40590,
+      "payload": {
+        "board": {
+          "hook": "It never stays in one hand.",
+          "beats": [
+            "First grab",
+            "Hand-off",
+            "Hand-off",
+            "Ideas link",
+            "Final catch"
+          ]
+        }
+      }
+    },
+    {
+      "title": "Four stages, four shots",
+      "gist": "Map the product-to-video chain onto exactly four shots, so the launch cut has one image per stage and nothing else.",
+      "format": "diagram",
+      "stretch": true,
+      "visual_query": "clean desk, soft daylight, single object",
+      "why": "from Mon 0:40: “make the product, then the AI, and then the output”",
+      "cite_card_ids": [
+        "2026-09-21_thomas-st#1"
+      ],
+      "cite_recording_id": "2026-09-21_thomas-st",
+      "cite_ms": 40590,
+      "payload": {
+        "diagram": {
+          "title": "Stage to shot",
+          "rows": [
+            {
+              "from": "Product",
+              "to": "Device in hand"
+            },
+            {
+              "from": "AI",
+              "to": "Ideas connecting"
+            },
+            {
+              "from": "Output",
+              "to": "Cards appear"
+            },
+            {
+              "from": "Video",
+              "to": "Finished cut"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Separate ideas meeting on screen",
+      "gist": "Creators speak into the device in different places; their separate lines drift together on screen and lock into one connected idea.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "different rooms, warm lamps, quiet voices",
+      "why": "from Mon 0:01: “the hook being that the ideas are connected into”",
+      "cite_card_ids": [
+        "2026-09-21_thomas-st#0"
+      ],
+      "cite_recording_id": "2026-09-21_thomas-st",
+      "cite_ms": 1440,
+      "payload": {
+        "board": {
+          "hook": "Three people. One idea. Never met.",
+          "beats": [
+            "Voice one",
+            "Voice two",
+            "Voice three",
+            "Lines connect",
+            "Logo"
+          ]
+        }
+      }
+    },
+    {
+      "title": "Cold open on the radio line",
+      "gist": "Start on black with only the radio crackle and the words, then rewind fast through the chase to show how she got there.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "black frame, radio static, night street",
+      "why": "from Tue 0:05: “radios through and says, I've got it.”",
+      "cite_card_ids": [
+        "2026-09-22_rooftop-chase#0"
+      ],
+      "cite_recording_id": "2026-09-22_rooftop-chase",
+      "cite_ms": 5440,
+      "payload": {
+        "board": {
+          "hook": "Black screen. \"I've got it.\"",
+          "beats": [
+            "Static",
+            "Fast rewind",
+            "Rooftop",
+            "Street fight",
+            "Logo"
+          ]
+        }
+      }
+    }
+  ],
+  "dropped": [],
+  "model": "claude-opus-5-5",
+  "cents": 5.3558,
+  "usage": {
+    "input_tokens": 832,
+    "output_tokens": 1946
+  }
+}

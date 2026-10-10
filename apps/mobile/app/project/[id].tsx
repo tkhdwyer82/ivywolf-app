@@ -2,9 +2,11 @@
 // Project (P11). Back; share and ••• (Rename, Delete — her own projects only; the defaults can't be changed); the
 // name; the Private project chip and "4 ideas · 1 board"; the ideas in a two-column masonry, frames only; the action
 // bar (Talk, scoped to this project).
-// More ideas (Job G, P12b 202:2): a tab only when a thread in the project has come back ≥ 3 times — "Your ideas" (a
-// strip of her thumbs, → All ideas) and "More ideas for this thread" (up to five suggestions, each a frame with a
-// lime pin: tap opens it, long-press hides it).
+// More ideas (Job H, Figma 165:423): Ivy's directions for the project — new things her own cards point to, each with
+// one cited line of her words and 3 references under it (lib/directions.ts). Staged: the tabs and the bar's More ideas
+// appear once the project has 3 cards. Opening the project checks whether directions are due (a change quiet 5 min,
+// or 24 h old) and they're rewritten in the background. Each direction is a tile with a lime + (Save, the screen's one
+// lime thing); ♥ · Save · Link to… · Not this live in the hold arc. Job G's thread suggestions no longer show here.
 // No blank state (rule 1): a project with no ideas yet is one prompt to talk to it.
 // Job I (165:5, 1468:128): the header is fixed under the status bar — back; add people (private in the pilot, and
 // says so), share, •••; POWERED BY her connected tools and + Add tool; All ideas · More ideas always (More ideas is
@@ -25,10 +27,12 @@ import { useSupabase } from '@/lib/supabase'
 import { masonry, tileHeight } from '@/lib/home'
 import { countLine, deleteProject, loadProject, renameProject, type ProjectPage } from '@/lib/project'
 import { Tile, useTileWidth } from '@/components/Tile'
-import { SuggestionTile } from '@/components/SuggestionTile'
 import { ProjectTabs, type ProjectTab } from '@/components/ProjectTabs'
 import { Shimmer } from '@/components/Shimmer'
-import { loadMoreIdeas, takePinNote, type PinNote, type Suggestion } from '@/lib/suggestions'
+import { takePinNote, type PinNote } from '@/lib/suggestions'
+import { loadDirections, referenceUsed, saveDirection, type Direction, type Directions } from '@/lib/directions'
+import { DirectionTile } from '@/components/DirectionTile'
+import { useAuth } from '@clerk/clerk-expo'
 import { IvyNote } from '@/components/IvyNote'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, radius, size, space, type } from '@ivywolf/ui'
@@ -55,7 +59,9 @@ function ProjectScreen() {
   const [page, setPage] = useState<ProjectPage | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<ProjectTab>('all')
-  const [more, setMore] = useState<Awaited<ReturnType<typeof loadMoreIdeas>>>(null)
+  const [dirs, setDirs] = useState<Directions | null>(null)
+  const [ivyLine, setIvyLine] = useState<string | null>(null)
+  const { getToken } = useAuth()
   const [pinNote, setPinNote] = useState<PinNote | null>(null)
   const [dissolve, setDissolve] = useState(false)
   const [menu, setMenu] = useState(false)
@@ -71,28 +77,64 @@ function ProjectScreen() {
       setDissolve(false)
       setTab('all')
     }
-    Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id), loadTools(supabase)])
-      .then(([p, m, t]) => {
+    Promise.all([loadProject(supabase, id), loadTools(supabase)])
+      .then(([p, t]) => {
         setPage(p)
-        setMore(m)
         setTools(t)
         setError(null)
       })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
+    // Opening the project is a trigger: due directions are rewritten in the background (no references needed yet).
+    refreshDirections(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supabase, id])
 
-  // Kept or set aside from the arc: gone from the tab at once. If it didn't take, the next load puts it back.
-  const gone = useCallback((s: Suggestion) => {
-    setMore((m) => (m ? { ...m, suggestions: m.suggestions.filter((x) => x.id !== s.id) } : m))
+  // Directions, with references when the tab is open. While new ones are being written the previous set shows, and
+  // the tab looks again in a little while (twice at most) — never on scroll.
+  const polls = useRef(0)
+  const refreshDirections = useCallback(
+    async (withReferences: boolean) => {
+      const token = await getToken()
+      if (!token) return
+      try {
+        const d = await loadDirections(token, id, withReferences)
+        setDirs((prev) => (withReferences || !prev ? d : { ...d, directions: prev.directions }))
+        if (d.generating && withReferences && polls.current < 2) {
+          polls.current++
+          setTimeout(() => refreshDirections(true), 25_000)
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'More ideas didn’t load')
+      }
+    },
+    // getToken is a new function every render (Clerk): never key on it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [id]
+  )
+  // The More ideas tab opened: directions with references, and Ivy's one line (it dissolves).
+  useEffect(() => {
+    if (tab !== 'more') return
+    polls.current = 0
+    refreshDirections(true)
+  }, [tab, refreshDirections])
+  useEffect(() => {
+    if (tab === 'more' && dirs?.ivy_line && dirs.directions.length) {
+      setIvyLine(dirs.ivy_line)
+      setDissolve(false)
+    }
+  }, [tab, dirs?.ivy_line, dirs?.directions.length])
+
+  // Saved or set aside: gone from the tab at once. If it didn't take, the next load puts it back.
+  const gone = useCallback((d: Direction) => {
+    setDirs((x) => (x ? { ...x, directions: x.directions.filter((y) => y.id !== d.id) } : x))
   }, [])
-  const [moreLeft, moreRight] = useMemo(() => balance(more?.suggestions ?? []), [more])
+  const [dirLeft, dirRight] = useMemo(() => balanceDirections(dirs?.directions ?? []), [dirs])
   useFocusEffect(load)
 
   // load() returns nothing; the arc's reload wants to wait for the page, so it loads directly.
   const reload = useCallback(async () => {
-    const [p, m] = await Promise.all([loadProject(supabase, id), loadMoreIdeas(supabase, id)])
+    const p = await loadProject(supabase, id)
     setPage(p)
-    setMore(m)
     return p
   }, [supabase, id])
   const latest = useRef<ProjectPage | null | undefined>(undefined)
@@ -192,6 +234,15 @@ function ProjectScreen() {
   const people = () => Alert.alert('Private project', 'Only you can view this project.')
   const pinned = pinnedOf(ideas)
   const [left, right] = masonry(ideas.filter((i) => !i.pinnedAt))
+  // Staged unlock (Job H): More ideas — the tab and the bar's verb — once the project has 3 cards.
+  const unlocked = dirs?.unlocked ?? ideas.length >= 3
+  // + : the direction becomes a card in this project (and on Home); it leaves the tab.
+  const saveOne = (d: Direction) => {
+    gone(d)
+    saveDirection(supabase, d.id)
+      .then(() => reload())
+      .catch((e) => setError(e instanceof Error ? e.message : 'That didn’t save'))
+  }
 
   // Rule 1: before the first idea, the whole screen is the prompt to talk to it.
   if (ideas.length === 0) {
@@ -243,9 +294,10 @@ function ProjectScreen() {
               <IvyNote sentences={[{ text: pinNote.text, cites: pinNote.cites }]} dissolve={dissolve} onGone={() => setPinNote(null)} />
             </View>
           )}
-          <ProjectTabs tab={tab} onChange={setTab} />
+          {unlocked && <ProjectTabs tab={tab} onChange={setTab} />}
+          {!unlocked && <View style={styles.noTabs} />}
 
-          {tab === 'all' ? (
+          {tab === 'all' || !unlocked ? (
             <>
               <View style={styles.pinned}>
                 <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
@@ -264,60 +316,64 @@ function ProjectScreen() {
             </>
           ) : (
             <>
-              <View style={styles.sectionRow}>
-                <Text style={type['Title / Section']}>Your ideas</Text>
-                <Pressable onPress={() => setTab('all')} hitSlop={(size.tap - ARROW) / 2} style={styles.arrow} accessibilityRole="button" accessibilityLabel="All ideas">
-                  <SymbolView name="arrow.right" tintColor={colour.Ink} size={ARROW / 2} weight="semibold" />
-                </Pressable>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.strip} contentContainerStyle={styles.stripRow}>
-                {ideas.map((i) => (
-                  <Pressable key={i.id} onPress={() => router.push(`/idea/${i.id}`)} style={styles.thumb} accessibilityRole="button" accessibilityLabel={i.title}>
-                    {i.shape !== 'photo' ? (
-                      // A quote, comparison, board or text card has no picture: its title stands in.
-                      <Text style={styles.thumbTitle} numberOfLines={4}>
-                        {i.title}
-                      </Text>
-                    ) : (
-                      <>
-                        <Shimmer style={StyleSheet.absoluteFill} />
-                        {i.frameStatus === 'done' && !!i.frameUrl && (
-                          <Image source={{ uri: i.frameUrl }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
-                        )}
-                      </>
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              {!!more && more.suggestions.length > 0 && (
-                <>
-                  <Text style={[type['Title / Section'], styles.moreTitle]}>More ideas for this thread</Text>
-                  <View style={styles.columns}>
-                    {[moreLeft, moreRight].map((col, c) => (
+              {ivyLine && (
+                <View style={styles.pinNote}>
+                  <IvyNote sentences={[{ text: ivyLine, cites: [] }]} dissolve={dissolve} onGone={() => setIvyLine(null)} quiet />
+                </View>
+              )}
+              <View style={styles.columns}>
+                {dirs && dirs.directions.length > 0
+                  ? [dirLeft, dirRight].map((col, c) => (
                       <View key={c} style={{ width: tileWidth }}>
-                        {col.map((s) => (
-                          <View key={s.id} style={styles.cell}>
-                            <Hold actions={() => actions.suggestionActions(s, gone)} face={() => <SuggestionTile suggestion={s} width={tileWidth} />}>
+                        {col.map((d) => (
+                          <View key={d.id} style={styles.cell}>
+                            <Hold
+                              actions={() => actions.directionActions(d, gone, () => refreshDirections(true))}
+                              face={() => <DirectionTile direction={d} gradient={project.gradient ?? null} width={tileWidth} onSave={() => {}} />}
+                            >
                               {(onLongPress) => (
-                                <SuggestionTile suggestion={s} width={tileWidth} onOpen={(x) => router.push(`/suggestion/${x.id}`)} onLongPress={onLongPress} />
+                                <DirectionTile
+                                  direction={d}
+                                  gradient={project.gradient ?? null}
+                                  width={tileWidth}
+                                  onSave={saveOne}
+                                  onLongPress={onLongPress}
+                                  onReference={async (r) => {
+                                    const token = await getToken()
+                                    if (token) referenceUsed(token, r)
+                                  }}
+                                />
                               )}
                             </Hold>
                           </View>
                         ))}
                       </View>
+                    ))
+                  : // Rule 1: never a blank tab — while the first directions are written, the tiles shimmer.
+                    [0, 1].map((c) => (
+                      <View key={c} style={{ width: tileWidth }}>
+                        {[0, 1].map((r) => (
+                          <View key={r} style={styles.cell}>
+                            <Shimmer style={[styles.waiting, { height: tileHeight(`wait-${c}-${r}`) }]} />
+                          </View>
+                        ))}
+                      </View>
                     ))}
-                  </View>
-                </>
-              )}
+              </View>
             </>
           )}
         </View>
       </ScrollView>
 
       {actions.layer(
-        // Talk only for now (Job I). 165:5's five verbs are the full set; each joins as it's earned — Create with Job D.
-        <ActionBar verbs={[{ key: 'talk', label: 'Talk', icon: 'mic.fill', lime: true, accessibilityLabel: `Talk to ${project.name}`, onPress: talk }]} />
+        // 165:5's five verbs are the full set; each joins as it's earned: More ideas at 3 cards (Job H), Create with Job D.
+        // On More ideas the + is the screen's one lime thing, so Talk isn't lime there.
+        <ActionBar
+          verbs={[
+            ...(unlocked ? [{ key: 'more', label: 'More ideas', icon: 'sparkles' as const, onPress: () => setTab('more') }] : []),
+            { key: 'talk', label: 'Talk', icon: 'mic.fill', lime: tab !== 'more' || !unlocked, accessibilityLabel: `Talk to ${project.name}`, onPress: talk },
+          ]}
+        />
       )}
 
       {menu && <ProjectMenu top={insets.top + MENU_OFFSET} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
@@ -402,17 +458,18 @@ function ProjectMenu({ top, onClose, onRename, onDelete }: { top: number; onClos
 }
 
 
-/** Two columns of suggestions, each into the shorter one — the same fill as her ideas. */
-function balance(items: Suggestion[]): [Suggestion[], Suggestion[]] {
-  const cols: [Suggestion[], Suggestion[]] = [[], []]
+/** Two columns of directions, each into the shorter one — the same fill as her ideas (the strip adds a third of a tile). */
+function balanceDirections(items: Direction[]): [Direction[], Direction[]] {
+  const cols: [Direction[], Direction[]] = [[], []]
   const h = [0, 0]
-  for (const s of items) {
+  for (const d of items) {
     const c = h[0] <= h[1] ? 0 : 1
-    cols[c].push(s)
-    h[c] += tileHeight(s.id) + space.gutter
+    cols[c].push(d)
+    h[c] += tileHeight(d.id) + (d.references.length ? 60 : 0) + space.gutter
   }
   return cols
 }
+
 
 // P12b (Figma 202:2) — measured, not tokens: the chip is 10 under the name, radius 16 (not radius/chip), 12 × 8
 // padding (tabs: components/ProjectTabs.tsx). P12b sets its text
@@ -423,7 +480,6 @@ const CHIP_R = 16
 const CHIP_PAD_H = 12
 const CHIP_PAD_V = 8
 const COLD_MIC = 84
-const ARROW = 36 // the → disc by Your ideas (202:15)
 const COLD_PAD = 32
 const TAP_SLOP = (size.tap - size.icon) / 2
 // 1468:128 — measured: the Powered by row 10 under the chip; tool chips 32 tall with a 24 logo.
@@ -454,14 +510,8 @@ const styles = StyleSheet.create({
   addToolText: { ...type['Label / Pill'], color: colour.Grey },
   // IvyNote pads itself to the margin; the body already has it.
   pinNote: { marginHorizontal: -space.margin },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  arrow: { width: ARROW, height: ARROW, borderRadius: ARROW / 2, backgroundColor: colour.Chip, alignItems: 'center', justifyContent: 'center' },
-  // The strip runs to the screen's edge: out of the body's margin, back in for the first thumb.
-  strip: { marginHorizontal: -space.margin, marginTop: space.stack },
-  stripRow: { paddingHorizontal: space.margin, gap: space.gutter },
-  thumbTitle: { ...type['Body / Small'], fontWeight: '600', padding: space.gutter + 2 },
-  thumb: { width: size.thumb, height: size.thumb, borderRadius: radius.thumb, overflow: 'hidden', backgroundColor: colour.Chip },
-  moreTitle: { marginTop: space.section, marginBottom: space.stack },
+  noTabs: { height: space.stack },
+  waiting: { borderRadius: radius.tile },
   columns: { flexDirection: 'row', justifyContent: 'space-between' },
   cell: { paddingBottom: space.gutter },
   // PinnedRow and LinkBanner pad themselves to the margin; the body already has it.

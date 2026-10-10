@@ -1,0 +1,139 @@
+{
+  "kept": [
+    {
+      "title": "What the bad guys are chasing",
+      "gist": "Give the chase a reason: everyone is after what's on the device. The final reveal is the screen, full of connected ideas.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "dusk rooftops, wet asphalt, neon glow",
+      "why": "from Tue 0:05: “running through a street defending off bad guys”",
+      "cite_card_ids": [
+        "2026-09-22_rooftop-chase#0"
+      ],
+      "cite_recording_id": "2026-09-22_rooftop-chase",
+      "cite_ms": 5440,
+      "payload": {
+        "board": {
+          "hook": "Everyone wants what's in her hands",
+          "beats": [
+            "Street chase",
+            "Device glimpsed",
+            "Rooftop leap",
+            "Screen of ideas"
+          ]
+        }
+      }
+    },
+    {
+      "title": "Product to video, step by step",
+      "gist": "A simple map of the flow the launch video has to make feel seamless, from the device in hand to the finished video.",
+      "format": "diagram",
+      "stretch": true,
+      "visual_query": "clean desk, soft daylight, pencil sketches",
+      "why": "from Mon 0:40: “the product, then the AI, and then the output”",
+      "cite_card_ids": [
+        "2026-09-21_thomas-st#1"
+      ],
+      "cite_recording_id": "2026-09-21_thomas-st",
+      "cite_ms": 40590,
+      "payload": {
+        "diagram": {
+          "title": "The seamless flow",
+          "rows": [
+            {
+              "from": "Product",
+              "to": "AI"
+            },
+            {
+              "from": "AI",
+              "to": "Output"
+            },
+            {
+              "from": "Output",
+              "to": "Video"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Creators finish each other's ideas",
+      "gist": "One creator speaks half a thought into the device and the next picks it up, so the connected ideas become the story itself.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "warm room light, overlapping hands, close mics",
+      "why": "from Mon 0:01: “the hook being that the ideas are connected into”",
+      "cite_card_ids": [
+        "2026-09-21_thomas-st#0"
+      ],
+      "cite_recording_id": "2026-09-21_thomas-st",
+      "cite_ms": 1440,
+      "payload": {
+        "board": {
+          "hook": "One creator starts a thought",
+          "beats": [
+            "First half spoken",
+            "Next voice continues",
+            "Ideas link up",
+            "One finished video"
+          ]
+        }
+      }
+    },
+    {
+      "title": "The chase in four beats",
+      "gist": "A stripped-down cut of the chase built for short attention: only the run, the leap, the device and the logo.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "motion blur, gritty street, hard shadows",
+      "why": "from Mon 0:40: “The video should be pretty short.”",
+      "cite_card_ids": [
+        "2026-09-21_thomas-st#1"
+      ],
+      "cite_recording_id": "2026-09-21_thomas-st",
+      "cite_ms": 40590,
+      "payload": {
+        "board": {
+          "hook": "Run, jump, it's done",
+          "beats": [
+            "Sprint",
+            "Leap",
+            "Device opens",
+            "Logo"
+          ]
+        }
+      }
+    },
+    {
+      "title": "The chase began as a voice note",
+      "gist": "A making-of piece: the fight-scene idea spoken into the device, turned into a card, then a board, then the finished chase playing out.",
+      "format": "board",
+      "stretch": false,
+      "visual_query": "quiet room, screen glow, late night",
+      "why": "from Mon 0:00: “this really interesting fight scene that I saw”",
+      "cite_card_ids": [
+        "2026-09-21_milton-st#0"
+      ],
+      "cite_recording_id": "2026-09-21_milton-st",
+      "cite_ms": 880,
+      "payload": {
+        "board": {
+          "hook": "Every launch starts as a sentence",
+          "beats": [
+            "Voice note",
+            "Idea card",
+            "Board",
+            "Chase plays"
+          ]
+        }
+      }
+    }
+  ],
+  "dropped": [],
+  "model": "claude-opus-5-5",
+  "cents": 4.956,
+  "usage": {
+    "input_tokens": 832,
+    "output_tokens": 2289
+  }
+}
