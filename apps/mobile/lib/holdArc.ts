@@ -17,10 +17,12 @@ export const LABEL_OFFSET = 180
 const DEG = Math.PI / 180
 
 /** Each button's angle (radians, screen axes: y down) for this aim. Order is kept: index 0 is first around the arc. */
-export function arcAngles(base: number, n: number, step: number = ARC.step): number[] {
+export function arcAngles(base: number, n: number, step?: number): number[] {
   'worklet'
+  // The default is read in the body: a worklet doesn't capture what a default parameter refers to.
+  const apart = step ?? ARC.step
   const out: number[] = []
-  for (let i = 0; i < n; i++) out.push(base + (i - (n - 1) / 2) * step * DEG)
+  for (let i = 0; i < n; i++) out.push(base + (i - (n - 1) / 2) * apart * DEG)
   return out
 }
 
