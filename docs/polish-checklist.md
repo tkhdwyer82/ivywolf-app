@@ -2,7 +2,7 @@
 
 Finished UI details that a build must still have. Before every build (CLAUDE.md, "Branches and builds"), go down
 this list on the build's code (in the simulator or by reading the code) and report anything missing before building.
-Add a line each time a polish PR merges: what it is, how to spot it, and where it lives.
+Add a line each time a polish PR merges: what it is, how to spot it, and where it lives. Builds are listed at the end.
 
 | Detail | How to spot it | Where |
 |---|---|---|
@@ -13,3 +13,13 @@ Add a line each time a polish PR merges: what it is, how to spot it, and where i
 | Hold arc: blob, white-out and big label | Hold a card 0.35 s: the whole screen (header and nav too) whites out, the card lifts and tilts by column, the actions fan out around the thumb; slide over one and it swells and turns ink, and its name shows large in the empty half of the screen. (PR #12 — on main once merged.) | `apps/mobile/components/HoldArc.tsx`, `apps/mobile/lib/holdArc.ts` |
 | Talk-only bar | A project page's bar is the lime Talk only (plus More ideas once the project has 3 cards); no Create. | `apps/mobile/app/project/[id].tsx` |
 | Ivy's line only when something changed | Open Home twice with nothing new: no line the second time. Add a card, reopen: one line with its cite, which dissolves. | `apps/mobile/app/index.tsx` (`ivyOnOpen`) |
+
+## Builds
+
+Every TestFlight build, newest last. TestFlight can't show the preview label, so this list is how builds are told
+apart. `scripts/build-ios.sh` prints the line to add after each build.
+
+| Build | Branch | Commit |
+|---|---|---|
+| 13 | main | 6c105ef |
+| 14 | PREVIEW: home-hold-arc | e0a9df4 |

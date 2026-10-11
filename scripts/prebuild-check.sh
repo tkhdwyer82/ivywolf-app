@@ -6,8 +6,7 @@
 #   4. the typecheck and the tests pass.
 # Then it points at the polish checklist (docs/polish-checklist.md), to be run and reported before the build.
 #
-#   npm run build:testflight      # check, then build from main and submit to TestFlight
-#   npm run build:preview         # check --preview, then build this branch, notes "PREVIEW: <branch>"
+# Called by scripts/build-ios.sh (npm run build:testflight / build:preview); run it on its own to check without building.
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
