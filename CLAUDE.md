@@ -64,7 +64,8 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
 
 ## Branches and builds
 - TestFlight builds come only from main, up to date with origin/main, with a clean working tree. The one exception is a
-  preview build from a feature branch when Tim asks for one; its build notes read "PREVIEW: <branch>".
+  preview build from a feature branch when Tim asks for one; its build notes (the EAS build message) read
+  "PREVIEW: <branch>". TestFlight's "What to Test" can't be set from EAS on our plan (Enterprise only).
 - Cut builds only with `npm run build:testflight` (main) or `npm run build:preview` (a feature branch, when asked). Both
   run `scripts/prebuild-check.sh` first (branch, clean tree, matches its remote, typecheck and tests); never call
   `eas build` directly.

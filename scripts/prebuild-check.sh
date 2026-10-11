@@ -7,7 +7,7 @@
 # Then it points at the polish checklist (docs/polish-checklist.md), to be run and reported before the build.
 #
 #   npm run build:testflight      # check, then build from main and submit to TestFlight
-#   npm run build:preview         # check --preview, then build this branch, notes "PREVIEW: <branch>"
+#   npm run build:preview         # check --preview, then build this branch, build message "PREVIEW: <branch>"
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
