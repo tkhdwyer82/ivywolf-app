@@ -11,8 +11,8 @@
     "dev": "npm run dev --workspace apps/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
-    "build:testflight": "bash scripts/prebuild-check.sh && cd apps/mobile && npx eas-cli build --platform ios --profile preview --auto-submit --non-interactive --message \"main $(git rev-parse --short HEAD)\"",
-    "build:preview": "bash scripts/prebuild-check.sh --preview && cd apps/mobile && npx eas-cli build --platform ios --profile preview --auto-submit --non-interactive --message \"PREVIEW: $(git branch --show-current)\""
+    "build:testflight": "bash scripts/build-ios.sh",
+    "build:preview": "bash scripts/build-ios.sh --preview"
   },
   "overrides": {
     "react": "19.2.3",
