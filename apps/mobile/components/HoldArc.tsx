@@ -34,7 +34,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView, type SFSymbol } from 'expo-symbols'
 import * as Haptics from 'expo-haptics'
 import { colour, type } from '@ivywolf/ui'
-import { ARC, blob, labelSpot, pickSelected, placeArc, pull, restCentre, type Screen } from '@/lib/holdArc'
+import { ARC, blob, labelSpot, pickSelected, placeArc, pull, restCentre, type Arc, type Screen } from '@/lib/holdArc'
 
 export interface HoldAction {
   key: string
@@ -57,7 +57,8 @@ interface Stage {
   fy: SharedValue<number>
   /** The finger is still down (the blob follows it). */
   tracking: SharedValue<boolean>
-  angles: SharedValue<number[]>
+  /** Where the arc settled: each button's angle, and its radius. */
+  arc: SharedValue<Arc>
   selected: SharedValue<number>
 }
 
@@ -80,8 +81,8 @@ export function useHolding(): boolean {
 export const HOLD_MS = 350
 
 // Pinterest's long-press menu: white at 0.85 in 150 ms; the card lifts 5% and tilts 2.5° (left column anticlockwise,
-// right column clockwise); a faint 44 ring at the touch; the label Title at 40, bold, ink; the selection fades
-// 120 ms; out in 200 ms. The arc and the blob are lib/holdArc.ts.
+// right column clockwise); a faint 44 ring at the touch; icons 24 in the 48 buttons; the label Title at 40, bold,
+// ink; the selection fades 120 ms; out in 200 ms. The arc and the blob are lib/holdArc.ts.
 const WHITE = 0.85
 const IN_MS = 150
 const OUT_MS = 200
@@ -91,7 +92,7 @@ const TILT = 2.5
 const RING = 44
 const LABEL = 40
 const LABEL_H = 48
-const ICON = 22
+const ICON = 24
 const SPRING = { damping: 15, stiffness: 220 }
 
 export function HoldProvider({ children }: { children: ReactNode }) {
@@ -111,7 +112,7 @@ export function HoldProvider({ children }: { children: ReactNode }) {
     fx: useSharedValue(0),
     fy: useSharedValue(0),
     tracking: useSharedValue(false),
-    angles: useSharedValue<number[]>([]),
+    arc: useSharedValue<Arc>({ angles: [], radius: ARC.radius }),
     selected: useSharedValue(-1),
   }
   const stageRef = useRef(stage)
@@ -228,9 +229,9 @@ function Overlay({
 /** One action on the arc: out from the touch as the hold opens, then a blob that swells and leans toward the finger. */
 function ArcButton({ index, action, stage }: { index: number; action: HoldAction; stage: Stage }) {
   const body = useAnimatedStyle(() => {
-    const angle = stage.angles.value[index] ?? 0
+    const angle = stage.arc.value.angles[index] ?? 0
     const touch = { x: stage.ox.value, y: stage.oy.value }
-    const rest = restCentre(touch, angle)
+    const rest = restCentre(touch, angle, stage.arc.value.radius)
     const p = stage.tracking.value ? pull({ x: stage.fx.value, y: stage.fy.value }, rest) : 0
     const b = blob(p, angle)
     const t = stage.progress.value
@@ -321,7 +322,7 @@ export function Hold({
         stage.oy.value = e.absoluteY
         stage.fx.value = e.absoluteX
         stage.fy.value = e.absoluteY
-        stage.angles.value = placeArc({ x: e.absoluteX, y: e.absoluteY }, count, screen)
+        stage.arc.value = placeArc({ x: e.absoluteX, y: e.absoluteY }, count, screen)
         stage.selected.value = -1
         stage.tracking.value = true
         stage.progress.value = withTiming(1, { duration: IN_MS })
@@ -331,7 +332,7 @@ export function Hold({
         if (!mine.value || !stage || !select) return
         stage.fx.value = e.absoluteX
         stage.fy.value = e.absoluteY
-        const s = pickSelected({ x: e.absoluteX, y: e.absoluteY }, { x: stage.ox.value, y: stage.oy.value }, stage.angles.value)
+        const s = pickSelected({ x: e.absoluteX, y: e.absoluteY }, { x: stage.ox.value, y: stage.oy.value }, stage.arc.value)
         if (s !== stage.selected.value) {
           stage.selected.value = s
           scheduleOnRN(select, s)
