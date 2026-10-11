@@ -61,3 +61,16 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
   which version ships and what it was ratcheted over (method: docs/rnd/eval-method-repeat-runs.md).
 - Run `supabase config diff` before `supabase config push` — push applies even when you answer "n" at its prompt.
 - Third-party auth (Clerk) is set via the Management API (`/v1/projects/{ref}/config/auth/third-party-auth`), not config.toml — config push does not sync it.
+
+## Branches and builds
+- TestFlight builds come only from main, up to date with origin/main, with a clean working tree. The one exception is a
+  preview build from a feature branch when Tim asks for one; its build notes read "PREVIEW: <branch>".
+- Cut builds only with `npm run build:testflight` (main) or `npm run build:preview` (a feature branch, when asked). Both
+  run `scripts/prebuild-check.sh` first (branch, clean tree, matches its remote, typecheck and tests); never call
+  `eas build` directly.
+- Push every commit to its branch straight away.
+- Start every new branch or worktree from a freshly pulled main.
+- When a feature is done, open a PR against main and tell Tim it's ready to merge. Don't start a build from another
+  branch while a finished PR is still open.
+- Before every build, run docs/polish-checklist.md and report anything missing. Add a line to it each time a polish PR
+  merges.
