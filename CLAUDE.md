@@ -64,10 +64,15 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
 
 ## Branches and builds
 - TestFlight builds come only from main, up to date with origin/main, with a clean working tree. The one exception is a
-  preview build from a feature branch when Tim asks for one; its build notes read "PREVIEW: <branch>".
-- Cut builds only with `npm run build:testflight` (main) or `npm run build:preview` (a feature branch, when asked). Both
-  run `scripts/prebuild-check.sh` first (branch, clean tree, matches its remote, typecheck and tests); never call
-  `eas build` directly.
+  preview build from a feature branch when Tim asks for one; its build notes (the EAS build message) read
+  "PREVIEW: <branch>". TestFlight's "What to Test" can't be set from EAS on our plan (Enterprise only).
+- Cut builds only with `npm run build:testflight` (main) or `npm run build:preview` (a feature branch, when asked); never
+  call `eas build` or `eas submit` directly. Both run `scripts/build-ios.sh`: `scripts/prebuild-check.sh` first (branch,
+  clean tree, matches its remote, typecheck and tests), then `eas build --wait`, then `eas submit --latest` as a
+  separate step. Any step that fails stops the script, non-zero, with a message saying what did and didn't happen
+  (no `--auto-submit`: it exits 0 when its submission is refused).
+- After every build, add its number, branch (or "PREVIEW: <branch>") and commit to docs/polish-checklist.md → Builds.
+  TestFlight can't show the preview label, so that list is how builds are told apart.
 - Push every commit to its branch straight away.
 - Start every new branch or worktree from a freshly pulled main.
 - When a feature is done, open a PR against main and tell Tim it's ready to merge. Don't start a build from another
