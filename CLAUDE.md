@@ -79,3 +79,6 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
   branch while a finished PR is still open.
 - Before every build, run docs/polish-checklist.md and report anything missing. Add a line to it each time a polish PR
   merges.
+- Simulator: quitting and relaunching the app, or rebuilding and installing the dev app over the existing one
+  (`expo run:ios`), needs no asking. Ask before anything that wipes the simulator (erase, uninstall, clearing app data)
+  or signs out.
