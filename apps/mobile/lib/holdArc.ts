@@ -7,8 +7,8 @@
 export type Point = { x: number; y: number }
 export type Screen = { w: number; h: number; top: number; bottom: number; left: number; right: number }
 
-/** The arc: buttons 48 on a 56 radius around the touch, 50° apart. */
-export const ARC = { radius: 56, button: 48, step: 50, margin: 16, aim: 200, aimFlipBelow: 300, rotateStep: 10 }
+/** The arc: buttons 48 on a 56 radius around the touch, 50° apart (40° near an edge, when 50° won't fit). */
+export const ARC = { radius: 56, button: 48, step: 50, tightStep: 40, margin: 16, aim: 200, aimFlipBelow: 300, rotateStep: 10 }
 /** The blob: how near (pt) a finger starts to pull a button, how much it swells and leans, and the selection line. */
 export const BLOB = { reach: 70, grow: 0.25, push: 18, select: 0.35 }
 /** The label sits this far above (touch in the lower half) or below the touch. */
@@ -17,10 +17,10 @@ export const LABEL_OFFSET = 180
 const DEG = Math.PI / 180
 
 /** Each button's angle (radians, screen axes: y down) for this aim. Order is kept: index 0 is first around the arc. */
-export function arcAngles(base: number, n: number): number[] {
+export function arcAngles(base: number, n: number, step: number = ARC.step): number[] {
   'worklet'
   const out: number[] = []
-  for (let i = 0; i < n; i++) out.push(base + (i - (n - 1) / 2) * ARC.step * DEG)
+  for (let i = 0; i < n; i++) out.push(base + (i - (n - 1) / 2) * step * DEG)
   return out
 }
 
@@ -49,7 +49,8 @@ export function spill(touch: Point, angles: number[], s: Screen): number {
 /**
  * Where the arc goes. Aim from the touch at (screen centre x, touch y − 200) — or + 200 when the touch is within 300
  * of the top — then, if any button would leave the safe area, turn the arc 10° at a time (+10, −10, +20, −20, …)
- * until all of them fit. If no turn fits (a corner), the turn that spills least.
+ * until all of them fit. Near an edge where no turn fits, tighten the spacing from 50° to 40° and try again; only if
+ * that still doesn't fit (a corner), the turn and spacing that spill least.
  */
 export function placeArc(touch: Point, n: number, s: Screen): number[] {
   'worklet'
@@ -57,14 +58,16 @@ export function placeArc(touch: Point, n: number, s: Screen): number[] {
   const base = Math.atan2(target.y - touch.y, target.x - touch.x)
   let best = arcAngles(base, n)
   let bestOver = spill(touch, best, s)
-  for (let k = 1; k <= 180 / ARC.rotateStep && bestOver > 0; k++) {
-    for (const sign of [1, -1]) {
-      const angles = arcAngles(base + sign * k * ARC.rotateStep * DEG, n)
-      const over = spill(touch, angles, s)
-      if (over < bestOver) {
-        best = angles
-        bestOver = over
-        if (over === 0) break
+  for (const step of [ARC.step, ARC.tightStep]) {
+    for (let k = 0; k <= 180 / ARC.rotateStep; k++) {
+      for (const sign of k === 0 ? [1] : [1, -1]) {
+        const angles = arcAngles(base + sign * k * ARC.rotateStep * DEG, n, step)
+        const over = spill(touch, angles, s)
+        if (over === 0) return angles
+        if (over < bestOver) {
+          best = angles
+          bestOver = over
+        }
       }
     }
   }

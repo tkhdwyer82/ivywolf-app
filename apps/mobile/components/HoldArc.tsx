@@ -3,7 +3,7 @@
 // long-press menu. Hold a card 0.35 s: the whole screen (header and nav too) fades to white, the card lifts out of
 // the grid, tilted by its column, and its actions fan out on a small arc around the thumb, aimed at the open middle
 // of the screen. Keep the finger down and slide: the nearest button swells and leans toward it, the selected one
-// turns ink, its name shows large in the empty half of the screen, and each change ticks. Let go on one to do it;
+// turns ink with a tick, and its name shows large in the empty half of the screen. Let go on one to do it;
 // anywhere else cancels. Either way everything fades and the card settles back.
 //
 //   <HoldProvider>             once per screen, around everything; renders the overlay on top
@@ -131,9 +131,10 @@ export function HoldProvider({ children }: { children: ReactNode }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
   }, [])
 
+  // A tick on landing on a button; none when the selection clears.
   const select = useCallback((i: number) => {
     setSelected(i)
-    Haptics.selectionAsync().catch(() => {})
+    if (i >= 0) Haptics.selectionAsync().catch(() => {})
   }, [])
 
   // The exit's last frame: unmount the overlay, unless another hold has opened since.

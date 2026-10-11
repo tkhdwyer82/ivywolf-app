@@ -60,13 +60,29 @@ describe('placeArc', () => {
     expect(fits(touch, placeArc(touch, 5, screen))).toBe(true)
   })
 
-  it('in a corner where no turn fits, takes the turn that spills least', () => {
-    const touch = { x: 360, y: 740 }
-    const straight = Math.atan2(-200, 201 - 360)
+  it('next to a side edge, where no 50° turn fits, tightens the spacing to 40° and fits', () => {
+    const touch = { x: 20, y: 420 }
+    const straight = Math.atan2(-200, 201 - 20)
+    for (let k = -18; k <= 18; k++) expect(fits(touch, arcAngles(straight + (k * 10 * Math.PI) / 180, 4))).toBe(false)
+    const angles = placeArc(touch, 4, screen)
+    expect(fits(touch, angles)).toBe(true)
+    for (let i = 1; i < 4; i++) expect(deg(angles[i] - angles[i - 1])).toBeCloseTo(40)
+  })
+
+  it('keeps 50° wherever 50° fits', () => {
+    const touch = { x: 60, y: 740 }
+    const angles = placeArc(touch, 5, screen)
+    expect(deg(angles[1] - angles[0])).toBeCloseTo(50)
+  })
+
+  it('in a corner where neither spacing fits, takes the turn and spacing that spill least', () => {
+    const touch = { x: 380, y: 800 }
+    const straight = Math.atan2(-200, 201 - 380)
     const placed = placeArc(touch, 5, screen)
-    expect(spill(touch, placed, screen)).toBeLessThan(spill(touch, arcAngles(straight, 5), screen))
-    for (let k = -18; k <= 18; k++)
-      expect(spill(touch, placed, screen)).toBeLessThanOrEqual(spill(touch, arcAngles(straight + (k * 10 * Math.PI) / 180, 5), screen) + 1e-9)
+    expect(fits(touch, placed)).toBe(false)
+    for (const step of [50, 40])
+      for (let k = -18; k <= 18; k++)
+        expect(spill(touch, placed, screen)).toBeLessThanOrEqual(spill(touch, arcAngles(straight + (k * 10 * Math.PI) / 180, 5, step), screen) + 1e-9)
   })
 })
 
