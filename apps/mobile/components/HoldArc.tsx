@@ -92,7 +92,8 @@ const TILT = 2.5
 const RING = 44
 const LABEL = 40
 const LABEL_H = 48
-const ICON = 24
+// An SF Symbol draws its glyph smaller than its size: 30 draws the 24-pt glyph Pinterest measures (24 drew 19).
+const ICON = 30
 const SPRING = { damping: 15, stiffness: 220 }
 
 export function HoldProvider({ children }: { children: ReactNode }) {
