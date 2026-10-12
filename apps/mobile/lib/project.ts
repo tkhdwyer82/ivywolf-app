@@ -3,7 +3,7 @@
 // threads have. To-dos live in My things (P4), which has its own room, so a project page shows ideas only.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { CARD_COLUMNS, toCardItem, type CardItem, type CardRow, type Project, type ThreadStage } from '@/lib/home'
+import { CARD_COLUMNS, loadOwnPictures, toCardItem, type CardItem, type CardRow, type Project, type ThreadStage } from '@/lib/home'
 import { loadLinks, withLinks, type Links } from '@/lib/links'
 
 export interface ProjectPage {
@@ -22,7 +22,7 @@ type Row = CardRow & { thread_cards: { threads: { stage: ThreadStage; thread_car
 
 export async function loadProject(supabase: SupabaseClient, id: string): Promise<ProjectPage | null> {
   const [project, cards, boards, links] = await Promise.all([
-    supabase.from('projects').select('id, name, kind, gradient').eq('id', id).maybeSingle(),
+    supabase.from('projects').select('id, name, kind, hue').eq('id', id).maybeSingle(),
     supabase
       .from('cards')
       .select(
@@ -37,10 +37,12 @@ export async function loadProject(supabase: SupabaseClient, id: string): Promise
   if (!p) return null
   if (boards.error) throw new Error(`boards: ${boards.error.message}`)
 
-  const ideas = (need('ideas', cards) as unknown as Row[])
+  const rows = need('ideas', cards) as unknown as Row[]
+  const own = await loadOwnPictures(supabase, rows.map((c) => c.id))
+  const ideas = rows
     .map((c) => {
       const t = c.thread_cards[0]?.threads
-      return withLinks(toCardItem(c, { size: t?.thread_cards.length ?? 1, stage: t?.stage ?? null }), links)
+      return withLinks(toCardItem(c, { size: t?.thread_cards.length ?? 1, stage: t?.stage ?? null }, own.get(c.id)), links)
     })
     .sort((x, y) => (x.at < y.at ? 1 : x.at > y.at ? -1 : 0))
   return { project: p, ideas, boards: boards.count ?? 0, links }

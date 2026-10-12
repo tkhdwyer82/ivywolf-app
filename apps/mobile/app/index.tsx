@@ -1,7 +1,9 @@
 // apps/mobile/app/index.tsx
-// Home (P1). Cards and to-dos in a two-column masonry, newest first, with a divider per local day; project chips
-// filter it, except My things, which opens its room (P4); the header has search and the avatar (Voice notes); the
-// nav trio is Home · ⊕ · Mini (launch UI 170:5, 145:5). The header collapses Pinterest-style
+// Home (P1; v4, Figma 1737:5 — visual first). Ideas in a two-column masonry, newest first, with a divider per local
+// day; every idea is a picture (lib/picture.ts). To-dos aren't tiles: the My things row at the top opens their list.
+// One Ivy direction tile a day sits among the ideas. Project chips filter it, except My things, which opens its room
+// (P4); the selected chip's underline is the project's hue. The header has search and the avatar (Voice notes); the
+// nav is Home · Explore · ⊕ · Mini (1739:2–14). The header collapses Pinterest-style
 // (components/CollapsingHeader.tsx): the logo row slides away on scroll-down and back on any scroll-up; the chips
 // stay, under an always-opaque status bar.
 // No blank state (rule 1): before the first card exists Home is First open (L1, 170:5) — Ivy's one line, "Say an
@@ -38,8 +40,12 @@ import {
   type HomeData,
   type Item,
   type IvySentence,
+  feedItems,
+  GRID,
+  thingsRow,
+  type CardItem,
 } from '@/lib/home'
-import { colour, space, size, type } from '@ivywolf/ui'
+import { colour, size, type } from '@ivywolf/ui'
 import { IvyNote } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
 import { ProjectChips } from '@/components/HomeChrome'
@@ -52,6 +58,12 @@ import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
 import { useCardActions } from '@/components/CardActions'
 import { LinkBanner } from '@/components/LinkMode'
 import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
+import { MyThingsRow } from '@/components/MyThingsRow'
+import { HomeDirectionTile } from '@/components/HomeDirectionTile'
+import { useOpenCredit } from '@/components/useOpenCredit'
+import { dismissForToday, directionOfDay, directionPicture, type HomeDirection } from '@/lib/directionOfDay'
+import { dismissDirection, saveDirection } from '@/lib/directions'
+import type { Picture, ReferencePicture } from '@/lib/picture'
 
 // The masonry, driven by the collapsing header's UI-thread scroll handler.
 const AnimatedFlashList = Animated.createAnimatedComponent(FlashList<Row>)
@@ -78,7 +90,7 @@ function HomeScreen() {
   const [ivy, setIvy] = useState<IvySentence[] | null>(null)
   const [dissolve, setDissolve] = useState(false)
   const list = useRef<FlashListRef<Row>>(null)
-  // A quote's ▶ chip (Figma 227:28) and Ivy's line (162:2) play from where it was said, without leaving Home.
+  // Ivy's line (162:2) plays from where it was said, without leaving Home.
   const player = useAudioPlayer(null)
   const [playing, setPlaying] = useState<string | null>(null)
 
@@ -111,6 +123,29 @@ function HomeScreen() {
       load()
     }, [load])
   )
+
+  // Today's direction (one a day) and its picture: the first stock reference, else the project's hue.
+  const [direction, setDirection] = useState<HomeDirection | null>(null)
+  const [directionRef, setDirectionRef] = useState<ReferencePicture | null>(null)
+  const loadDirection = useCallback(async () => {
+    const d = await directionOfDay(supabase).catch(() => null)
+    setDirection(d)
+    if (!d) return setDirectionRef(null)
+    const token = await getToken()
+    setDirectionRef(token ? await directionPicture(token, d.id).catch(() => null) : null)
+  }, [supabase, getToken])
+  useFocusEffect(
+    useCallback(() => {
+      loadDirection()
+    }, [loadDirection])
+  )
+  const directionDone = useCallback(async (run: () => Promise<unknown>) => {
+    setDirection(null)
+    await dismissForToday()
+    await run().catch((e) => setError(e instanceof Error ? e.message : 'That didn’t save'))
+    load()
+  }, [load])
+  const openCredit = useOpenCredit()
 
   // Ivy on open: composed once, from the first load Home is actually on screen for (not mounted under the recorder
   // from a deep link). Her last look then moves to the newest card she has had on screen, and keeps up while she's
@@ -152,12 +187,24 @@ function HomeScreen() {
     return () => clearInterval(t)
   }, [waiting, load])
 
-  const visible = useMemo(
-    () => (data ? data.items.filter((i) => project === null || i.projectId === project) : []),
-    [data, project]
-  )
+  // The feed is ideas only; to-dos are the My things row (v4).
+  const visible = useMemo(() => (data ? feedItems(data.items, project) : []), [data, project])
   const pinned = useMemo(() => pinnedOf(visible), [visible])
-  const rows = useMemo(() => toRows(groupByDay(visible.filter((i) => i.kind !== 'card' || !i.pinnedAt))), [visible])
+  const rows = useMemo(
+    () => toRows(groupByDay(visible.filter((i) => !i.pinnedAt)), project === null ? direction : null),
+    [visible, project, direction]
+  )
+  const things = useMemo(() => (data ? thingsRow(data.items) : null), [data])
+  const openThings = useMemo(() => (data ? data.items.filter((i) => i.kind === 'action' && !i.done).length : 0), [data])
+  // A board's 3-up: two more pictures from its thread.
+  const trioOf = useCallback(
+    (card: CardItem): Picture[] => {
+      const thread = data?.threads.find((t) => t.cardIds.includes(card.id))
+      if (!thread) return []
+      return visible.filter((c) => c.id !== card.id && thread.cardIds.includes(c.id) && c.picture.uri).slice(0, 2).map((c) => c.picture)
+    },
+    [data, visible]
+  )
   const actions = useCardActions({
     links: data?.links,
     reload: load,
@@ -203,8 +250,8 @@ function HomeScreen() {
             onLongPress={onLongPress}
             mark={actions.markFor(item)}
             pinned={inPinned}
-            playing={playing === item.id}
-            onPlay={(i) => i.kind === 'card' && play(i.id, i.storagePath, i.playFromMs)}
+            trio={item.kind === 'card' && item.shape === 'board' ? trioOf(item) : undefined}
+            onCredit={openCredit}
           />
         )}
       </Hold>
@@ -254,7 +301,7 @@ function HomeScreen() {
       <AnimatedFlashList
         ref={list}
         data={rows}
-        extraData={[playing, linking]}
+        extraData={[linking, directionRef]}
         scrollEnabled={!holding}
         onScroll={header.onScroll}
         scrollEventThrottle={16}
@@ -262,14 +309,14 @@ function HomeScreen() {
         masonry
         numColumns={2}
         keyExtractor={(r) => r.key}
-        getItemType={(r) => (r.kind === 'day' ? 'day' : r.item.kind)}
+        getItemType={(r) => (r.kind === 'tile' ? r.item.kind : r.kind)}
         overrideItemLayout={(layout, r) => {
           if (r.kind === 'day') layout.span = 2
         }}
         contentContainerStyle={{
           paddingTop: headerInset,
-          paddingHorizontal: space.margin - space.gutter / 2,
-          paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section,
+          paddingHorizontal: GRID.margin - GRID.gutter / 2,
+          paddingBottom: BAR_BOTTOM + size['bar-h'] + GRID.after * 2,
         }}
         ListHeaderComponent={
           <View style={styles.listHeader}>
@@ -280,12 +327,34 @@ function HomeScreen() {
             )}
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}
+            {project === null && !linking && <MyThingsRow row={things} open={openThings} />}
             <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
           </View>
         }
         renderItem={({ item: r }) =>
           r.kind === 'day' ? (
             <Text style={styles.divider}>{r.label}</Text>
+          ) : r.kind === 'direction' ? (
+            <View style={styles.cell}>
+              <Hold
+                actions={() => [
+                  { key: 'save', label: 'Save', icon: 'plus', run: () => directionDone(() => saveDirection(supabase, r.direction.id)) },
+                  { key: 'not', label: 'Not this', icon: 'xmark', run: () => directionDone(() => dismissDirection(supabase, r.direction.id)) },
+                ]}
+                face={() => <HomeDirectionTile direction={r.direction} reference={directionRef} />}
+                disabled={!!linking}
+              >
+                {(onLongPress) => (
+                  <HomeDirectionTile
+                    direction={r.direction}
+                    reference={directionRef}
+                    onOpen={() => router.push(`/project/${r.direction.projectId}?tab=more`)}
+                    onLongPress={onLongPress}
+                    onCredit={openCredit}
+                  />
+                )}
+              </Hold>
+            </View>
           ) : (
             <View style={styles.cell}>{tile(r.item)}</View>
           )
@@ -304,13 +373,24 @@ function HomeScreen() {
   )
 }
 
-/** Home's list: each day's overline across both columns, then its tiles in the masonry, newest first. */
-type Row = { kind: 'day'; key: string; label: string } | { kind: 'tile'; key: string; item: Item }
-function toRows(groups: DayGroup[]): Row[] {
-  return groups.flatMap((g) => [
+/**
+ * Home's list: each day's overline across both columns, then its tiles in the masonry, newest first. Today's
+ * direction, when there is one, comes second — the right column of the first row (1737:152).
+ */
+type Row =
+  | { kind: 'day'; key: string; label: string }
+  | { kind: 'tile'; key: string; item: Item }
+  | { kind: 'direction'; key: string; direction: HomeDirection }
+function toRows(groups: DayGroup[], direction: HomeDirection | null): Row[] {
+  const rows: Row[] = groups.flatMap((g) => [
     ...(g.label ? [{ kind: 'day' as const, key: `day-${g.day}`, label: g.label }] : []),
     ...g.items.map((item) => ({ kind: 'tile' as const, key: item.id, item })),
   ])
+  if (direction) {
+    const first = rows.findIndex((r) => r.kind === 'tile')
+    rows.splice(first < 0 ? rows.length : first + 1, 0, { kind: 'direction', key: `direction-${direction.id}`, direction })
+  }
+  return rows
 }
 
 function Wordmark() {
@@ -377,18 +457,19 @@ const L1 = { frame: 852, heroTop: 330, title: 28, body: 16, bodyLine: 19, bodyWi
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colour.Surface },
-  centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.margin },
+  centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: GRID.margin },
   secondary: { color: colour.Grey, textAlign: 'center' },
-  error: { color: colour.Grey, paddingHorizontal: space.margin, paddingTop: space.gutter },
+  error: { color: colour.Grey, paddingHorizontal: GRID.margin, paddingTop: GRID.gutter },
   wordmark: type['Title / Wordmark'],
   avatar: { width: size.icon, height: size.icon, alignItems: 'center', justifyContent: 'center' },
   avatarGlyph: { width: size.icon / 2, height: size.icon / 2 },
   // The list is inset by margin − gutter/2 and every cell pads gutter/2, so tiles sit at the margin, a gutter apart;
   // the list header undoes the inset.
-  listHeader: { marginHorizontal: -(space.margin - space.gutter / 2), paddingBottom: space.section - space.stack },
-  cell: { paddingHorizontal: space.gutter / 2, paddingBottom: space.gutter },
-  divider: { ...type['Label / Overline'], color: colour.Grey, textTransform: 'uppercase', marginHorizontal: space.gutter / 2, marginTop: space.stack, marginBottom: OVERLINE_GAP },
-  firstHero: { position: 'absolute', left: space.margin, right: space.margin },
+  listHeader: { marginHorizontal: -(GRID.margin - GRID.gutter / 2), paddingBottom: 0 },
+  // Each cell pads half a gutter, so tiles sit at the margin, 13 apart; the tile's caption carries the 18 below it.
+  cell: { paddingHorizontal: GRID.gutter / 2 },
+  divider: { ...type['Label / Overline'], color: colour.Grey, textTransform: 'uppercase', marginHorizontal: GRID.gutter / 2, marginTop: OVERLINE_GAP, marginBottom: OVERLINE_GAP },
+  firstHero: { position: 'absolute', left: GRID.margin, right: GRID.margin },
   firstTitle: { fontSize: L1.title, fontWeight: '700', color: colour.Ink },
   firstBody: { fontSize: L1.body, lineHeight: L1.bodyLine, color: colour.Grey, width: L1.bodyWidth, marginTop: L1.bodyGap },
   arrow: { position: 'absolute', bottom: L1.arrowBottom, alignSelf: 'center', width: L1.arrowW, height: L1.arrowH },

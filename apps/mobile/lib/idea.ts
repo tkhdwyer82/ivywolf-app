@@ -3,7 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CardShape } from '@ivywolf/schema'
-import type { GradientName } from '@ivywolf/ui'
+import type { HueName } from '@ivywolf/ui'
 import { cardPicture, toCardItem, type CardItem, type CardRow, type ThreadStage } from '@/lib/home'
 import { writeStyleSignal } from '@/lib/styleSignals'
 
@@ -63,7 +63,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 type Row = CardRow & {
   source: CardSource; source_url: string | null; hearted_at: string | null; shape_set_by: 'ivy' | 'creator' | null
   visual_query: string | null
-  projects: { id: string; name: string; kind: string; gradient: GradientName } | null
+  projects: { id: string; name: string; kind: string; hue: HueName } | null
   thread_cards: { threads: { id: string; title: string; return_count: number; stage: ThreadStage } | null }[]
 }
 
@@ -73,7 +73,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, pinned_at, shared_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, recordings(recorded_at, storage_path, source), projects(id, name, kind, gradient), thread_cards(threads(id, title, return_count, stage))'
+        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, pinned_at, shared_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, reference_picture, recordings(recorded_at, storage_path, source), projects(id, name, kind, hue), thread_cards(threads(id, title, return_count, stage))'
       )
       .eq('id', id)
       .maybeSingle()

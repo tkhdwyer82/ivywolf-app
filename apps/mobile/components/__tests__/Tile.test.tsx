@@ -1,14 +1,31 @@
 /// <reference types="jest" />
-// Job B revised (Figma 227:5): an idea tile takes the form Ivy picked — photo, quote, diagram, board or text. This
-// supersedes Job G §5.7's "no text on idea tiles": a photo now carries its title and its Unsplash credit.
+// Home v4 (Figma 1737:5): every idea is a picture with the form on it, the title and meta under it, the credit on tap.
+// Supersedes Job B revised's forms-as-tiles (227:5): the forms now render on top of the picture.
 import { fireEvent, render, screen } from '@testing-library/react-native'
 import { Tile } from '@/components/Tile'
 import type { ActionItem, CardItem } from '@/lib/home'
+import { resolvePicture, type Picture } from '@/lib/picture'
 
 jest.mock('expo-symbols', () => ({ SymbolView: () => null }))
 jest.mock('@ivywolf/schema', () => ({ LOW_CONFIDENCE: 0.6 }))
+jest.mock('expo-linear-gradient', () => {
+  const { View } = require('react-native')
+  return { LinearGradient: View }
+})
+jest.mock('expo-video', () => {
+  const { View } = require('react-native')
+  return { useVideoPlayer: () => ({ status: 'idle', duration: 0 }), VideoView: View }
+})
+jest.mock('expo', () => ({ ...jest.requireActual('expo'), useEvent: (_p: unknown, _e: string, initial: unknown) => initial }))
 
-const base = { at: '2026-09-28T02:00:00Z', projectId: 'p-things', recordingId: 'r1', frameAt: null }
+const unsplash: Picture = resolvePicture({
+  own: [],
+  unsplash: { url: 'https://images.unsplash.com/photo-1', photographer: 'Ana Ruiz', photographerUrl: 'https://unsplash.com/@ana', photoUrl: 'https://unsplash.com/photos/1' },
+  reference: null,
+})
+const hue: Picture = resolvePicture({ own: [], unsplash: null, reference: null })
+
+const base = { at: '2026-09-28T02:00:00Z', projectId: 'p-launch', recordingId: 'r1', frameAt: null }
 const idea = (over: Partial<CardItem> = {}): CardItem =>
   ({
     ...base,
@@ -16,7 +33,7 @@ const idea = (over: Partial<CardItem> = {}): CardItem =>
     id: 'c1',
     title: 'Rooftop chase, night',
     gist: 'She leaps the roof and radios through.',
-    playFromMs: 760_000,
+    playFromMs: 31_000,
     confidence: 0.9,
     frameUrl: 'https://images.unsplash.com/photo-1',
     frameStatus: 'done',
@@ -26,52 +43,46 @@ const idea = (over: Partial<CardItem> = {}): CardItem =>
     quote: null,
     diagram: null,
     board: null,
-    credit: { photographer: 'Ana Ruiz', photographerUrl: 'https://unsplash.com/@ana?utm_source=ivywolf&utm_medium=referral', photoUrl: 'https://unsplash.com/photos/1?utm_source=ivywolf&utm_medium=referral' },
+    credit: null,
+    picture: unsplash,
     recordingSource: 'mini',
     threadStage: 'ready',
+    projectName: 'Launch video',
+    hue: 'butter',
+    createdAt: '2026-09-28T02:00:00Z',
+    links: 0,
     ...over,
   }) as CardItem
 const todo: ActionItem = { ...base, kind: 'action', id: 'a1', text: 'Get milk for the office', done: false, dueDate: '2026-10-02', frameUrl: null, frameStatus: 'none' } as ActionItem
 
 describe('Tile', () => {
-  it('photo: the PHOTO pill, the title, and the Unsplash credit', async () => {
+  it('a picture, then the title and the meta (time · project) under it', async () => {
     await render(<Tile item={idea()} onOpen={() => {}} />)
-    expect(screen.getByText('PHOTO')).toBeTruthy()
     expect(screen.getByText('Rooftop chase, night')).toBeTruthy()
-    expect(screen.getByText('Photo by Ana Ruiz on Unsplash')).toBeTruthy()
+    expect(screen.getByText('0:31 · Launch video')).toBeTruthy()
   })
 
-  it('photo still on its way: the shimmer, and no credit until there is a photo', async () => {
-    await render(<Tile item={idea({ frameUrl: null, frameStatus: 'queued', credit: null })} />)
-    expect(screen.getByTestId('shimmer')).toBeTruthy()
-    expect(screen.queryByText(/Unsplash/)).toBeNull()
+  it('the credit shows on tap, and opening it is the use', async () => {
+    const onCredit = jest.fn()
+    const onOpen = jest.fn()
+    await render(<Tile item={idea()} onOpen={onOpen} onCredit={onCredit} />)
+    expect(screen.queryByText('Ana Ruiz')).toBeNull()
+    await fireEvent.press(screen.getByHintText('Shows who made the picture.'))
+    await fireEvent.press(screen.getByText('Ana Ruiz'))
+    expect(onCredit).toHaveBeenCalledWith(unsplash)
   })
 
-  it('quote: the exact line, who said it, and a ▶ chip that plays from play_from_ms', async () => {
-    const onPlay = jest.fn()
-    const card = idea({ shape: 'quote', quote: { text: 'We scaled the apology.', speaker: 'Arabella' } })
-    await render(<Tile item={card} onPlay={onPlay} />)
-    expect(screen.getByText('We scaled the apology.')).toBeTruthy()
-    expect(screen.getByText('— Arabella')).toBeTruthy()
-    fireEvent.press(screen.getByLabelText('Play from Mini · 12:40'))
-    expect(onPlay).toHaveBeenCalledWith(card)
+  it('quote: the line in white on the picture, no title under it', async () => {
+    await render(<Tile item={idea({ shape: 'quote', quote: { text: 'The names read as a poem.', speaker: null } })} />)
+    expect(screen.getByText('“The names read as a poem.”')).toBeTruthy()
+    expect(screen.queryByText('Rooftop chase, night')).toBeNull()
   })
 
-  it('diagram: the title and each row, from → to', async () => {
-    await render(<Tile item={idea({ shape: 'diagram', diagram: { title: 'Old vs new', rows: [{ from: '5am', to: '7am' }, { from: 'Daily', to: 'Batch' }] } })} />)
-    expect(screen.getByText('OLD VS NEW')).toBeTruthy()
-    for (const w of ['5am', '7am', 'Daily', 'Batch']) expect(screen.getByText(w)).toBeTruthy()
-  })
-
-  it('board: the hook, the beats, and the thread’s stage as the pill', async () => {
-    await render(<Tile item={idea({ shape: 'board', board: { hook: 'Launch video', beats: ['Hook', 'Turn', 'Reveal'] } })} />)
-    for (const w of ['Launch video', 'Hook', 'Turn', 'Reveal', 'BOARD · READY']) expect(screen.getByText(w)).toBeTruthy()
-  })
-
-  it('text: the title and gist — and a shape whose payload is missing falls back to it', async () => {
-    await render(<Tile item={idea({ shape: 'quote', quote: null })} />)
+  it('no picture yet: the project hue block carries the title, and the meta says a picture is being found', async () => {
+    const now = new Date().toISOString()
+    await render(<Tile item={idea({ picture: hue, shape: 'text', createdAt: now })} />)
     expect(screen.getByText('Rooftop chase, night')).toBeTruthy()
-    expect(screen.getByText('She leaps the roof and radios through.')).toBeTruthy()
+    expect(screen.getByText('0:31 · Launch video · finding a picture…')).toBeTruthy()
   })
 
   it('an unsure idea is greyed and says so to VoiceOver (the idea page says "Ivy isn’t sure")', async () => {

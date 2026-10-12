@@ -1,9 +1,10 @@
 // apps/mobile/lib/saveTo.ts
 // Save to (P10): her projects, placed for the picker. Top choices are where the idea lives now ("saved here") and
 // My things — or, if it already lives in My things, the project she's used most recently. Your projects is the rest,
-// most recently used first. Each row carries a thumbnail: the project's newest frame, else a palette block.
+// most recently used first. Each row carries a thumbnail: the project's newest frame, else its hue (0039).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { hueOf } from '@ivywolf/ui'
 
 export interface PickerProject {
   id: string
@@ -11,6 +12,8 @@ export interface PickerProject {
   kind: 'things' | 'mini' | 'user'
   ideas: number
   thumbUrl: string | null
+  /** Its flat hue (0039): the swatch when there's no frame. */
+  hue: string | null
   /** Newest thing in it (ISO), or when it was made — orders the list. */
   lastUsed: string
 }
@@ -26,12 +29,12 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
   return r.data
 }
 
-type ProjectRow = { id: string; name: string; kind: PickerProject['kind']; created_at: string }
+type ProjectRow = { id: string; name: string; kind: PickerProject['kind']; hue: string | null; created_at: string }
 type ItemRow = { project_id: string; frame_url: string | null; frame_status: string; created_at: string }
 
 export async function loadPicker(supabase: SupabaseClient, currentId: string | null): Promise<Picker> {
   const [projects, cards, actions] = await Promise.all([
-    supabase.from('projects').select('id, name, kind, created_at'),
+    supabase.from('projects').select('id, name, kind, hue, created_at'),
     supabase.from('cards').select('project_id, frame_url, frame_status, created_at').order('created_at', { ascending: false }),
     supabase.from('actions').select('project_id, frame_url, frame_status, created_at').order('created_at', { ascending: false }),
   ])
@@ -48,6 +51,7 @@ export async function loadPicker(supabase: SupabaseClient, currentId: string | n
       kind: p.kind,
       ideas: cardRows.filter((c) => c.project_id === p.id).length,
       thumbUrl: framed?.frame_url ?? null,
+      hue: p.hue,
       lastUsed: newest?.created_at ?? p.created_at,
     }
   })
@@ -93,10 +97,5 @@ export function subtitle(p: PickerProject, savedHere: boolean): string {
   return savedHere ? `${count} · saved here` : count
 }
 
-// Figma 83:397 — project blocks without a frame yet: sand, sage, slate, mauve.
-const BLOCKS = ['#EDDFC4', '#DCE3D3', '#C9CDD8', '#A69DAE']
-export function blockColour(id: string): string {
-  let h = 0
-  for (const ch of id) h = (h * 31 + ch.charCodeAt(0)) | 0
-  return BLOCKS[Math.abs(h) % BLOCKS.length]
-}
+/** A project's swatch without a frame: its hue (0039). */
+export const blockColour = (p: Pick<PickerProject, 'hue'>): string => hueOf(p.hue)

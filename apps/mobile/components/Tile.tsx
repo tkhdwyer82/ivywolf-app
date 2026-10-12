@@ -1,12 +1,11 @@
 // apps/mobile/components/Tile.tsx
 // One pin in a masonry (Home P1, a project's All ideas, search).
-//   Idea tile  — the form the idea takes (Job B revised, Figma 227:5): photo, quote, diagram, board or text, drawn by
-//                CardFace. A photo shows the Shimmer until it lands, then its title and Unsplash credit under it.
-//                Tap opens the idea page; a quote's ▶ chip plays from where it was said.
+//   Idea tile  — Home v4 (Figma 1737:5): a picture with the form on it, the title and meta under it
+//                (components/IdeaTile.tsx). Tap opens the idea page.
 //                Below 0.6 confidence the tile is greyed (the idea page says "Ivy isn't sure").
 //   To-do tile — no frame: Heading / Card title, the Caption meta ("My things · Thu"), and a calendar only when a
 //                date was heard (L3b, Figma 209:17).
-// The title is still the tile's accessibility label, so VoiceOver reads it; it isn't drawn.
+// The title is the tile's accessibility label, so VoiceOver reads it once.
 // Job C+: hold for the arc (components/HoldArc.tsx gives the tile its onLongPress); in link mode a mark sits over it
 // (components/LinkMode.tsx); a linked idea shows its link count, top right; a pinned one, the pin.
 
@@ -15,7 +14,8 @@ import { SymbolView } from 'expo-symbols'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { colour, radius, space, type } from '@ivywolf/ui'
 import { frameHeight, type Item } from '@/lib/home'
-import { CardFace } from '@/components/CardFace'
+import type { Picture } from '@/lib/picture'
+import { IdeaTile } from '@/components/IdeaTile'
 import { HOLD_MS } from '@/components/HoldArc'
 import { LinkBadge, LinkMarkView, type LinkMark } from '@/components/LinkMode'
 
@@ -39,22 +39,18 @@ export function Tile({
   item,
   meta,
   onOpen,
-  onPlay,
-  playing,
   width,
   onLongPress,
   mark,
   pinned,
+  trio,
+  onCredit,
 }: {
   item: Item
   /** A to-do's meta line ("My things · Thu"). Ideas carry no text. */
   meta?: string
   /** Opens the idea (P9) or the to-do (P17). */
   onOpen?: (item: Item) => void
-  /** A quote card's ▶ chip: play from play_from_ms. */
-  onPlay?: (item: Item) => void
-  /** This card's audio is playing (the chip shows pause). */
-  playing?: boolean
   /** Omit to fill the parent (a masonry cell). */
   width?: number
   /** Hold (about 0.35 s) for the arc. */
@@ -63,6 +59,10 @@ export function Tile({
   mark?: LinkMark | null
   /** In the Pinned row. */
   pinned?: boolean
+  /** A board's 3-up: two more pictures from its thread. */
+  trio?: Picture[]
+  /** She opened a picture credit's source. */
+  onCredit?: (p: Picture) => void
 }) {
   const open = onOpen ? () => onOpen(item) : undefined
 
@@ -104,7 +104,7 @@ export function Tile({
       testID={`tile-${item.id}`}
     >
       <View style={unsure && styles.unsure}>
-        <CardFace card={item} photoHeight={frameHeight(item)} playing={playing} onPlay={onPlay && item.storagePath ? () => onPlay(item) : undefined} pinned={pinned} />
+        <IdeaTile card={item} height={frameHeight(item)} trio={trio} pinned={pinned} onCredit={onCredit} />
       </View>
       {!mark && !pinned && <LinkBadge count={item.links} />}
       {mark && <LinkMarkView mark={mark} />}

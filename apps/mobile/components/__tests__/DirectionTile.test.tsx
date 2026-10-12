@@ -29,26 +29,26 @@ const d: Direction = {
 describe('DirectionTile', () => {
   it('shows the cite pill and the title, and + saves', async () => {
     const onSave = jest.fn()
-    await render(<DirectionTile direction={d} gradient="ember" width={180} onSave={onSave} />)
+    await render(<DirectionTile direction={d} hue="slate" width={180} onSave={onSave} />)
     expect(screen.getByText(/^From Tue 0:05 · “radios through/)).toBeTruthy()
     expect(screen.getByText('Cold open on the radio line')).toBeTruthy()
     fireEvent.press(screen.getByLabelText('Save Cold open on the radio line'))
     expect(onSave).toHaveBeenCalledWith(d)
   })
   it('has no row of buttons: ♥ and Not this live in the hold arc', async () => {
-    await render(<DirectionTile direction={d} gradient="ember" width={180} onSave={() => {}} />)
+    await render(<DirectionTile direction={d} hue="slate" width={180} onSave={() => {}} />)
     expect(screen.queryByLabelText(/^Like/)).toBeNull()
     expect(screen.queryByLabelText(/^Not this/)).toBeNull()
     expect(screen.queryByLabelText(/^Dismiss/)).toBeNull()
   })
   it('puts 3 references under it; a Pinterest pin is never cropped', async () => {
-    await render(<DirectionTile direction={d} gradient="ember" width={180} onSave={() => {}} />)
+    await render(<DirectionTile direction={d} hue="slate" width={180} onSave={() => {}} />)
     expect(screen.getAllByLabelText(/^Reference: /)).toHaveLength(3)
     expect(screen.getAllByTestId('image-cover')).toHaveLength(2)
     expect(screen.getAllByTestId('image-contain')).toHaveLength(1)
   })
   it('tap shows the gist', async () => {
-    await render(<DirectionTile direction={d} gradient="ember" width={180} onSave={() => {}} />)
+    await render(<DirectionTile direction={d} hue="slate" width={180} onSave={() => {}} />)
     expect(screen.queryByText(/radio crackle/)).toBeNull()
     await fireEvent.press(screen.getByLabelText(/^Cold open on the radio line\./))
     expect(await screen.findByText(/radio crackle/)).toBeTruthy()

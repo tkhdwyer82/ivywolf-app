@@ -1,9 +1,10 @@
 // apps/web/components/shared-card.tsx
 // A shared card, for anyone with the link (Job C+, Copy link): the card alone — its title, the form it takes and the
-// photo credit — drawn after the app's CardFace (apps/mobile/components/CardFace.tsx) on its project's gradient.
+// photo credit — drawn after the app's CardFace (apps/mobile/components/CardFace.tsx) on a flat bed, ink text (Home v4:
+// no gradients). shared_card() (0034) returns the project's old gradient name, not its hue (0039), so the bed is the
+// neutral Chip until that function returns the hue.
 // Never the recording, transcript, context, linked ideas, project or thread: shared_card() (0034) doesn't return them.
 
-import { gradientOf } from '@ivywolf/ui/theme/gradients'
 import { hero } from '@/components/graph'
 
 export type SharedCard = {
@@ -19,16 +20,16 @@ export type SharedCard = {
   gradient: string | null
 }
 
+const BED = '#F0F0F0' // Colour / Chip
 const font = 'system-ui, -apple-system, "SF Pro Text", sans-serif'
 
 export function SharedCardView({ card }: { card: SharedCard }) {
-  const g = gradientOf(card.gradient)
-  const fg = g.ink ? hero.ink : '#FFFFFF'
-  const soft = g.ink ? 'rgba(29,29,31,0.7)' : 'rgba(255,255,255,0.78)'
+  const fg = hero.ink
+  const soft = 'rgba(29,29,31,0.7)'
   const bed: React.CSSProperties = {
     borderRadius: 28,
     padding: 24,
-    background: `linear-gradient(to bottom, ${g.colors[0]}, ${g.colors[1]})`,
+    background: BED,
     color: fg,
     minHeight: 320,
     boxSizing: 'border-box',
@@ -65,7 +66,7 @@ export function SharedCardView({ card }: { card: SharedCard }) {
         {card.diagram.title && <p style={{ margin: 0, fontSize: 12, fontWeight: 600, letterSpacing: 1.2, color: soft, textTransform: 'uppercase' }}>{card.diagram.title}</p>}
         {card.diagram.rows.map((r, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ flex: 1, textAlign: 'center', borderRadius: 10, padding: '8px 6px', background: g.ink ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.22)' }}>{r.from}</span>
+            <span style={{ flex: 1, textAlign: 'center', borderRadius: 10, padding: '8px 6px', background: 'rgba(255,255,255,0.6)' }}>{r.from}</span>
             <span aria-hidden>→</span>
             <span style={{ flex: 1, textAlign: 'center', borderRadius: 10, padding: '8px 6px', background: 'rgba(255,255,255,0.9)', color: hero.ink }}>{r.to}</span>
           </div>
