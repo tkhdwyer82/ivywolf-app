@@ -2,7 +2,7 @@
 // An idea on Home v4 (Figma 1737:5): visual first. Every idea is a picture (lib/picture.ts: her own, else its
 // Unsplash photo, else its reference, else the project's flat hue while one is found) with the form drawn on it:
 //   quote — the line in white on a bottom scrim (1737:136);
-//   board — 3-up: its picture and two more from its thread;
+//   board — 3-up: its picture and two more from its thread (just its own picture until the thread has three);
 //   text, diagram, photo — the picture as is, the title under it.
 // A take from the Create flow shows its still with "▶ 0:03" (1737:143); on Home video plays only when earned, so it
 // never plays here. The hue block carries the title itself (1737:140) and "finding a picture…" in the meta while the
@@ -57,8 +57,8 @@ export function IdeaTile({
               {card.title}
             </Text>
           </View>
-        ) : board ? (
-          <ThreeUp pictures={[p, ...(trio ?? [])]} recyclingKey={card.id} />
+        ) : board && distinct([p, ...(trio ?? [])]).length >= 3 ? (
+          <ThreeUp pictures={distinct([p, ...(trio ?? [])])} recyclingKey={card.id} />
         ) : (
           <Layer picture={p} recyclingKey={card.id} />
         )}
@@ -112,9 +112,12 @@ function Layer({ picture, recyclingKey }: { picture: Picture; recyclingKey: stri
   return <Image source={{ uri: picture.uri }} recyclingKey={recyclingKey} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} accessibilityIgnoresInvertColors />
 }
 
-/** A board: its picture on the left, two more stacked on the right, 2 apart. Missing ones repeat the first. */
+/** Pictures with a uri, each once. */
+const distinct = (pictures: Picture[]) => pictures.filter((x, i) => x.uri && pictures.findIndex((y) => y.uri === x.uri) === i)
+
+/** A board: its picture on the left, two more stacked on the right, 2 apart. */
 function ThreeUp({ pictures, recyclingKey }: { pictures: Picture[]; recyclingKey: string }) {
-  const [a, b = a, c = b] = pictures.filter((x) => x.uri)
+  const [a, b, c] = pictures
   return (
     <View style={[StyleSheet.absoluteFill, styles.trio]}>
       <View style={styles.trioMain}>

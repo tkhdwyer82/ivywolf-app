@@ -32,7 +32,7 @@ colour, and Explore is a nav tab.
 | Form | On Home |
 |---|---|
 | quote | The line in white Semibold 15/18 on a bottom scrim (clear to black 65 %). No title under it, only the meta. |
-| board | A 3-up: its picture large on the left, and two more from its thread stacked on the right. |
+| board | A 3-up: its picture large on the left, and two more from its thread stacked on the right. Until its thread has three different pictures, just its own. |
 | text, diagram | The picture as is, with the title under it. |
 | photo | As is. |
 | a Create take | Its first frame, muted and still, with "▶ 0:03". Video plays without being earned only on Explore. |
