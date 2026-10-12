@@ -71,6 +71,11 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
   clean tree, matches its remote, typecheck and tests), then `eas build --wait`, then `eas submit --latest` as a
   separate step. Any step that fails stops the script, non-zero, with a message saying what did and didn't happen
   (no `--auto-submit`: it exits 0 when its submission is refused).
+- Run the build scripts directly; never pipe them through `tail`, `head` or anything else, which hides their exit
+  code (a refused build then reads as exit 0). To keep a log, redirect to a file instead.
+- In a worktree, run `npm ci` after any lock file change or branch switch, before building: a stale `node_modules`
+  can fail the prebuild tests even when the code and lock file are right (a leftover Gesture Handler 3.3.0 against
+  the locked 2.32.0 did, before build 16).
 - After every build, add its number, branch (or "PREVIEW: <branch>") and commit to docs/polish-checklist.md → Builds.
   TestFlight can't show the preview label, so that list is how builds are told apart.
 - Push every commit to its branch straight away.
