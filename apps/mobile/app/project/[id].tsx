@@ -52,13 +52,14 @@ export default function Project() {
 }
 
 function ProjectScreen() {
-  const { id, linkFrom } = useLocalSearchParams<{ id: string; linkFrom?: string }>()
+  const { id, linkFrom, tab: openOn } = useLocalSearchParams<{ id: string; linkFrom?: string; tab?: string }>()
   const holding = useHolding()
   const supabase = useSupabase()
   const insets = useSafeAreaInsets()
   const [page, setPage] = useState<ProjectPage | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<ProjectTab>('all')
+  // Home's direction tile opens straight onto More ideas (?tab=more).
+  const [tab, setTab] = useState<ProjectTab>(openOn === 'more' ? 'more' : 'all')
   const [dirs, setDirs] = useState<Directions | null>(null)
   const [ivyLine, setIvyLine] = useState<string | null>(null)
   const { getToken } = useAuth()
@@ -329,12 +330,12 @@ function ProjectScreen() {
                           <View key={d.id} style={styles.cell}>
                             <Hold
                               actions={() => actions.directionActions(d, gone, () => refreshDirections(true))}
-                              face={() => <DirectionTile direction={d} gradient={project.gradient ?? null} width={tileWidth} onSave={() => {}} />}
+                              face={() => <DirectionTile direction={d} hue={project.hue ?? null} width={tileWidth} onSave={() => {}} />}
                             >
                               {(onLongPress) => (
                                 <DirectionTile
                                   direction={d}
-                                  gradient={project.gradient ?? null}
+                                  hue={project.hue ?? null}
                                   width={tileWidth}
                                   onSave={saveOne}
                                   onLongPress={onLongPress}

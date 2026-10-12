@@ -1,5 +1,5 @@
 // apps/mobile/components/DirectionTile.tsx
-// A direction on More ideas (Job H, Figma 165:423; tile styling 227:2 v3.4): the project's gradient bed (a direction
+// A direction on More ideas (Job H, Figma 165:423; tile styling 227:2 v3.4): the project's flat hue (0039; a direction
 // never has a frame), the cite pill top-left (her words, one line), the title bottom-left, and the lime + bottom-right
 // — Save, and the screen's one lime thing. Tap shows the gist. Hold for the arc (♥ · Save · Link to… · Not this),
 // like every other tile; there is no row of buttons.
@@ -10,11 +10,9 @@
 import { useState } from 'react'
 import { ActionSheetIOS, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native'
 import { Image } from 'expo-image'
-import { LinearGradient } from 'expo-linear-gradient'
 import * as WebBrowser from 'expo-web-browser'
 import { SymbolView } from 'expo-symbols'
-import { colour, radius, size, space, type } from '@ivywolf/ui'
-import { gradientOf } from '@ivywolf/ui/theme/gradients'
+import { colour, hueOf, radius, size, space, type } from '@ivywolf/ui'
 import { tileHeight } from '@/lib/home'
 import { HOLD_MS } from '@/components/HoldArc'
 import type { Direction, Reference } from '@/lib/directions'
@@ -34,15 +32,15 @@ const pillText = (why: string) => why.replace(/^from ([^:]+:\d\d): /, (_m, at: s
 
 export function DirectionTile({
   direction,
-  gradient,
+  hue,
   width,
   onSave,
   onLongPress,
   onReference,
 }: {
   direction: Direction
-  /** The project's gradient name (0034). */
-  gradient: string | null
+  /** The project's hue (0039). */
+  hue: string | null
   width: number
   onSave: (d: Direction) => void
   /** Hold for the arc. */
@@ -51,8 +49,7 @@ export function DirectionTile({
   onReference?: (r: Reference) => void
 }) {
   const [open, setOpen] = useState(false)
-  const g = gradientOf(gradient)
-  const fg = g.ink ? colour.Ink : colour.Surface
+  const fg = colour.Ink // ink text on every hue
 
   const showReference = (r: Reference) =>
     ActionSheetIOS.showActionSheetWithOptions(
@@ -74,7 +71,7 @@ export function DirectionTile({
         accessibilityLabel={`${direction.title}. ${direction.why}`}
         accessibilityHint="Shows what it is. Hold for Like, Save, Link to or Not this."
       >
-        <LinearGradient colors={g.colors} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[styles.tile, { minHeight: tileHeight(direction.id) }]}>
+        <View style={[styles.tile, { minHeight: tileHeight(direction.id), backgroundColor: hueOf(hue) }]}>
           <View style={styles.pill}>
             <Text style={styles.pillText} numberOfLines={2}>
               {pillText(direction.why)}
@@ -89,7 +86,7 @@ export function DirectionTile({
           <Pressable onPress={() => onSave(direction)} hitSlop={(size.tap - size.pin) / 2} style={styles.plus} accessibilityRole="button" accessibilityLabel={`Save ${direction.title}`} testID={`direction-save-${direction.id}`}>
             <SymbolView name="plus" tintColor={colour.Ink} size={16} weight="semibold" />
           </Pressable>
-        </LinearGradient>
+        </View>
       </Pressable>
 
       {direction.references.length > 0 && (

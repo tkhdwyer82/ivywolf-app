@@ -83,7 +83,7 @@ export default function SaveTo() {
         {p.thumbUrl ? (
           <Image source={{ uri: p.thumbUrl }} style={styles.thumb} />
         ) : (
-          <View style={[styles.thumb, { backgroundColor: blockColour(p.id) }]} />
+          <View style={[styles.thumb, { backgroundColor: blockColour(p) }]} />
         )}
         <View style={styles.rowText}>
           <Text style={styles.name} numberOfLines={1}>

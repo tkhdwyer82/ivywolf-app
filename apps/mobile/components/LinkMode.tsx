@@ -25,6 +25,9 @@ const DONE_W = 200
 const DONE_H = 56
 const BANNER_H = 40
 const DOT = 7
+// A deck's line (1743:14–17): 3 wide, its ends 10.
+const DECK_LINE = 3
+const DECK_DOT = 10
 
 /** Over a tile in link mode. Draws only; the tile's own press does the linking. */
 export function LinkMarkView({ mark }: { mark: LinkMark }) {
@@ -118,11 +121,15 @@ export interface LinkLinesHandle {
   remeasure: () => void
 }
 
+/** A deck's line (1743:14): 3 wide with 10 dots, in a colour and an opacity per link. */
+export type LinePaint = (id: string) => { colour: string; opacity: number }
+
 /**
  * Lines from the "linking from" card to each card it's linked to, edge to edge with a dot at each end, drawn over the
- * screen. Cards report their views through `register`; only the ones on screen are measured and drawn.
+ * screen. Cards report their views through `register`; only the ones on screen are measured and drawn. Blue in link
+ * mode; with `paint`, a deck's lines (each link's own colour and opacity, thicker, bigger dots).
  */
-export const LinkLines = forwardRef<LinkLinesHandle, { from: string; to: string[]; views: Map<string, View> }>(function LinkLines({ from, to, views }, ref) {
+export const LinkLines = forwardRef<LinkLinesHandle, { from: string; to: string[]; views: Map<string, View>; paint?: LinePaint }>(function LinkLines({ from, to, views, paint }, ref) {
   const [rects, setRects] = useState<Map<string, Rect>>(new Map())
   const root = useRef<View>(null)
   const pending = useRef(false)
@@ -164,16 +171,21 @@ export const LinkLines = forwardRef<LinkLinesHandle, { from: string; to: string[
           const [p, q] = edgeToEdge(a, b)
           const len = Math.hypot(q.x - p.x, q.y - p.y)
           const angle = Math.atan2(q.y - p.y, q.x - p.x)
+          const look = paint?.(id)
+          const w = look ? DECK_LINE : 2
+          const d = look ? DECK_DOT : DOT
+          const tint = look && { backgroundColor: look.colour }
           return (
-            <View key={id}>
+            <View key={id} style={look && { opacity: look.opacity }}>
               <View
                 style={[
                   styles.line,
-                  { left: (p.x + q.x) / 2 - len / 2, top: (p.y + q.y) / 2 - 1, width: len, transform: [{ rotate: `${angle}rad` }] },
+                  tint,
+                  { left: (p.x + q.x) / 2 - len / 2, top: (p.y + q.y) / 2 - w / 2, width: len, height: w, borderRadius: w / 2, transform: [{ rotate: `${angle}rad` }] },
                 ]}
               />
-              <View style={[styles.dot, { left: p.x - DOT / 2, top: p.y - DOT / 2 }]} />
-              <View style={[styles.dot, { left: q.x - DOT / 2, top: q.y - DOT / 2 }]} />
+              <View style={[styles.dot, tint, { left: p.x - d / 2, top: p.y - d / 2, width: d, height: d, borderRadius: d / 2 }]} />
+              <View style={[styles.dot, tint, { left: q.x - d / 2, top: q.y - d / 2, width: d, height: d, borderRadius: d / 2 }]} />
             </View>
           )
         })}

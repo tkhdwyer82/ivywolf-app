@@ -1,5 +1,5 @@
-// Job C+: links both ways, the link lines' geometry, context lines, the gradient fallback and the pinned order.
-import { gradientOf, GRADIENT_NAMES } from '@ivywolf/ui'
+// Job C+: links both ways, the link lines' geometry, context lines, the hue fallback (v4) and the pinned order.
+import { hueOf, HUE_NAMES, hues } from '@ivywolf/ui'
 import { linkedLine, pair, toLinks } from '@/lib/links'
 import { contextLines, type ContextItem } from '@/lib/context'
 import { edgeToEdge } from '@/components/LinkMode'
@@ -24,13 +24,13 @@ describe('links', () => {
   })
 })
 
-describe('gradients', () => {
-  it('has the ten from the palette, in order, and falls back to Ember', () => {
-    expect(GRADIENT_NAMES).toEqual(['ember', 'peach', 'lagoon', 'dusk', 'sky', 'orchid', 'meadow', 'honey', 'blaze', 'ice'])
-    expect(gradientOf('dusk').ink).toBe(false)
-    expect(gradientOf('peach').ink).toBe(true)
-    expect(gradientOf('nope').name).toBe('ember')
-    expect(gradientOf(null).name).toBe('ember')
+describe('hues', () => {
+  it('has the four project hues and My things’ cool-grey, flat colours, and falls back to cool-grey', () => {
+    expect(HUE_NAMES).toEqual(['coral', 'sage', 'butter', 'slate', 'cool-grey'])
+    for (const name of HUE_NAMES) expect(hues[name]).toMatch(/^#[0-9A-F]{6}$/)
+    expect(hueOf('butter')).toBe('#F2E3B2')
+    expect(hueOf('nope')).toBe(hues['cool-grey'])
+    expect(hueOf(null)).toBe(hues['cool-grey'])
   })
 })
 

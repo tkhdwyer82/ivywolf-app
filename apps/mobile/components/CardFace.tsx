@@ -8,16 +8,15 @@
 //   board   — dark card: the hook, a lime dot per beat, and the thread's stage as a lime pill (BOARD · READY).
 //   text    — a plain card, title and gist: the low-confidence fallback.
 // `size` is 'tile' in a masonry and 'page' at the top of the idea page (bigger type, the same parts).
-// Gradients (Job C+, Figma 1462:4 / 1462:36): every non-photo form wears its project's gradient, with white or ink
-// text as the palette lists, and on a tile a footer — "Ivy brand · Car 0:42". Photos keep the photo; lime is never a
-// card colour (the comparison's "to" cells and the board's dots and pill are white on the gradient).
+// Hues (Home v4, 0039): every non-photo form sits on its project's flat hue, ink text always, and on a tile a footer —
+// "Ivy brand · Car 0:42". No gradients. Photos keep the photo; lime is never a card colour (the comparison's "to" cells
+// and the board's dots and pill are white on the hue).
 
 import type { ReactNode } from 'react'
 import { Linking, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { Image } from 'expo-image'
-import { LinearGradient } from 'expo-linear-gradient'
 import { SymbolView } from 'expo-symbols'
-import { colour, gradientOf, radius, space, type } from '@ivywolf/ui'
+import { colour, hueOf, radius, space, type } from '@ivywolf/ui'
 import { textMinHeight, type CardItem } from '@/lib/home'
 import { Shimmer } from '@/components/Shimmer'
 
@@ -69,16 +68,16 @@ export function CardFace({
   /** Play from play_from_ms. Without it the chip is drawn but not a button. */
   onPlay?: () => void
   style?: StyleProp<ViewStyle>
-  /** "Project · Car 0:42" under a gradient card. On by default on a tile. */
+  /** "Project · Car 0:42" under a hue card. On by default on a tile. */
   footer?: boolean
   /** In the Pinned row: the pin, top right. */
   pinned?: boolean
 }) {
   const page = size === 'page'
-  const ink = card.gradient ? gradientOf(card.gradient).ink : true
-  const fg = { color: ink ? colour.Ink : colour.Surface }
-  const soft = { color: ink ? INK_SOFT : WHITE_SOFT }
-  const foot = footer && card.gradient ? <Footer card={card} style={soft} /> : null
+  const ink = true // ink text on every hue
+  const fg = { color: colour.Ink }
+  const soft = { color: INK_SOFT }
+  const foot = footer && card.hue ? <Footer card={card} style={soft} /> : null
   const pin = pinned ? <Pin ink={ink} /> : null
   switch (card.shape) {
     case 'quote':
@@ -99,18 +98,18 @@ export function CardFace({
     case 'diagram':
       if (card.diagram)
         return (
-          <Bed card={card} style={[styles.box, card.gradient ? styles.diagramBed : styles.diagramBox, page && styles.boxPage, style]}>
+          <Bed card={card} style={[styles.box, card.hue ? styles.diagramBed : styles.diagramBox, page && styles.boxPage, style]}>
             {pin}
-            {!!card.diagram.title && <Text style={[styles.overline, card.gradient && soft]}>{card.diagram.title.toUpperCase()}</Text>}
+            {!!card.diagram.title && <Text style={[styles.overline, card.hue && soft]}>{card.diagram.title.toUpperCase()}</Text>}
             {card.diagram.rows.map((r, i) => (
               <View key={i} style={styles.row}>
-                <View style={[styles.cell, card.gradient ? (ink ? styles.cellFromInk : styles.cellFromWhite) : styles.cellFrom]}>
-                  <Text style={[styles.cellText, page && styles.cellTextPage, card.gradient && fg]} numberOfLines={2}>
+                <View style={[styles.cell, card.hue ? styles.cellFromInk : styles.cellFrom]}>
+                  <Text style={[styles.cellText, page && styles.cellTextPage, card.hue && fg]} numberOfLines={2}>
                     {r.from}
                   </Text>
                 </View>
-                <Arrow tint={card.gradient ? fg.color : undefined} />
-                <View style={[styles.cell, card.gradient ? styles.cellToOnGradient : styles.cellTo]}>
+                <Arrow tint={card.hue ? fg.color : undefined} />
+                <View style={[styles.cell, card.hue ? styles.cellToOnGradient : styles.cellTo]}>
                   <Text style={[styles.cellText, page && styles.cellTextPage]} numberOfLines={2}>
                     {r.to}
                   </Text>
@@ -126,18 +125,18 @@ export function CardFace({
         return (
           <Bed card={card} style={[styles.box, styles.boardBox, page && styles.boxPage, style]}>
             {pin}
-            <Text style={[styles.boardTitle, page && styles.boardTitlePage, card.gradient && fg]} numberOfLines={2}>
+            <Text style={[styles.boardTitle, page && styles.boardTitlePage, card.hue && fg]} numberOfLines={2}>
               {card.board.hook || card.title}
             </Text>
             {card.board.beats.map((b, i) => (
               <View key={i} style={styles.beat}>
-                <View style={[styles.beatDot, card.gradient && { backgroundColor: fg.color }]} />
-                <Text style={[styles.beatText, page && styles.beatTextPage, card.gradient && fg]} numberOfLines={1}>
+                <View style={[styles.beatDot, card.hue && { backgroundColor: fg.color }]} />
+                <Text style={[styles.beatText, page && styles.beatTextPage, card.hue && fg]} numberOfLines={1}>
                   {b}
                 </Text>
               </View>
             ))}
-            <View style={[styles.statusPill, card.gradient && styles.pillOnGradient]}>
+            <View style={[styles.statusPill, card.hue && styles.pillOnGradient]}>
               <Text style={styles.pillText}>BOARD · {STAGE[card.threadStage ?? 'sparked']}</Text>
             </View>
             {foot}
@@ -146,7 +145,7 @@ export function CardFace({
       break
     case 'photo':
       // Job I: a photo card is an Unsplash photo with its credit or her own picture (lib/home.ts cardPicture). The
-      // Shimmer stands in only while one is coming; done with nothing to show, it falls through to the gradient.
+      // Shimmer stands in only while one is coming; done with nothing to show, it falls through to the hue.
       if (!card.frameUrl && card.frameStatus !== 'none' && card.frameStatus !== 'queued') break
       return (
         <View style={style}>
@@ -181,14 +180,14 @@ export function CardFace({
   // text — and any shape whose payload is missing. On a tile it stands as tall as the rhythm: the title at the top,
   // the gist and the footer at the bottom (Figma 1462:36).
   return (
-    <Bed card={card} style={[styles.box, styles.textBox, page && styles.boxPage, !page && card.gradient && { minHeight: textMinHeight(card.id) }, style]}>
+    <Bed card={card} style={[styles.box, styles.textBox, page && styles.boxPage, !page && card.hue && { minHeight: textMinHeight(card.id) }, style]}>
       {pin}
       <Text style={[styles.textTitle, page && styles.textTitlePage, fg]} numberOfLines={page ? undefined : 4}>
         {card.title}
       </Text>
       <View style={styles.textBottom}>
         {!!card.gist && (
-          <Text style={[styles.textGist, page && styles.textGistPage, card.gradient ? soft : null]} numberOfLines={page ? undefined : 4}>
+          <Text style={[styles.textGist, page && styles.textGistPage, card.hue ? soft : null]} numberOfLines={page ? undefined : 4}>
             {card.gist}
           </Text>
         )}
@@ -198,15 +197,9 @@ export function CardFace({
   )
 }
 
-/** The card's bed: its project's gradient, top to bottom — or the grey Chip where the project wasn't read. */
+/** The card's bed: its project's flat hue — or the grey Chip where the project wasn't read. */
 function Bed({ card, style, children }: { card: CardItem; style: StyleProp<ViewStyle>; children: ReactNode }) {
-  if (!card.gradient) return <View style={style}>{children}</View>
-  const g = gradientOf(card.gradient)
-  return (
-    <LinearGradient colors={g.colors} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[style, styles.noBed]}>
-      {children}
-    </LinearGradient>
-  )
+  return <View style={[style, !!card.hue && { backgroundColor: hueOf(card.hue) }]}>{children}</View>
 }
 
 /** "Ivy brand · Car 0:42": where it lives, and where it was said. */
@@ -296,9 +289,8 @@ const CREDIT = 11
 const HAIRLINE = '#E6E6E4'
 const CHIP_SLOP = 12
 // Job C+ (1462:36) — measured: the footer is Regular 11 at 60–75% of the text colour, 12 under the card's words; the
-// comparison's cells on a gradient are white at 35% (ink text) / 22% (white text), the "to" cell white at 90%.
+// comparison's cells on a hue are white at 35%, the "to" cell white at 90%.
 const INK_SOFT = 'rgba(29,29,31,0.7)'
-const WHITE_SOFT = 'rgba(255,255,255,0.78)'
 const FOOTER = 11
 const PIN = 16
 
@@ -365,10 +357,8 @@ const styles = StyleSheet.create({
   textGist: { ...type['Body / Small'], color: colour.Grey },
   textGistPage: { ...type['Body'], color: colour.Grey },
   textBottom: { marginTop: 'auto', gap: 6 },
-  noBed: { backgroundColor: undefined },
   diagramBed: { gap: ROW_GAP },
   cellFromInk: { backgroundColor: 'rgba(255,255,255,0.35)' },
-  cellFromWhite: { backgroundColor: 'rgba(255,255,255,0.22)' },
   cellToOnGradient: { backgroundColor: 'rgba(255,255,255,0.9)' },
   pillOnGradient: { backgroundColor: 'rgba(255,255,255,0.9)' },
   footer: { fontSize: FOOTER, marginTop: space.gutter + 4 },

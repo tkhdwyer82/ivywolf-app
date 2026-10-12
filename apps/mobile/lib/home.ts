@@ -6,16 +6,17 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CardBoard, CardDiagram, CardQuote, CardShape } from '@ivywolf/schema'
-import { space, type GradientName } from '@ivywolf/ui'
+import type { HueName } from '@ivywolf/ui'
 import { requestProcessing } from './record'
 import { loadLinks, withLinks, type Links } from './links'
+import { resolvePicture, type OwnPicture, type Picture, type ReferencePicture } from './picture'
 
 export interface Project {
   id: string
   name: string
   kind: 'things' | 'mini' | 'user'
-  /** Its card gradient (0034, Figma 1462:4): every non-photo card in it wears this. */
-  gradient: GradientName
+  /** Its flat hue (0039, Home v4): an idea's block while a picture is found, the chip's underline, its swatch. */
+  hue: HueName
 }
 
 interface Base {
@@ -53,14 +54,16 @@ export interface CardItem extends Base {
   diagram: CardDiagram | null
   board: CardBoard | null
   credit: PhotoCredit | null
+  /** What it shows (Home v4): her own picture or take, its Unsplash photo, its reference, or its project's hue. */
+  picture: Picture
   /** recordings.source — where it was said, for the quote's ▶ chip ("Mini · 12:40"). */
   recordingSource: string | null
   /** Its thread's stage — a board card's status pill. */
   threadStage: ThreadStage | null
   /** When the card landed (cards.created_at) — "new since she last looked" for Ivy's line. */
   createdAt?: string
-  /** Its project's gradient and name (the tile's footer, Figma 1462:36). Null where the project wasn't read. */
-  gradient: GradientName | null
+  /** Its project's hue and name. Null where the project wasn't read. */
+  hue: HueName | null
   projectName: string | null
   /** Pin to top (0034): pinned cards sit in the Pinned row, newest pin first. */
   pinnedAt: string | null
@@ -120,24 +123,25 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 
 /** The columns every card tile needs. Callers add their own thread embedding (for size and stage). */
 export const CARD_COLUMNS =
-  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, gradient)'
+  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, reference_picture, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, hue)'
 
 export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
   confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
   created_at: string; source?: string | null; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
   frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string } | null
+  reference_picture?: ReferencePicture | null
   recordings: { recorded_at: string | null; storage_path?: string | null; source?: string } | null
   pinned_at?: string | null
   shared_at?: string | null
   hearted_at?: string | null
-  projects?: { name: string; gradient?: GradientName | null; id?: string; kind?: string } | null
+  projects?: { name: string; hue?: HueName | null; id?: string; kind?: string } | null
 }
 
 /**
  * The only pictures a card shows (Job I): an Unsplash photo with its credit, or her own picture (an import). Anything
  * else in frame_url — the fal frames drawn for cards before Job B, a pinned suggestion's preview — is not shown; the
- * card falls back to its project gradient or no picture at all.
+ * card falls back to its reference picture or its project hue (lib/picture.ts).
  */
 export function cardPicture(r: Pick<CardRow, 'frame_url' | 'frame_status' | 'frame_attribution'> & { source?: string | null }): string | null {
   if (r.frame_status !== 'done' || !r.frame_url) return null
@@ -153,8 +157,18 @@ export function shapeOf(r: Pick<CardRow, 'shape' | 'frame_status' | 'frame_url' 
   return r.frame_status === 'none' || r.frame_status === 'queued' ? 'photo' : 'text'
 }
 
-export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStage | null } = { size: 1, stage: null }): CardItem {
-  const a = c.frame_attribution
+const unsplashOf = (a: CardRow['frame_attribution']): PhotoCredit | null =>
+  a?.provider === 'unsplash' && a.photographer && a.photographer_url && a.photo_url
+    ? { photographer: a.photographer, photographerUrl: a.photographer_url, photoUrl: a.photo_url }
+    : null
+
+/**
+ * @param own her pictures and takes for this card (loadOwnPictures); an import's picture is added here.
+ */
+export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStage | null } = { size: 1, stage: null }, own: OwnPicture[] = []): CardItem {
+  const credit = unsplashOf(c.frame_attribution)
+  const frame = cardPicture(c)
+  const imported: OwnPicture[] = frame && !credit ? [{ uri: frame, kind: 'image', at: c.frame_at ?? c.created_at, from: 'context' }] : []
   return {
     kind: 'card',
     id: c.id,
@@ -175,14 +189,16 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     quote: c.quote,
     diagram: c.diagram,
     board: c.board,
-    credit:
-      a?.provider === 'unsplash' && a.photographer && a.photographer_url && a.photo_url
-        ? { photographer: a.photographer, photographerUrl: a.photographer_url, photoUrl: a.photo_url }
-        : null,
+    credit,
+    picture: resolvePicture({
+      own: [...imported, ...own],
+      unsplash: credit && frame ? { url: frame, ...credit } : null,
+      reference: c.reference_picture ?? null,
+    }),
     recordingSource: c.recordings?.source ?? null,
     threadStage: thread.stage,
     createdAt: c.created_at,
-    gradient: c.projects?.gradient ?? null,
+    hue: c.projects?.hue ?? null,
     projectName: c.projects?.name ?? null,
     pinnedAt: c.pinned_at ?? null,
     sharedAt: c.shared_at ?? null,
@@ -191,12 +207,46 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
   }
 }
 
+/**
+ * Her own pictures for these cards (rule 1's first place): images she added with Add context for the idea (role idea
+ * or both, never style alone), signed from the private bucket for an hour; and the Create flow's takes
+ * (generation_runs that completed into our storage). Best-effort: if either read fails, those cards fall to the next
+ * picture.
+ */
+export async function loadOwnPictures(supabase: SupabaseClient, cardIds: string[]): Promise<Map<string, OwnPicture[]>> {
+  const out = new Map<string, OwnPicture[]>()
+  if (cardIds.length === 0) return out
+  const add = (id: string, p: OwnPicture) => out.set(id, [...(out.get(id) ?? []), p])
+  const [context, runs] = await Promise.all([
+    supabase.from('card_context').select('card_id, url, meta, created_at').eq('kind', 'image').in('card_id', cardIds),
+    supabase
+      .from('generation_runs')
+      .select('card_id, kind, output_url, completed_at, created_at')
+      .eq('status', 'completed')
+      .not('output_url', 'is', null)
+      .in('card_id', cardIds),
+  ])
+  type ContextRow = { card_id: string; url: string | null; meta: { role?: string } | null; created_at: string }
+  const images = ((context.data ?? []) as ContextRow[]).filter((r) => r.url && (r.meta?.role ?? 'idea') !== 'style')
+  if (images.length) {
+    const { data: signed } = await supabase.storage.from('context').createSignedUrls(images.map((r) => r.url!), 3600)
+    const byPath = new Map((signed ?? []).filter((x) => x.signedUrl && x.path).map((x) => [x.path!, x.signedUrl]))
+    for (const r of images) {
+      const uri = byPath.get(r.url!)
+      if (uri) add(r.card_id, { uri, kind: 'image', at: r.created_at, from: 'context' })
+    }
+  }
+  type RunRow = { card_id: string; kind: 'image' | 'video'; output_url: string; completed_at: string | null; created_at: string }
+  for (const r of (runs.data ?? []) as RunRow[]) add(r.card_id, { uri: r.output_url, kind: r.kind, at: r.completed_at ?? r.created_at, from: 'created' })
+  return out
+}
+
 const LIMIT = 300
 const STUCK_MS = 30_000
 
 export async function loadHome(supabase: SupabaseClient, userId: string): Promise<HomeData> {
   const [projects, cards, actions, threads, inFlight, creator] = await Promise.all([
-    supabase.from('projects').select('id, name, kind, gradient').order('is_default', { ascending: false }).order('created_at'),
+    supabase.from('projects').select('id, name, kind, hue').order('is_default', { ascending: false }).order('created_at'),
     supabase
       .from('cards')
       .select(CARD_COLUMNS)
@@ -234,13 +284,14 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
 
   type Rec = { recorded_at: string | null; storage_path?: string | null; source?: string } | null
   const cardRows = need('cards', cards) as unknown as CardRow[]
+  const own = await loadOwnPictures(supabase, cardRows.map((c) => c.id))
   const actionRows = need('actions', actions) as unknown as {
     id: string; recording_id: string | null; project_id: string; text: string; done: boolean; due_date: string | null
     frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null; created_at: string; recordings: Rec
   }[]
 
   const items: Item[] = [
-    ...cardRows.map((c) => withLinks(toCardItem(c, threadOf.get(c.id) ?? { size: 1, stage: null }), links)),
+    ...cardRows.map((c) => withLinks(toCardItem(c, threadOf.get(c.id) ?? { size: 1, stage: null }, own.get(c.id)), links)),
     ...actionRows.map((a): ActionItem => ({
       kind: 'action',
       id: a.id,
@@ -279,6 +330,75 @@ export async function markSeen(supabase: SupabaseClient, userId: string, items: 
   const newest = items.reduce<string | null>((m, i) => (i.kind === 'card' && (!m || (i.createdAt ?? i.at) > m) ? (i.createdAt ?? i.at) : m), null)
   if (!newest) return
   await supabase.from('creators').update({ last_opened_at: newest }).eq('id', userId).or(`last_opened_at.is.null,last_opened_at.lt.${newest}`)
+}
+
+// ── My things row ───────────────────────────────────────────────────────────────────────────────────────────────
+
+export interface ThingsRow {
+  /** "3 today": her open to-dos due today, overdue, or with no date — what's on her plate now. */
+  today: number
+  /** The first three of them, oldest first: "milk · visa · wipes". */
+  first: string[]
+}
+
+/**
+ * My things leaves the feed (Home v4, Row/My things 1737:129): one row at the top of Home instead of to-do tiles. Null
+ * when she has no open to-dos, so the row isn't drawn.
+ */
+export function thingsRow(items: Item[], now = new Date()): ThingsRow | null {
+  const today = localDay(now.toISOString())
+  const open = items
+    .filter((i): i is ActionItem => i.kind === 'action' && !i.done)
+    .filter((a) => !a.dueDate || a.dueDate <= today)
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+  if (!items.some((i) => i.kind === 'action' && !i.done)) return null
+  return { today: open.length, first: open.slice(0, 3).map((a) => a.text) }
+}
+
+/** "3 today · milk · visa · wipes" — or, with nothing due yet, how many are open. */
+export function thingsLine(row: ThingsRow, open: number): string {
+  if (row.today === 0) return `${open} open`
+  return [`${row.today} today`, ...row.first].join(' · ')
+}
+
+/**
+ * Where an idea appears (decks, Figma 1742:2): its own project, and the project of every idea it's linked to. Derived
+ * from card_links — project_id never changes. To-dos are never linked, so they appear only where they are.
+ */
+export function appearsIn(card: Item, links: Links | undefined, projectOf: Map<string, string>): Set<string> {
+  const out = new Set([card.projectId])
+  if (card.kind !== 'card') return out
+  for (const id of links?.get(card.id) ?? []) {
+    const p = projectOf.get(id)
+    if (p) out.add(p)
+  }
+  return out
+}
+
+/**
+ * The feed is ideas only: to-dos live in the My things row and its room. Under a project chip, an idea shows if it
+ * appears in that project (its own, or linked into it); under All each idea shows once.
+ */
+export function feedItems(items: Item[], project: string | null, links?: Links): CardItem[] {
+  const cards = items.filter((i): i is CardItem => i.kind === 'card')
+  if (project === null) return cards
+  const projectOf = new Map(cards.map((c) => [c.id, c.projectId]))
+  return cards.filter((c) => appearsIn(c, links, projectOf).has(project))
+}
+
+/** Max cards a deck shows at once: the top card and one peeking. */
+export const DECK_VISIBLE = 2
+
+/**
+ * A deck (1742:2): an idea with at least one link, over the ideas it's linked to — the pages a swipe goes through,
+ * newest first. Errands never deck. Only linked ideas that are loaded can be paged to.
+ */
+export function deckOf(card: Item, links: Links | undefined, byId: Map<string, Item>): CardItem[] {
+  if (card.kind !== 'card') return []
+  return [...(links?.get(card.id) ?? [])]
+    .map((id) => byId.get(id))
+    .filter((c): c is CardItem => !!c && c.kind === 'card')
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
 }
 
 // ── Days ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -326,6 +446,13 @@ export function groupByDay(items: Item[], now = new Date()): DayGroup[] {
 
 // ── Masonry ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Home v4's grid (Figma 1737:5) — measured, not tokens (no variables are bound in the v4 frames): columns 170 at 393,
+ * gutter 13, margins 20, corners 16. Under each picture: 8, the title (Semibold 13, line 16, two lines at most), 3,
+ * the meta (Regular 11, line 13), then 18 to the next tile.
+ */
+export const GRID = { gutter: 13, margin: 20, corner: 16, titleGap: 8, title: 13, titleLine: 16, metaGap: 3, meta: 11, metaLine: 13, after: 18 } as const
+
 /** Small stable number from an id, so a tile keeps its height across renders and refreshes. */
 function jitter(id: string, spread: number): number {
   let h = 0
@@ -334,53 +461,45 @@ function jitter(id: string, spread: number): number {
 }
 
 /**
- * An idea tile's height (v3.4b: the frame is the whole tile). L3b (Figma 209:2) runs 160–240 tall at size/tile-w;
- * a stable jitter per id gives the Pinterest rhythm, whether the frame has landed or it's still the shimmer.
- * To-do tiles size to their words.
+ * A picture's height. v4 (1737:5) runs its pictures 120–214 tall at 170 wide; a stable jitter per id gives the
+ * Pinterest rhythm, whether the picture has landed or it's still the hue block.
  */
-const IDEA_H = 200
-const IDEA_SPREAD = 40
+const IDEA_H = 170
+const IDEA_SPREAD = 45
 export function tileHeight(id: string): number {
   return IDEA_H + jitter(id, IDEA_SPREAD)
 }
 export const frameHeight = (item: Item): number => tileHeight(item.id)
+/** A text card on the idea page's face stands 40 shorter than a picture, so the two kinds don't line up. */
+export const textMinHeight = (id: string): number => tileHeight(id) - 40
 
-/**
- * A tile's height in a column plus the gutter under it — for balancing the two columns. Photos are their frame plus
- * the title and credit; the other shapes are estimated from what they hold (Figma 227:5); to-dos from L3b.
- */
-const TODO_ESTIMATE = 100 // L3b 209:17 / 209:24: 96–100 for two lines of title and the meta
-const PHOTO_CAPTION = 44 // 227:23–24: title 17 + credit 13, 8 and 3 above
-export function estimateHeight(item: Item): number {
-  if (item.kind === 'action') return TODO_ESTIMATE
-  switch (item.shape) {
-    case 'photo':
-      return frameHeight(item) + (item.credit ? PHOTO_CAPTION : PHOTO_CAPTION - 16)
-    case 'quote':
-      return (item.quote ? 112 + Math.ceil(item.quote.text.length / 18) * 24 : 120) + FOOTER
-    case 'diagram':
-      return (item.diagram ? 40 + item.diagram.rows.length * 40 : 120) + FOOTER
-    case 'board':
-      return (item.board ? 84 + item.board.beats.length * 28 : 120) + FOOTER
-    default:
-      return Math.max(textMinHeight(item.id), 60 + Math.min(4, Math.ceil(item.gist.length / 24)) * 18 + FOOTER)
-  }
+/** About how many characters of Semibold 13 fit a 162-wide line (1737:134). */
+const TITLE_CHARS = 24
+/** The title's lines under a picture: one or two. A quote's words are on its picture, so it has none. */
+export function titleLines(item: CardItem): number {
+  if (item.shape === 'quote' && item.quote && item.picture.source !== 'hue') return 0
+  if (item.picture.source === 'hue') return 0 // the hue block carries the title itself (1737:140)
+  return item.title.length > TITLE_CHARS ? 2 : 1
 }
 
-/** A gradient tile's footer line ("Ivy brand · Car 0:42", Figma 1462:36) and the gap above it. */
-const FOOTER = 26
-/**
- * A text card stands as tall as the rhythm around it (Figma 1462:36: title at the top, the gist and footer at the
- * bottom), 40 shorter than a photo so the two kinds don't line up.
- */
-export const textMinHeight = (id: string): number => tileHeight(id) - 40
-const columnHeight = (item: Item) => estimateHeight(item) + space.gutter
+/** Under a picture: the title's lines with the 8 above them, the meta with its 3, and the 18 to the next tile. */
+export function captionHeight(item: CardItem): number {
+  const lines = titleLines(item)
+  return (lines ? GRID.titleGap + lines * GRID.titleLine + GRID.metaGap : GRID.titleGap) + GRID.metaLine + GRID.after
+}
+
+const TODO_ESTIMATE = 100 // L3b 209:17 / 209:24: 96–100 for two lines of title and the meta
+/** A tile's full height in its column — picture and caption, the gap to the next included. */
+export function estimateHeight(item: Item): number {
+  if (item.kind === 'action') return TODO_ESTIMATE + GRID.after
+  return frameHeight(item) + captionHeight(item)
+}
 
 /**
  * Two columns, each tile into the shorter one — the Pinterest fill. Order within a day is kept top-down.
- * `height` is a tile's full height in the column, gutter included.
+ * `height` is a tile's full height in the column, the gap under it included.
  */
-export function masonry<T extends Item>(items: T[], height: (item: T) => number = columnHeight): [T[], T[]] {
+export function masonry<T extends Item>(items: T[], height: (item: T) => number = estimateHeight): [T[], T[]] {
   const cols: [T[], T[]] = [[], []]
   const heights = [0, 0]
   for (const item of items) {

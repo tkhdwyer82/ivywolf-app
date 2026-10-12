@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
 import { useSupabase } from '@/lib/supabase'
@@ -23,7 +23,9 @@ export default function Search() {
   const supabase = useSupabase()
   const insets = useSafeAreaInsets()
   const [error, setError] = useState<string | null>(null)
-  const [q, setQ] = useState('')
+  // Explore's search hands over what she typed (?q=).
+  const params = useLocalSearchParams<{ q?: string }>()
+  const [q, setQ] = useState(params.q ?? '')
   const [results, setResults] = useState<Found | null>(null)
 
   // Search as she types, once she pauses; a slower earlier answer never replaces a newer one.

@@ -10,6 +10,7 @@ import { transcribe, type Transcript } from './transcribe'
 import { textUtterances } from './text'
 import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
 import { frameRecording } from './frames'
+import { referencePicturesForRecording } from './references/picture'
 import { shapeCards, type Analysed } from './shape'
 import { attachImport, parseImport } from './imports'
 import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification, type NewCard } from './graph'
@@ -17,6 +18,7 @@ import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassifica
 export { claimRecording, markFailed } from './graph'
 // For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
 export { photoForCard } from './frames'
+export { backfillReferencePictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
 export { findReferences, pinterestAvailable, trackReferenceUse, type Reference, type ReferenceSource } from './references'
 export { generateDirections, shouldGenerate, MIN_CARDS as DIRECTIONS_MIN_CARDS } from './suggest'
 export { transcribe } from './transcribe'
@@ -230,5 +232,11 @@ async function finish(supabase: SupabaseClient, rec: Pick<Rec, 'id' | 'creator_i
     await frameRecording(rec.creator_id, rec.id)
   } catch (err) {
     console.error(`[pipeline] ${rec.id}: frames failed`, err)
+  }
+  // Then a reference picture for every card still without one (Home v4: every idea carries a picture).
+  try {
+    await referencePicturesForRecording(rec.creator_id, rec.id)
+  } catch (err) {
+    console.error(`[pipeline] ${rec.id}: reference pictures failed`, err)
   }
 }

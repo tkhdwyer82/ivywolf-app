@@ -1,10 +1,11 @@
 // apps/mobile/components/Nav.tsx
-// The nav (Figma 145:5, "Nav · selected states"): Home · ⊕ · Mini as three separate squircle tiles, size/nav square,
-// r16, 8 apart. Home and Mini are rooms — each changes in its own way when selected, never by colour: Home's outline
-// house fills ink with a smile; Mini's outline rectangle + grille goes solid ink with the grille knocked out. The ⊕ is
-// an action, not a room: a lime tile with the mic that never shows a selected state, only the listening halo.
+// The nav (Home v4, Figma 1739:2–1739:14; selected states v3.1 145:53/71/61/79): Home · Explore · ⊕ · Mini as four
+// separate squircle pills, size/nav (56) square, r16, 10 apart, centred. Home, Explore and Mini are rooms — each
+// changes in its own way when selected, never by colour: Home's outline house fills ink with a smile; Explore's
+// magnifier goes heavy; Mini's outline rectangle + grille goes solid ink with the grille knocked out. The ⊕ is an
+// action, not a room: the only lime pill, with the mic, never selected, only the listening halo.
 // Glyphs are the frame's own (assets/figma/nav-*.svg, 24 × 24). Tap ⊕ = mic. Long-press ⊕ = Talk / Import / Project
-// (rule 1). Search lives in the header, never here.
+// (rule 1). Search for ideas also lives in Home's header.
 
 import { useEffect, useRef } from 'react'
 import { ActionSheetIOS, Alert, Animated, Easing, Pressable, StyleSheet, View } from 'react-native'
@@ -15,10 +16,10 @@ import { colour, size } from '@ivywolf/ui'
 import { useSupabase } from '@/lib/supabase'
 import { BAR_BOTTOM } from '@/components/ActionBar'
 
-// Figma 145:5 — measured, not tokens: tiles r16 and 8 apart, glyphs 24, shadow 0 4 14 at 14 % (an iOS radius of 7);
-// the halo is the tile + 8 all round (72, r22), lime at 35 %.
+// Figma 1739:2–14 — measured, not tokens: pills r16 and 10 apart, glyphs 24, shadow 0 4 14 at 14 % (an iOS radius
+// of 7); the halo is the pill + 8 all round (72, r22), lime at 35 %.
 const TILE_R = 16
-const GAP = 8
+const GAP = 10
 const GLYPH = 24
 const HALO = 8
 const HALO_R = 22
@@ -27,12 +28,14 @@ const TILE_SHADOW = { shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 7,
 const GLYPHS = {
   home: require('@/assets/figma/nav-home-rest.svg'),
   homeSelected: require('@/assets/figma/nav-home-selected.svg'),
+  explore: require('@/assets/figma/nav-explore-rest.svg'),
+  exploreSelected: require('@/assets/figma/nav-explore-selected.svg'),
   mini: require('@/assets/figma/nav-mini-rest.svg'),
   miniSelected: require('@/assets/figma/nav-mini-selected.svg'),
   mic: require('@/assets/figma/nav-mic.svg'),
 }
 
-export type Room = 'home' | 'mini'
+export type Room = 'home' | 'explore' | 'mini'
 
 /**
  * @param room     which room is selected
@@ -46,6 +49,9 @@ export function Nav({ room, listening = false, onHome }: { room: Room; listening
   const goHome = () => {
     if (room === 'home') return onHome?.()
     router.dismissTo('/')
+  }
+  const goExplore = () => {
+    if (room !== 'explore') router.push('/explore')
   }
   const goMini = () => {
     if (room !== 'mini') router.push('/mini')
@@ -86,6 +92,16 @@ export function Nav({ room, listening = false, onHome }: { room: Room; listening
         testID="nav-home"
       >
         <Image source={room === 'home' ? GLYPHS.homeSelected : GLYPHS.home} style={styles.glyph} accessibilityElementsHidden />
+      </Pressable>
+      <Pressable
+        onPress={goExplore}
+        style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+        accessibilityRole="tab"
+        accessibilityLabel="Explore"
+        accessibilityState={{ selected: room === 'explore' }}
+        testID="nav-explore"
+      >
+        <Image source={room === 'explore' ? GLYPHS.exploreSelected : GLYPHS.explore} style={styles.glyph} accessibilityElementsHidden />
       </Pressable>
       <View>
         {listening && <Halo />}

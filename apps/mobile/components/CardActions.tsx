@@ -336,6 +336,8 @@ export function useCardActions({
       toggleLink,
       startLinking,
       viewRef,
+      /** Every tile's view by id, for lines drawn over the screen (link mode's, a deck's). */
+      views,
       remeasure: () => lines.current?.remeasure(),
       layer,
       openShare: setShare,
