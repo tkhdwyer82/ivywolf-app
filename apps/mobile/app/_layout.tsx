@@ -7,6 +7,7 @@ import { tokenCache } from '@clerk/clerk-expo/token-cache'
 import { router, Stack } from 'expo-router'
 import { useEffect } from 'react'
 import { StatusBar } from 'expo-status-bar'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { color, hero } from '@/lib/theme'
 
 const PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!
@@ -83,9 +84,12 @@ function useReminderTaps(ready: boolean) {
 
 export default function RootLayout() {
   return (
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY} tokenCache={tokenCache}>
-      <StatusBar style="dark" />
-      <Routes />
-    </ClerkProvider>
+    // Gesture Handler's root: the hold arc (components/HoldArc.tsx) is a Pan that activates after a long press.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY} tokenCache={tokenCache}>
+        <StatusBar style="dark" />
+        <Routes />
+      </ClerkProvider>
+    </GestureHandlerRootView>
   )
 }
