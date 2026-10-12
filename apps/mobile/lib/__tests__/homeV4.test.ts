@@ -119,3 +119,36 @@ describe('Explore', () => {
     expect(pickableLine(p('a', '2026-10-01', 0))).toBe('Launch video · no frames yet')
   })
 })
+
+import { appearsIn, deckOf } from '@/lib/home'
+import { toLinks } from '@/lib/links'
+
+describe('decks', () => {
+  const idea = (id: string, projectId: string, at: string) => ({ kind: 'card', id, projectId, at }) as CardItem
+  const rooftop = idea('rooftop', 'launch', '2026-10-10T00:00:00Z')
+  const mara = idea('mara', 'candles', '2026-10-11T00:00:00Z')
+  const restock = idea('restock', 'reel', '2026-10-09T00:00:00Z')
+  const items: Item[] = [rooftop, mara, restock, todo('milk')]
+  const links = toLinks([{ card_a: 'mara', card_b: 'rooftop' }])
+
+  it('a card linked across projects appears under both chips and once under All', () => {
+    expect(feedItems(items, 'launch', links).map((c) => c.id)).toEqual(['rooftop', 'mara'])
+    expect(feedItems(items, 'candles', links).map((c) => c.id)).toEqual(['rooftop', 'mara'])
+    expect(feedItems(items, 'reel', links).map((c) => c.id)).toEqual(['restock'])
+    const all = feedItems(items, null, links).map((c) => c.id)
+    expect(all.filter((id) => id === 'mara')).toHaveLength(1)
+    expect(all.filter((id) => id === 'rooftop')).toHaveLength(1)
+  })
+  it('appears_in is derived from links; project_id never changes', () => {
+    const projectOf = new Map(items.map((i) => [i.id, i.projectId]))
+    expect([...appearsIn(rooftop, links, projectOf)].sort()).toEqual(['candles', 'launch'])
+    expect(rooftop.projectId).toBe('launch')
+  })
+  it('a card with a link is a deck over its links, newest first; errands never deck', () => {
+    const byId = new Map(items.map((i) => [i.id, i]))
+    const more = toLinks([{ card_a: 'rooftop', card_b: 'mara' }, { card_a: 'restock', card_b: 'rooftop' }])
+    expect(deckOf(rooftop, more, byId).map((c) => c.id)).toEqual(['mara', 'restock'])
+    expect(deckOf(restock, links, byId)).toEqual([])
+    expect(deckOf(todo('milk'), toLinks([{ card_a: 'milk', card_b: 'rooftop' }]), byId)).toEqual([])
+  })
+})

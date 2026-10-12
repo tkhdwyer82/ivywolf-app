@@ -19,6 +19,7 @@ Add a line each time a polish PR merges: what it is, how to spot it, and where i
 | Four-pill nav | Home · Explore · ⊕ · Mini, 56 square, 10 apart, centred; only the ⊕ is lime; the selected room's glyph is solid (Explore's magnifier heavy). | `apps/mobile/components/Nav.tsx` |
 | Explore tab | Explore: header and line, "Search ideas and tools", chips, tool tiles with "Connected ✓" (Kling 3.0) or "Coming soon"; tapping a live tool opens "Try Higgsfield on…" and nothing spends. | `apps/mobile/app/explore.tsx`, `lib/explore.ts` |
 | One direction a day | Second tile on All: lime "IVY · DIRECTION", its picture or hue, title and "from Thu 0:31 · Project"; tap opens More ideas; Save or Not this and no other direction shows until tomorrow. | `apps/mobile/components/HomeDirectionTile.tsx`, `lib/directionOfDay.ts` |
+| Decks | An idea with a link shows a second card peeking 6 above it at 70 % and "🔗 N" top right; swipe it sideways and its links page inside the tile, with dots, and a line to each linked idea on screen — the active one in its project hue, the rest faint. A linked idea also shows under the other project's chip. | `apps/mobile/components/DeckTile.tsx`, `deckOf` / `feedItems` in `lib/home.ts` |
 
 ## Builds
 

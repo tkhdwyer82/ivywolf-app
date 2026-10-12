@@ -9,13 +9,15 @@
 // Job C+: hold for the arc (components/HoldArc.tsx gives the tile its onLongPress); in link mode a mark sits over it
 // (components/LinkMode.tsx); a linked idea shows its link count, top right; a pinned one, the pin.
 
+import { useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native'
 import { SymbolView } from 'expo-symbols'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { colour, radius, space, type } from '@ivywolf/ui'
-import { frameHeight, type Item } from '@/lib/home'
+import { frameHeight, type CardItem, type Item } from '@/lib/home'
 import type { Picture } from '@/lib/picture'
 import { IdeaTile } from '@/components/IdeaTile'
+import { DeckTile } from '@/components/DeckTile'
 import { HOLD_MS } from '@/components/HoldArc'
 import { LinkBadge, LinkMarkView, type LinkMark } from '@/components/LinkMode'
 
@@ -45,6 +47,8 @@ export function Tile({
   pinned,
   trio,
   onCredit,
+  deck,
+  onDeck,
 }: {
   item: Item
   /** A to-do's meta line ("My things · Thu"). Ideas carry no text. */
@@ -63,8 +67,16 @@ export function Tile({
   trio?: Picture[]
   /** She opened a picture credit's source. */
   onCredit?: (p: Picture) => void
+  /** The ideas it's linked to: with any, it renders as a deck (1742:2). */
+  deck?: CardItem[]
+  /** The deck was swiped: which link is showing (null on the card itself), and whether it's still moving. */
+  onDeck?: (active: CardItem | null, swiping: boolean) => void
 }) {
-  const open = onOpen ? () => onOpen(item) : undefined
+  const [page, setPage] = useState(0)
+  const decked = item.kind === 'card' && !!deck?.length && !mark && !pinned
+  // A deck opens the idea that's showing.
+  const showing = decked && page > 0 ? deck![page - 1] : item
+  const open = onOpen ? () => onOpen(showing) : undefined
 
   if (item.kind === 'action') {
     return (
@@ -104,9 +116,25 @@ export function Tile({
       testID={`tile-${item.id}`}
     >
       <View style={unsure && styles.unsure}>
-        <IdeaTile card={item} height={frameHeight(item)} trio={trio} pinned={pinned} onCredit={onCredit} />
+        {decked ? (
+          <DeckTile
+            card={item}
+            deck={deck!}
+            height={frameHeight(item)}
+            page={page}
+            onPage={(p) => {
+              setPage(p)
+              onDeck?.(p > 0 ? deck![p - 1] : null, false)
+            }}
+            onSwiping={(s) => s && onDeck?.(page > 0 ? deck![page - 1] : null, true)}
+            trio={trio}
+            onCredit={onCredit}
+          />
+        ) : (
+          <IdeaTile card={item} height={frameHeight(item)} trio={trio} pinned={pinned} onCredit={onCredit} />
+        )}
       </View>
-      {!mark && !pinned && <LinkBadge count={item.links} />}
+      {!mark && !pinned && !decked && <LinkBadge count={item.links} />}
       {mark && <LinkMarkView mark={mark} />}
     </Pressable>
   )

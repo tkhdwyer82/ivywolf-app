@@ -361,9 +361,45 @@ export function thingsLine(row: ThingsRow, open: number): string {
   return [`${row.today} today`, ...row.first].join(' · ')
 }
 
-/** The feed is ideas only: to-dos live in the My things row and its room. */
-export const feedItems = (items: Item[], project: string | null): CardItem[] =>
-  items.filter((i): i is CardItem => i.kind === 'card' && (project === null || i.projectId === project))
+/**
+ * Where an idea appears (decks, Figma 1742:2): its own project, and the project of every idea it's linked to. Derived
+ * from card_links — project_id never changes. To-dos are never linked, so they appear only where they are.
+ */
+export function appearsIn(card: Item, links: Links | undefined, projectOf: Map<string, string>): Set<string> {
+  const out = new Set([card.projectId])
+  if (card.kind !== 'card') return out
+  for (const id of links?.get(card.id) ?? []) {
+    const p = projectOf.get(id)
+    if (p) out.add(p)
+  }
+  return out
+}
+
+/**
+ * The feed is ideas only: to-dos live in the My things row and its room. Under a project chip, an idea shows if it
+ * appears in that project (its own, or linked into it); under All each idea shows once.
+ */
+export function feedItems(items: Item[], project: string | null, links?: Links): CardItem[] {
+  const cards = items.filter((i): i is CardItem => i.kind === 'card')
+  if (project === null) return cards
+  const projectOf = new Map(cards.map((c) => [c.id, c.projectId]))
+  return cards.filter((c) => appearsIn(c, links, projectOf).has(project))
+}
+
+/** Max cards a deck shows at once: the top card and one peeking. */
+export const DECK_VISIBLE = 2
+
+/**
+ * A deck (1742:2): an idea with at least one link, over the ideas it's linked to — the pages a swipe goes through,
+ * newest first. Errands never deck. Only linked ideas that are loaded can be paged to.
+ */
+export function deckOf(card: Item, links: Links | undefined, byId: Map<string, Item>): CardItem[] {
+  if (card.kind !== 'card') return []
+  return [...(links?.get(card.id) ?? [])]
+    .map((id) => byId.get(id))
+    .filter((c): c is CardItem => !!c && c.kind === 'card')
+    .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+}
 
 // ── Days ────────────────────────────────────────────────────────────────────────────────────────────────────────
 

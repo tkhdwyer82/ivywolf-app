@@ -22,6 +22,9 @@ import { clock } from '@/components/CardFace'
 import { GRID, titleLines, type CardItem } from '@/lib/home'
 import { findingPicture, takeLength, type Picture } from '@/lib/picture'
 
+/** The picture box: corners, clipped, Shimmer grey under a picture that's still loading. */
+export const pictureBox = () => styles.picture
+
 export function ideaMeta(card: CardItem, picture: Picture = card.picture): string {
   return [clock(card.playFromMs), card.projectName, findingPicture(picture, card.createdAt) ? 'finding a picture…' : null].filter(Boolean).join(' · ')
 }
@@ -42,66 +45,83 @@ export function IdeaTile({
   /** She opened the credit's source (the download event, for Unsplash). */
   onCredit?: (p: Picture) => void
 }) {
-  const [credit, setCredit] = useState(false)
-  const p = card.picture
-  const lines = titleLines(card)
-  const quote = card.shape === 'quote' && card.quote && p.source !== 'hue'
-  const board = card.shape === 'board' && p.source !== 'hue'
-
   return (
     <View>
       <View style={[styles.picture, { height }]}>
-        {p.source === 'hue' ? (
-          <View style={[StyleSheet.absoluteFill, styles.hue, { backgroundColor: hueOf(card.hue) }]}>
-            <Text style={styles.hueTitle} numberOfLines={4}>
-              {card.title}
-            </Text>
-          </View>
-        ) : board && distinct([p, ...(trio ?? [])]).length >= 3 ? (
-          <ThreeUp pictures={distinct([p, ...(trio ?? [])])} recyclingKey={card.id} />
-        ) : (
-          <Layer picture={p} recyclingKey={card.id} />
-        )}
-        {quote && (
-          <>
-            <LinearGradient colors={SCRIM} style={StyleSheet.absoluteFill} pointerEvents="none" />
-            <Text style={styles.quote} numberOfLines={4}>
-              “{card.quote!.text}”
-            </Text>
-          </>
-        )}
-        {pinned && (
-          <View style={styles.pin} pointerEvents="none" accessibilityLabel="Pinned">
-            <SymbolView name="pin.fill" tintColor={p.source === 'hue' ? colour.Ink : colour.Surface} size={PIN} />
-          </View>
-        )}
+        <IdeaPicture card={card} trio={trio} pinned={pinned} />
       </View>
-      <Pressable
-        onPress={p.credit ? () => setCredit((c) => !c) : undefined}
-        disabled={!p.credit}
-        accessibilityRole={p.credit ? 'button' : undefined}
-        accessibilityHint={p.credit ? 'Shows who made the picture.' : undefined}
-        style={styles.caption}
-      >
-        {lines > 0 && (
-          <Text style={styles.title} numberOfLines={2}>
+      <IdeaCaption card={card} onCredit={onCredit} />
+    </View>
+  )
+}
+
+/** What fills an idea's picture box: the picture, its form on it, the pin. The box (size, corners) is the caller's. */
+export function IdeaPicture({ card, trio, pinned, badged }: { card: CardItem; trio?: Picture[]; pinned?: boolean; badged?: boolean }) {
+  const p = card.picture
+  const quote = card.shape === 'quote' && card.quote && p.source !== 'hue'
+  const board = card.shape === 'board' && p.source !== 'hue'
+  const three = board ? distinct([p, ...(trio ?? [])]) : []
+  return (
+    <>
+      {p.source === 'hue' ? (
+        <View style={[StyleSheet.absoluteFill, styles.hue, { backgroundColor: hueOf(card.hue) }]}>
+          <Text style={[styles.hueTitle, badged && styles.underBadge]} numberOfLines={4}>
             {card.title}
           </Text>
-        )}
-        <Text style={[styles.meta, lines === 0 && styles.metaAlone]} numberOfLines={1}>
-          {ideaMeta(card)}
-        </Text>
-        {credit && p.credit && (
-          <Text style={styles.credit} numberOfLines={1}>
-            {p.credit.provider === 'Unsplash' ? 'Photo by ' : 'Image by '}
-            <Text style={styles.creditLink} onPress={() => onCredit?.(p)} accessibilityRole="link">
-              {p.credit.name}
-            </Text>
-            {` on ${p.credit.provider}`}
+        </View>
+      ) : three.length >= 3 ? (
+        <ThreeUp pictures={three} recyclingKey={card.id} />
+      ) : (
+        <Layer picture={p} recyclingKey={card.id} />
+      )}
+      {quote && (
+        <>
+          <LinearGradient colors={SCRIM} style={StyleSheet.absoluteFill} pointerEvents="none" />
+          <Text style={styles.quote} numberOfLines={4}>
+            “{card.quote!.text}”
           </Text>
-        )}
-      </Pressable>
-    </View>
+        </>
+      )}
+      {pinned && (
+        <View style={styles.pin} pointerEvents="none" accessibilityLabel="Pinned">
+          <SymbolView name="pin.fill" tintColor={p.source === 'hue' ? colour.Ink : colour.Surface} size={PIN} />
+        </View>
+      )}
+    </>
+  )
+}
+
+/** Under the picture: the title (unless the picture carries it), the meta, and the credit once tapped. */
+export function IdeaCaption({ card, onCredit }: { card: CardItem; onCredit?: (p: Picture) => void }) {
+  const [credit, setCredit] = useState(false)
+  const p = card.picture
+  const lines = titleLines(card)
+  return (
+    <Pressable
+      onPress={p.credit ? () => setCredit((c) => !c) : undefined}
+      disabled={!p.credit}
+      accessibilityRole={p.credit ? 'button' : undefined}
+      accessibilityHint={p.credit ? 'Shows who made the picture.' : undefined}
+      style={styles.caption}
+    >
+      {lines > 0 && (
+        <Text style={styles.title} numberOfLines={2}>
+          {card.title}
+        </Text>
+      )}
+      <Text style={[styles.meta, lines === 0 && styles.metaAlone]} numberOfLines={1}>
+        {ideaMeta(card)}
+      </Text>
+      {credit && p.credit && (
+        <Text style={styles.credit} numberOfLines={1}>
+          {p.credit.provider === 'Unsplash' ? 'Photo by ' : 'Image by '}
+          <Text style={styles.creditLink} onPress={() => onCredit?.(p)} accessibilityRole="link">
+            {p.credit.name}
+          </Text>
+          {` on ${p.credit.provider}`}
+        </Text>
+      )}
+    </Pressable>
   )
 }
 
@@ -167,6 +187,8 @@ const styles = StyleSheet.create({
   picture: { borderRadius: GRID.corner, borderCurve: 'continuous', overflow: 'hidden', backgroundColor: colour.Shimmer },
   hue: { padding: HUE_PAD },
   hueTitle: { fontSize: 16, lineHeight: 20, fontWeight: '600', color: colour.Ink },
+  // A deck's 🔗 badge sits top right; its hue title starts under it.
+  underBadge: { marginTop: 22 },
   quote: { position: 'absolute', left: HUE_PAD, right: HUE_PAD, bottom: HUE_PAD, fontSize: 15, lineHeight: 18, fontWeight: '600', color: colour.Surface },
   trio: { flexDirection: 'row', gap: TRIO_GAP },
   trioMain: { flex: 2, overflow: 'hidden' },

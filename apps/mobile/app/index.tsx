@@ -1,8 +1,9 @@
 // apps/mobile/app/index.tsx
 // Home (P1; v4, Figma 1737:5 — visual first). Ideas in a two-column masonry, newest first, with a divider per local
 // day; every idea is a picture (lib/picture.ts). To-dos aren't tiles: the My things row at the top opens their list.
-// One Ivy direction tile a day sits among the ideas. Project chips filter it, except My things, which opens its room
-// (P4); the selected chip's underline is the project's hue. The header has search and the avatar (Voice notes); the
+// One Ivy direction tile a day sits among the ideas. An idea with links is a deck (1742:2): swipe it through its links,
+// and its lines draw in each link's project hue. Project chips filter it — an idea appears under its own project and
+// under every project it's linked into — except My things, which opens its room (P4); the chip's underline is the hue. The header has search and the avatar (Voice notes); the
 // nav is Home · Explore · ⊕ · Mini (1739:2–14). The header collapses Pinterest-style
 // (components/CollapsingHeader.tsx): the logo row slides away on scroll-down and back on any scroll-up; the chips
 // stay, under an always-opaque status bar.
@@ -40,12 +41,13 @@ import {
   type HomeData,
   type Item,
   type IvySentence,
+  deckOf,
   feedItems,
   GRID,
   thingsRow,
   type CardItem,
 } from '@/lib/home'
-import { colour, size, type } from '@ivywolf/ui'
+import { colour, hueLineOf, size, type } from '@ivywolf/ui'
 import { IvyNote } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
 import { ProjectChips } from '@/components/HomeChrome'
@@ -56,7 +58,7 @@ import { FailedRecordings } from '@/components/FailedRecordings'
 import { deleteRecording } from '@/lib/deleteRecording'
 import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
 import { useCardActions } from '@/components/CardActions'
-import { LinkBanner } from '@/components/LinkMode'
+import { LinkBanner, LinkLines, type LinkLinesHandle } from '@/components/LinkMode'
 import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
 import { MyThingsRow } from '@/components/MyThingsRow'
 import { HomeDirectionTile } from '@/components/HomeDirectionTile'
@@ -188,7 +190,11 @@ function HomeScreen() {
   }, [waiting, load])
 
   // The feed is ideas only; to-dos are the My things row (v4).
-  const visible = useMemo(() => (data ? feedItems(data.items, project) : []), [data, project])
+  const visible = useMemo(() => (data ? feedItems(data.items, project, data.links) : []), [data, project])
+  const byId = useMemo(() => new Map((data?.items ?? []).map((i) => [i.id, i])), [data])
+  // The deck being swiped: its lines show while it's moving or off its top card.
+  const [deckFocus, setDeckFocus] = useState<{ from: string; active: string | null } | null>(null)
+  const deckLines = useRef<LinkLinesHandle>(null)
   const pinned = useMemo(() => pinnedOf(visible), [visible])
   const rows = useMemo(
     () => toRows(groupByDay(visible.filter((i) => !i.pinnedAt)), project === null ? direction : null),
@@ -212,7 +218,11 @@ function HomeScreen() {
   })
   const linking = actions.linking
   const startScroll = useCallback(() => setDissolve(true), [])
-  const header = useCollapsingHeader({ onScroll: linking ? actions.remeasure : undefined, onBeginDrag: startScroll })
+  const remeasureLines = useCallback(() => {
+    actions.remeasure()
+    deckLines.current?.remeasure()
+  }, [actions])
+  const header = useCollapsingHeader({ onScroll: linking || deckFocus ? remeasureLines : undefined, onBeginDrag: startScroll })
   const headerInset = useHeaderInset()
 
   // An idea's ••• → Link ideas (My things, Ivy Mini): link mode from that idea, once Home has it.
@@ -237,7 +247,7 @@ function HomeScreen() {
     return (
       <Hold
         actions={() => actions.actionsFor(item)}
-        face={() => <Tile item={item} meta={meta} pinned={inPinned} />}
+        face={() => <Tile item={item} meta={meta} pinned={inPinned} deck={linking || inPinned ? undefined : deckOf(item, data?.links, byId)} />}
         viewRef={actions.viewRef(item.id)}
         disabled={!!linking}
       >
@@ -252,6 +262,8 @@ function HomeScreen() {
             pinned={inPinned}
             trio={item.kind === 'card' && item.shape === 'board' ? trioOf(item) : undefined}
             onCredit={openCredit}
+            deck={linking || inPinned ? undefined : deckOf(item, data?.links, byId)}
+            onDeck={(active, swiping) => setDeckFocus(active || swiping ? { from: item.id, active: active?.id ?? null } : null)}
           />
         )}
       </Hold>
@@ -301,7 +313,7 @@ function HomeScreen() {
       <AnimatedFlashList
         ref={list}
         data={rows}
-        extraData={[linking, directionRef]}
+        extraData={[linking, directionRef, deckFocus]}
         scrollEnabled={!holding}
         onScroll={header.onScroll}
         scrollEventThrottle={16}
@@ -368,6 +380,18 @@ function HomeScreen() {
         chips={<ProjectChips projects={chips} selected={project} onSelect={(id) => (chips.find((p) => p.id === id)?.kind === 'things' ? router.push('/things') : setProject(id))} />}
       />
 
+      {deckFocus && !linking && (
+        <LinkLines
+          ref={deckLines}
+          from={deckFocus.from}
+          to={[...(data.links.get(deckFocus.from) ?? [])]}
+          views={actions.views}
+          paint={(id) => {
+            const c = byId.get(id)
+            return { colour: hueLineOf(c?.kind === 'card' ? c.hue : null), opacity: id === deckFocus.active ? 1 : 0.25 }
+          }}
+        />
+      )}
       {actions.layer(<Nav room="home" listening={data.inFlight > 0} onHome={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />)}
     </View>
   )

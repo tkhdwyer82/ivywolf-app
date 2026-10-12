@@ -141,6 +141,32 @@ projects (`components/HomeDirectionTile.tsx`, 1737:152).
 - The same direction stays all day, even if newer ones land.
 - Once she saves it or says Not this, there's no direction tile until tomorrow.
 
+## 7. Decks
+
+An idea with at least one link (`card_links`) renders as a deck (`components/DeckTile.tsx`, Figma 1742:2):
+
+- **Two visible at most.** The top card, and its first link peeking behind it: 6 up, 6 in from each side (158 of 170
+  wide), at 70 %.
+- **"🔗 N"** sits top right (#3380FF, Semibold 11 white, radius 12). On a hue block the title starts under it.
+- **Swipe.** A horizontal swipe pages through its links inside the tile's own slot (1742:75); the slot clips, so the
+  masonry never moves.
+  - The links come newest first (`deckOf()` in `lib/home.ts`).
+  - Dots show while it's off the top card, and the title and meta under it follow the page.
+  - A tap opens the idea that's showing.
+  - It uses Gesture Handler's ScrollView, which takes the sideways swipe inside the hold arc's detector and cancels
+    the tap. React Native's own lost it to the tap.
+- **Lines.** While a deck is being swiped or is off its top card, Home draws its lines to each linked idea on screen
+  (`LinkLines` with a `paint`):
+  - 3 wide, with 10 dots at the ends.
+  - The active link's line is its project's hue at full colour; the others are at 25 %.
+  - Full colours are in `hueLines` (`packages/ui/theme/hues.ts`). Coral's `#F5856B` is from 1743:14; the other four
+    aren't drawn in the frames yet.
+- **Chips.** Linked ideas appear under each other's project chips without changing `project_id`. Where an idea
+  appears is derived from `card_links` (`appearsIn()`, `feedItems()`): its own project plus its links' projects.
+  Under All each idea shows once.
+- **Never decked:** errands (to-dos), tiles in the Pinned row, and tiles in link mode. A deck's own hold arc works as
+  before, for its top card.
+
 ## Tests
 
 - `apps/mobile/lib/__tests__/homeV4.test.ts`:
@@ -149,6 +175,8 @@ projects (`components/HomeDirectionTile.tsx`, 1737:152).
   - That to-dos never render as tiles.
   - The direction tile's once-a-day rule.
   - Explore's filter and Pick an idea's order.
+  - Decks: a card linked across projects appears under both chips and once under All; appears-in is derived and
+    project_id is unchanged; links page newest first; errands never deck.
 - `apps/mobile/components/__tests__/Tile.test.tsx`: the v4 tile (picture, caption, credit on tap, quote on the
   picture, hue block).
 - `scripts/test-0039.sql`, a rolled-back migration test:

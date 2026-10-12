@@ -19,3 +19,19 @@ export const hues: Record<HueName, string> = {
 export function hueOf(name: string | null | undefined): string {
   return (name && hues[name as HueName]) || hues['cool-grey']
 }
+
+/**
+ * Each hue at full colour, for a deck's link line (Figma 1743:14 draws coral's, #F5856B, 3 wide). The other four
+ * aren't drawn in the frames yet; they're the same depth of their own hue.
+ */
+export const hueLines: Record<HueName, string> = {
+  coral: '#F5856B',
+  sage: '#8DB07F',
+  butter: '#E2B53E',
+  slate: '#7D88A6',
+  'cool-grey': '#8CA2BA',
+}
+
+export function hueLineOf(name: string | null | undefined): string {
+  return (name && hueLines[name as HueName]) || hueLines['cool-grey']
+}
