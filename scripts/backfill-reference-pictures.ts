@@ -2,6 +2,8 @@
 // Job B.2 (0039): a reference picture for every card that has no picture yet — the first Unsplash or Pixabay result of
 // findReferences(card, {limit: 1}), stored in cards.reference_picture (packages/pipeline/references/picture.ts). Never
 // Pinterest. Cards with an Unsplash photo of their own are left alone. Run after 0039 is applied.
+// Without the keys locally, POST /api/admin/reference-pictures in production runs the same function for the signed-in
+// (admin) creator, with the keys that stay in Vercel.
 //
 //   npx tsx --env-file=.env.local scripts/backfill-reference-pictures.ts              # the test account
 //   CREATOR=user_… npx tsx --env-file=.env.local scripts/backfill-reference-pictures.ts
