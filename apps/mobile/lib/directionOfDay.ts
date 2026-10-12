@@ -3,10 +3,10 @@
 // 'direction', status 'new') across her projects, lime-pilled "IVY · DIRECTION", with its picture by rule 1 and its
 // cite line. Tap opens that project's More ideas; hold → Save / Not this. Once she saves or dismisses it, Home shows
 // no direction until tomorrow — the next one doesn't step in. Which one is today's, and whether it's gone, is kept on
-// the phone (SecureStore): it's how Home looks, not part of her graph.
+// the phone (a small JSON file in the app's documents): it's how Home looks, not part of her graph.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import * as SecureStore from 'expo-secure-store'
+import { File, Paths } from 'expo-file-system'
 import type { HueName } from '@ivywolf/ui'
 import { localDay } from './home'
 import type { ReferencePicture } from './picture'
@@ -51,19 +51,25 @@ export function directionMeta(d: Pick<HomeDirection, 'why' | 'projectName'>): st
   return [at ? `from ${at}` : null, d.projectName].filter(Boolean).join(' · ')
 }
 
-const KEY = 'home.direction'
+const stateFile = () => new File(Paths.document, 'home-direction.json')
 
 export async function readDayState(): Promise<DayState | null> {
   try {
-    const raw = await SecureStore.getItemAsync(KEY)
-    return raw ? (JSON.parse(raw) as DayState) : null
+    const f = stateFile()
+    return f.exists ? (JSON.parse(await f.text()) as DayState) : null
   } catch {
     return null
   }
 }
 
 export async function writeDayState(state: DayState): Promise<void> {
-  await SecureStore.setItemAsync(KEY, JSON.stringify(state)).catch(() => {})
+  try {
+    const f = stateFile()
+    if (!f.exists) f.create()
+    f.write(JSON.stringify(state))
+  } catch {
+    // Not remembered: the worst case is the same direction again tomorrow-or-today.
+  }
 }
 
 /** Her new directions, newest first, across every project (her own rows, RLS). */

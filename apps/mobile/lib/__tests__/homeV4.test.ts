@@ -1,8 +1,7 @@
 // Home v4 (Job B.2, Figma 1737:2): the picture every idea carries and the order it's found in; My things as a row,
 // not tiles; one direction a day. (Hue cycling is the database's: scripts/test-0039.sql.)
-jest.mock('expo-secure-store', () => ({ getItemAsync: jest.fn(), setItemAsync: jest.fn() }))
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid' }))
-jest.mock('expo-file-system', () => ({ File: class {} }))
+jest.mock('expo-file-system', () => ({ File: class {}, Paths: {} }))
 
 import { feedItems, thingsLine, thingsRow, type ActionItem, type CardItem, type Item } from '@/lib/home'
 import { findingPicture, resolvePicture, type OwnPicture, type ReferencePicture, type UnsplashFrame } from '@/lib/picture'

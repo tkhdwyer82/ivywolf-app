@@ -137,7 +137,7 @@ projects (`components/HomeDirectionTile.tsx`, 1737:152).
 - Tap opens that project's More ideas (`/project/<id>?tab=more`).
 - Hold offers Save (`save_direction`, which makes a real card) or Not this (`dismiss_direction`).
 
-**Once a day.** Which direction is today's, and whether she's done with it, is stored on the phone in SecureStore.
+**Once a day.** Which direction is today's, and whether she's done with it, is stored on the phone in a small JSON file (the app's documents).
 - The same direction stays all day, even if newer ones land.
 - Once she saves it or says Not this, there's no direction tile until tomorrow.
 
