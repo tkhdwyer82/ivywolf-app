@@ -625,4 +625,3 @@ export async function retryRecording(supabase: SupabaseClient, recordingId: stri
   if (!data) throw new Error('That recording can’t be retried.')
   await requestProcessing(recordingId, token)
 }
-
