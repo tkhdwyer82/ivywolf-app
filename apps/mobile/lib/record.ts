@@ -34,7 +34,7 @@ export async function submitRecording(args: {
   meta?: Record<string, unknown>
   /** A DJI import from the Mini tab: its source, a long-recording kind, and the file's own container. */
   session?: { source: 'dji_import'; extension: string; contentType: string }
-}): Promise<{ recordingId: string }> {
+}): Promise<{ recordingId: string; storagePath: string }> {
   const { supabase, userId } = args
 
   // The creator row must exist before any graph row references it. Insert-if-missing under RLS.
@@ -69,7 +69,7 @@ export async function submitRecording(args: {
 
   // Once the row exists the take is safe: if the server can't be reached now, Home asks again (requestProcessing).
   await requestProcessing(recordingId, args.token).catch((e) => console.warn(`[record] ${recordingId}: ${e.message}`))
-  return { recordingId }
+  return { recordingId, storagePath }
 }
 
 /**

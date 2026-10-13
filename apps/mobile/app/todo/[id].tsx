@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView, type SFSymbol } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
 import { useSupabase } from '@/lib/supabase'
+import { TRASH_TODO_LINE } from '@/lib/trash'
 import {
   changeDate,
   clock,
@@ -77,12 +78,12 @@ export default function TodoPage() {
 
   function trash() {
     if (!todo) return
-    Alert.alert('Move to trash?', 'The to-do is deleted, with its reminder. The recording stays in Voice notes.', [
+    Alert.alert('Move to trash?', TRASH_TODO_LINE, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Move to trash',
         style: 'destructive',
-        onPress: () => deleteTodo(supabase, todo).then(() => router.back(), fail('That didn’t delete')),
+        onPress: () => deleteTodo(supabase, todo).then(() => router.back(), fail('That didn’t move to the trash')),
       },
     ])
   }

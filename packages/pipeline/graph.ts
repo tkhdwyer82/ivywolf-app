@@ -365,14 +365,15 @@ export async function threadNewCards(creatorId: string, cards: NewCard[]): Promi
     'threads',
     await supabase
       .from('threads')
-      .select('id, title, thread_cards(cards(id, embedding))')
+      .select('id, title, thread_cards(cards(id, embedding, trashed_at))')
       .eq('creator_id', creatorId)
   )
   const threads: ThreadState[] = existing.map((t) => ({
     id: t.id,
     title: t.title,
-    cards: (t.thread_cards as unknown as { cards: { id: string; embedding: unknown } | null }[]).flatMap((tc) => {
-      const e = tc.cards ? parseVector(tc.cards.embedding) : null
+    // A trashed card (0040) doesn't pull new ideas into its thread.
+    cards: (t.thread_cards as unknown as { cards: { id: string; embedding: unknown; trashed_at: string | null } | null }[]).flatMap((tc) => {
+      const e = tc.cards && !tc.cards.trashed_at ? parseVector(tc.cards.embedding) : null
       return tc.cards && e ? [{ id: tc.cards.id, embedding: e }] : []
     }),
   })).filter((t) => t.cards.length > 0)

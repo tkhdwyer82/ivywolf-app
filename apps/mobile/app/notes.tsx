@@ -1,7 +1,7 @@
 // apps/mobile/app/notes.tsx
 // Voice notes (the profile avatar on Home): every recording, grouped by the day it was recorded, newest first.
 // While any recording is queued or processing, the list re-polls so "Ivy is listening…" resolves on its own.
-// Long-press a note to delete it and everything Ivy derived from it.
+// Long-press a note to delete it and everything Ivy derived from it. Trash (Job B.3) is at the foot of the list.
 
 import { useCallback, useRef, useState } from 'react'
 import { Alert, Pressable, RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native'
@@ -27,6 +27,7 @@ export default function Notes() {
     const { data, error } = await supabase
       .from('recordings')
       .select('id, source, storage_path, duration_ms, recorded_at, received_at, title, is_junk, junk_reason, status')
+      .is('discarded_at', null) // Undo on Home (0040): a take on its way out
       .order('received_at', { ascending: false })
       .limit(200)
     if (error) {
@@ -99,6 +100,13 @@ export default function Notes() {
           </View>
         ) : null
       }
+      ListFooterComponent={
+        sections !== null ? (
+          <Link href="/trash" style={[styles.link, styles.trash]} accessibilityRole="link">
+            Trash
+          </Link>
+        ) : null
+      }
       renderSectionHeader={({ section }) => <Text style={[type.meta, styles.day]}>{section.title}</Text>}
       renderItem={({ item }) => (
         <Pressable
@@ -158,4 +166,5 @@ const styles = StyleSheet.create({
   error: { color: color.accent },
   empty: { paddingTop: space.xxl, alignItems: 'center', gap: space.s },
   link: { color: color.accent, fontSize: 15, fontWeight: '600' },
+  trash: { textAlign: 'center', paddingVertical: space.xl },
 })

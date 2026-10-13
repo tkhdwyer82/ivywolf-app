@@ -32,6 +32,7 @@ function Routes() {
           name="notes"
           options={{ title: 'Voice notes', headerBackTitle: 'Home', headerStyle: { backgroundColor: color.paper } }}
         />
+        <Stack.Screen name="trash" options={{ title: 'Trash', headerBackTitle: 'Voice notes', headerStyle: { backgroundColor: color.paper } }} />
         <Stack.Screen name="record" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen
           name="add"

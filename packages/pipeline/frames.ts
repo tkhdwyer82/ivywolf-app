@@ -13,7 +13,7 @@
 //
 // A failure sets 'failed' (to-dos) or falls back to text (cards) and never blocks the row.
 // To-dos are cached by (style pack, normalised brief): "a carton of milk" is drawn once per creator, and its file is
-// removed when the last to-do using it is deleted (reference-counted by apps/mobile/lib/deleteRecording.ts).
+// removed when the last to-do using it is deleted (reference-counted by packages/schema/deletion.ts).
 // Only the brief, tone words and palette are sent to fal.ai — never a name, the transcript or other creators' data.
 // "Never a name" is enforced, not just asked for: the words of anyone heard in the recording are stripped from the
 // brief and the visual_query before they leave (redact.ts), and the strip is logged (a count, never the names).
@@ -170,7 +170,7 @@ async function frameOne(creatorId: string, pack: StylePack, s: Subject, people: 
       .limit(1)
       .maybeSingle()
     // A cached frame is only good while some to-do still uses it: deleting the last one removes the file
-    // (apps/mobile/lib/deleteRecording.ts), and the next to-do with this brief is drawn afresh.
+    // (packages/schema/deletion.ts), and the next to-do with this brief is drawn afresh.
     const live =
       hit &&
       (await supabase.from('actions').select('id', { count: 'exact', head: true }).eq('frame_url', hit.frame_url)).count

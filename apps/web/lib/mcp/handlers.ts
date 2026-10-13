@@ -125,6 +125,7 @@ export async function listIdeas(
     .from('cards')
     .select(status ? CARD_COLUMNS.replace('thread_cards(threads(', 'thread_cards!inner(threads!inner(') : CARD_COLUMNS)
     .eq('creator_id', creatorId)
+    .is('trashed_at', null) // the service role sees the trash (0040); she doesn't
     .not('source', 'in', PINNED_SOURCES) // her ideas only: a pinned suggestion (Job G) has no cite of hers (follow-up: cite source_url)
     .gte('created_at', sinceOrDefault(args.since))
   if (args.project) q = q.eq('project_id', await projectId(creatorId, args.project))
@@ -148,6 +149,7 @@ export async function searchIdeas(creatorId: string, args: { query: string; limi
       .from('cards')
       .select(`${CARD_COLUMNS}, embedding`)
       .eq('creator_id', creatorId)
+      .is('trashed_at', null)
       .not('embedding', 'is', null)
       .order('created_at', { ascending: false })
       .limit(SEARCH_POOL)
@@ -192,7 +194,7 @@ function toAction(a: ActionRow): Action {
 
 export async function getIdea(creatorId: string, args: { id: string }) {
   const row = check(
-    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).eq('id', args.id).not('source', 'in', PINNED_SOURCES).maybeSingle()
+    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).eq('id', args.id).is('trashed_at', null).not('source', 'in', PINNED_SOURCES).maybeSingle()
   ) as unknown as CardRow | null
   if (!row) throw new McpError("I couldn't find that idea in your Ivy. It may have been deleted.")
 
@@ -204,6 +206,7 @@ export async function getIdea(creatorId: string, args: { id: string }) {
           .select(`id, title, stage, return_count, last_seen, thread_cards(cards(${CARD_COLUMNS}))`)
           .eq('creator_id', creatorId)
           .eq('id', t.id)
+          .is('thread_cards.cards.trashed_at', null) // a trashed sibling comes back as null, and is skipped below
           .maybeSingle()
       ) as unknown as ThreadRow | null)
     : null
@@ -211,7 +214,7 @@ export async function getIdea(creatorId: string, args: { id: string }) {
   // "Actions on it": the to-dos said in the same recording. Actions aren't linked to a card, only to where they
   // were said.
   const actions = check(
-    await db().from('actions').select(ACTION_COLUMNS).eq('creator_id', creatorId).eq('recording_id', row.recording_id)
+    await db().from('actions').select(ACTION_COLUMNS).eq('creator_id', creatorId).eq('recording_id', row.recording_id).is('trashed_at', null)
   ) as unknown as ActionRow[]
 
   const siblings = (thread?.thread_cards ?? [])
@@ -279,7 +282,7 @@ export async function listThreads(creatorId: string, args: { min_returns?: numbe
 
 // ── list_actions ─────────────────────────────────────────────────────────────────────────────────────────────
 export async function listActions(creatorId: string, args: { status?: 'open' | 'done'; due_before?: string; limit?: number }) {
-  let q = db().from('actions').select(ACTION_COLUMNS).eq('creator_id', creatorId)
+  let q = db().from('actions').select(ACTION_COLUMNS).eq('creator_id', creatorId).is('trashed_at', null)
   if (args.status) q = q.eq('done', args.status === 'done')
   if (args.due_before) q = q.lt('due_date', args.due_before.slice(0, 10))
   const rows = check(
@@ -297,7 +300,7 @@ type SessionRow = { id: string; title: string | null; duration_ms: number | null
 async function sessionCards(creatorId: string, recordingIds: string[]) {
   if (recordingIds.length === 0) return [] as CardRow[]
   return check(
-    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).in('recording_id', recordingIds).order('play_from_ms')
+    await db().from('cards').select(CARD_COLUMNS).eq('creator_id', creatorId).in('recording_id', recordingIds).is('trashed_at', null).order('play_from_ms')
   ) as unknown as CardRow[]
 }
 
@@ -307,6 +310,7 @@ export async function listSessions(creatorId: string, args: { since?: string; li
       .from('recordings')
       .select('id, title, duration_ms, recorded_at, received_at')
       .eq('creator_id', creatorId)
+      .is('discarded_at', null)
       .eq('kind', 'session')
       .eq('status', 'done')
       .gte('received_at', sinceOrDefault(args.since))
@@ -339,6 +343,7 @@ export async function getSessionQuotes(creatorId: string, args: { session_id: st
       .from('recordings')
       .select('id, kind')
       .eq('creator_id', creatorId)
+      .is('discarded_at', null)
       .eq('id', args.session_id)
       .maybeSingle()
   ) as { id: string; kind: string } | null
@@ -355,7 +360,7 @@ export async function getSessionQuotes(creatorId: string, args: { session_id: st
       .order('start_ms')
   ) as { id: string; text: string; speaker: string | null; start_ms: number }[]
   const cards = check(
-    await db().from('cards').select('id, segment_id, energy').eq('creator_id', creatorId).eq('recording_id', session.id)
+    await db().from('cards').select('id, segment_id, energy').eq('creator_id', creatorId).eq('recording_id', session.id).is('trashed_at', null)
   ) as { id: string; segment_id: string | null; energy: number | null }[]
 
   const quotes = segments.map((s) => {
@@ -401,6 +406,7 @@ export async function getTranscript(creatorId: string, args: { recording_id: str
       .from('recordings')
       .select('id, title, kind, status, transcript, recorded_at, received_at')
       .eq('creator_id', creatorId)
+      .is('discarded_at', null)
       .eq('id', args.recording_id)
       .maybeSingle()
   ) as { id: string; title: string | null; kind: string; status: string; transcript: unknown; recorded_at: string | null; received_at: string } | null
@@ -408,7 +414,7 @@ export async function getTranscript(creatorId: string, args: { recording_id: str
   if (rec.status === 'queued' || rec.status === 'processing') throw new McpError('Ivy is still listening to that one. Try again in a minute.')
 
   const first = check(
-    await db().from('cards').select('id').eq('creator_id', creatorId).eq('recording_id', rec.id).order('play_from_ms').limit(1)
+    await db().from('cards').select('id').eq('creator_id', creatorId).eq('recording_id', rec.id).is('trashed_at', null).order('play_from_ms').limit(1)
   ) as { id: string }[]
 
   return {

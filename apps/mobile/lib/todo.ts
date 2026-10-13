@@ -5,6 +5,7 @@
 // native modules, and a to-do without a date must still open.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { trashAction } from './trash'
 
 export interface Todo {
   id: string
@@ -293,11 +294,12 @@ export async function setTodoDone(supabase: SupabaseClient, id: string, done: bo
   await pushToReminder({ text: row.text, dueDate: row.due_date, done, syncedReminderId: row.synced_reminder_id })
 }
 
-/** Move to trash: the row, and whatever it put on the phone. */
+/**
+ * Move to trash (0040): the to-do hides for 30 days (lib/trash.ts), and whatever it put on the phone goes now — a
+ * to-do in the trash shouldn't nag. Restoring it brings the to-do back without its reminder.
+ */
 export async function deleteTodo(supabase: SupabaseClient, t: Todo) {
-  const { data, error } = await supabase.from('actions').delete().eq('id', t.id).select('id')
-  if (error) throw new Error(`to-do: ${error.message}`)
-  if (!data?.length) throw new Error('This to-do has gone.')
+  await trashAction(supabase, t.id)
   if (t.remindAt) await unschedule(t.id).catch(() => {})
   if (t.syncedReminderId) await (await findReminder(t.syncedReminderId))?.delete().catch(() => {})
 }

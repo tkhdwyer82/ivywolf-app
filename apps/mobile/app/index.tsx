@@ -55,6 +55,7 @@ import { CollapsingHeader, LOGO_ROW_H, useCollapsingHeader, useHeaderInset } fro
 import { Nav } from '@/components/Nav'
 import { BAR_BOTTOM } from '@/components/ActionBar'
 import { FailedRecordings } from '@/components/FailedRecordings'
+import { UndoPill } from '@/components/UndoPill'
 import { deleteRecording } from '@/lib/deleteRecording'
 import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
 import { useCardActions } from '@/components/CardActions'
@@ -393,6 +394,7 @@ function HomeScreen() {
         />
       )}
       {actions.layer(<Nav room="home" listening={data.inFlight > 0} onHome={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />)}
+      <UndoPill onUndone={load} />
     </View>
   )
 }

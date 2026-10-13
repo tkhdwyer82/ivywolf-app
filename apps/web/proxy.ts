@@ -17,6 +17,7 @@
 //   /oauth/token      client-authenticated, not session-authenticated
 //   /oauth/revoke     likewise
 //   /api/health       liveness probe, must answer before auth
+//   /api/cron/purge-trash  Vercel Cron (Job B.3): no Clerk session; the route checks CRON_SECRET itself
 //   /api/pinterest/callback  Pinterest's OAuth redirect (Job H.0c): the consent browser has no Clerk session; the sealed,
 //                     expiring state it carries is the authentication (lib/pinterest.ts)
 //   /idea/<id>        Copy link (Job C+): a card she has shared is public, the card alone (title, form, credit), via
@@ -49,6 +50,7 @@ const isPublicRoute = createRouteMatcher([
   '/oauth/token',
   '/oauth/revoke',
   '/api/health',
+  '/api/cron/purge-trash',
   '/api/pinterest/callback',
   '/idea/(.*)',
 ])

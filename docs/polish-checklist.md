@@ -20,6 +20,9 @@ Add a line each time a polish PR merges: what it is, how to spot it, and where i
 | Explore tab | Explore: header and line, "Search ideas and tools", chips, tool tiles with "Connected ✓" (Kling 3.0) or "Coming soon"; tapping a live tool opens "Try Higgsfield on…" and nothing spends. | `apps/mobile/app/explore.tsx`, `lib/explore.ts` |
 | One direction a day | Second tile on All: lime "IVY · DIRECTION", its picture or hue, title and "from Thu 0:31 · Project"; tap opens More ideas; Save or Not this and no other direction shows until tomorrow. | `apps/mobile/components/HomeDirectionTile.tsx`, `lib/directionOfDay.ts` |
 | Decks | An idea with a link shows a second card peeking 6 above it at 70 % and "🔗 N" top right; swipe it sideways and its links page inside the tile, with dots, and a line to each linked idea on screen — the active one in its project hue, the rest faint. A linked idea also shows under the other project's chip. | `apps/mobile/components/DeckTile.tsx`, `deckOf` / `feedItems` in `lib/home.ts` |
+| × on the listening screen | Record under 5 s (or say nothing) and tap ×: it just closes, nothing in Voice notes. Talk 5 s or more and tap ×: the take pauses and a sheet asks "Keep this recording?" — Keep in lime, Discard grey with red text; tapping outside carries on recording. | `apps/mobile/app/record.tsx`, `lib/discard.ts` |
+| Writing it up · Undo | Stop a voice take: Home shows a dark pill above the nav, "Writing it up · Undo" (Undo in lime), for 6 s. Undo: the pill goes and the take never turns up, in Home or Voice notes. | `components/UndoPill.tsx`, `lib/discard.ts` |
+| Trash, 30 days | Move an idea to the trash: it's gone from Home, its project, search and its links; Voice notes → Trash lists it with "Deletes in 30 days" and Restore, which brings it back with its links. | `lib/trash.ts`, `app/trash.tsx`, 0040 |
 
 ## Builds
 

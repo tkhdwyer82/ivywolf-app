@@ -14,8 +14,11 @@ import { referencePicturesForRecording } from './references/picture'
 import { shapeCards, type Analysed } from './shape'
 import { attachImport, parseImport } from './imports'
 import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification, type NewCard } from './graph'
+import { Discarded, stillWanted } from './discard'
 
 export { claimRecording, markFailed } from './graph'
+export { Discarded, isDiscarded, stillWanted } from './discard'
+export { purgePlan, purgeTrash, TRASH_DAYS } from './trash'
 // For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
 export { photoForCard } from './frames'
 export { backfillReferencePictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
@@ -117,10 +120,12 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   })
   const { data: rec, error } = await supabase
     .from('recordings')
-    .select('id, creator_id, source, kind, storage_path, recorded_at, recorded_tz, project_id, meta, transcript')
+    .select('id, creator_id, source, kind, storage_path, recorded_at, recorded_tz, project_id, meta, transcript, discarded_at')
     .eq('id', recordingId)
     .single()
   if (error || !rec) throw new Error(`recording ${recordingId}: ${error?.message ?? 'not found'}`)
+  // Undo on Home (0040) stops the pipeline wherever it has got to: here, after transcribing, and before frames.
+  if (rec.discarded_at) throw new Discarded(rec.id)
 
   const creator = await loadCreatorContext(rec.creator_id, rec.project_id)
   const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
@@ -144,6 +149,7 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
 
   const imported = parseImport(rec.meta, rec.creator_id)
   const result = await analyse({ audioUrl, source: rec.source, creator, recorded, keepShort: !!imported })
+  await stillWanted(supabase, rec.id)
 
   if (result.junk && !imported) {
     await markJunk(rec.id, result.junk, result.transcript.raw)
@@ -191,6 +197,7 @@ async function processText(
   recorded: RecordedDay | null
 ): Promise<ProcessResult> {
   const result = await analyseText({ utterances: storedUtterances(rec), creator, recorded })
+  await stillWanted(supabase, rec.id)
   if (result.junk) {
     await markJunk(rec.id, result.junk, result.transcript.utterances)
     return result
@@ -225,6 +232,7 @@ async function finish(supabase: SupabaseClient, rec: Pick<Rec, 'id' | 'creator_i
       .update({ processing_error: `threading: ${err instanceof Error ? err.message : String(err)}`.slice(0, 2000) })
       .eq('id', rec.id)
   }
+  await stillWanted(supabase, rec.id)
   await markDone(rec.id)
 
   // Frames after the card is visible: a slow or failed frame never holds it back (frames.ts sets 'failed' per frame).
