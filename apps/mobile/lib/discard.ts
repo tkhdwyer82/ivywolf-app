@@ -4,7 +4,8 @@
 // 1. × on the listening screen. A take under 5 s, or one the mic never heard speech in, closes and is deleted on the
 //    phone without a word — nothing was uploaded. Anything longer asks: Keep (lime) or Discard. An import always
 //    asks, because its picture is already uploaded and is the idea.
-// 2. Undo on Home's "Writing it up · Undo" pill, shown for 6 s after stop. Undo stamps recordings.discarded_at — the
+// 2. Undo on Home's "Writing it up · Undo" pill, shown for 6 s once Home is back (saving can take seconds itself,
+//    so the window starts when the pill can be seen, not at the tap on stop). Undo stamps recordings.discarded_at — the
 //    pipeline's stop signal (packages/pipeline/discard.ts) — then deletes the recording, its transcript and anything
 //    already derived (packages/schema/deletion.ts). Nothing is logged to credits: the pipeline never charges a take.
 //
@@ -31,7 +32,8 @@ export function closeDecision(take: { tookMs: number; peakDb: number | null; imp
 
 // ── Undo hand-off: Record → Home ────────────────────────────────────────────────────────────────────────────────
 
-export type JustRecorded = { recordingId: string; storagePath: string; stoppedAt: number }
+/** `shownAt`: when the take was handed to Home — the start of the 6 s. */
+export type JustRecorded = { recordingId: string; storagePath: string; shownAt: number }
 
 let current: JustRecorded | null = null
 const listeners = new Set<(j: JustRecorded | null) => void>()
@@ -52,5 +54,5 @@ export function onJustRecorded(l: (j: JustRecorded | null) => void): () => void 
 
 /** Milliseconds of the Undo window left at `now`; 0 once it has passed. */
 export function undoLeft(j: JustRecorded | null, now: number): number {
-  return j ? Math.max(0, j.stoppedAt + UNDO_MS - now) : 0
+  return j ? Math.max(0, j.shownAt + UNDO_MS - now) : 0
 }

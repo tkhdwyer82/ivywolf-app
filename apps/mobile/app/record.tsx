@@ -146,7 +146,6 @@ export default function Record() {
   async function stop() {
     setAsking(false)
     if (phase.kind !== 'recording') return close()
-    const stoppedAt = Date.now()
     const durationMs = state.durationMillis
     const took = tookMs()
     const silent = peakDb.current !== null && peakDb.current < SILENT_DB
@@ -177,7 +176,7 @@ export default function Record() {
         meta: imported ? { import: imported } : correctionOf ? { correction_of: correctionOf } : undefined,
       })
       // Undo on Home is for a voice take. An import's picture isn't on a card yet, so undoing it would orphan it.
-      if (!imported) setJustRecorded({ recordingId: saved.recordingId, storagePath: saved.storagePath, stoppedAt })
+      if (!imported) setJustRecorded({ recordingId: saved.recordingId, storagePath: saved.storagePath, shownAt: Date.now() })
       close()
     } catch (e) {
       setPhase({ kind: 'failed', message: e instanceof Error ? e.message : 'Upload failed' })

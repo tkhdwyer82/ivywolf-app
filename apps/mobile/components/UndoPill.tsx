@@ -1,5 +1,5 @@
 // apps/mobile/components/UndoPill.tsx
-// "Writing it up · Undo" (Job B.3): on Home for 6 s after a voice take is stopped, just above the nav. Undo discards
+// "Writing it up · Undo" (Job B.3): on Home for 6 s once a voice take is saved and Home is back, just above the nav. Undo discards
 // the take — stamps it, which stops the pipeline, then deletes the recording and anything already derived from it
 // (lib/discard.ts). The pill goes as soon as Undo is tapped; if the delete fails it says so.
 
@@ -53,7 +53,7 @@ export function UndoPill({ onUndone }: { onUndone: () => void }) {
           <>
             <Text style={styles.label}>Writing it up</Text>
             <Text style={styles.dot}>·</Text>
-            <Pressable onPress={undo} hitSlop={12} accessibilityRole="button" accessibilityLabel="Undo, discard this recording">
+            <Pressable onPress={undo} hitSlop={12} testID="undo-take" accessibilityRole="button" accessibilityLabel="Undo, discard this recording">
               <Text style={styles.undo}>Undo</Text>
             </Pressable>
           </>

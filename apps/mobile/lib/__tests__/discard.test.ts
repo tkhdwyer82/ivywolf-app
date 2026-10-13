@@ -62,10 +62,10 @@ describe('× on the listening screen', () => {
 describe('Undo on Home', () => {
   afterEach(() => setJustRecorded(null))
 
-  it('hands the take from Record to Home, for 6 s from stop', () => {
+  it('hands the take from Record to Home, for 6 s from when Home shows it', () => {
     const seen: (string | null)[] = []
     const off = onJustRecorded((j) => seen.push(j?.recordingId ?? null))
-    setJustRecorded({ recordingId: 'r1', storagePath: 'u/r1.m4a', stoppedAt: 1000 })
+    setJustRecorded({ recordingId: 'r1', storagePath: 'u/r1.m4a', shownAt: 1000 })
     expect(justRecorded()?.recordingId).toBe('r1')
     expect(undoLeft(justRecorded(), 1000)).toBe(UNDO_MS)
     expect(undoLeft(justRecorded(), 1000 + UNDO_MS - 1)).toBe(1)
