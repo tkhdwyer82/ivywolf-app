@@ -11,8 +11,9 @@
 // import and the pipeline makes the card (packages/pipeline/imports.ts).
 //
 // × (Job B.3, lib/discard.ts): under 5 s or no speech, it closes and the take is deleted on the phone, silently.
-// Otherwise the take pauses and a sheet asks — Keep (lime) saves it, as stop does; Discard deletes it; tapping
-// outside carries on recording. After a voice take is saved, Home shows "Writing it up · Undo" for 6 s.
+// Otherwise the take pauses and a sheet asks (Figma 1787:5, D1) — Keep (lime) saves it, as stop does; Discard (red
+// text) deletes it; dismissing the sheet is Keep. After a voice take is saved, Home shows "Writing it up… · Undo"
+// for 6 s (D2).
 
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -126,11 +127,6 @@ export default function Record() {
     setAsking(true)
   }
 
-  function carryOn() {
-    setAsking(false)
-    recorder.record()
-  }
-
   async function discard() {
     setAsking(false)
     await dropTake()
@@ -230,15 +226,17 @@ export default function Record() {
       </View>
 
       {asking && (
-        <Sheet title="Keep this recording?" subtitle={`${formatDuration(state.durationMillis)} so far`} onClose={carryOn}>
-          <View style={styles.choices}>
-            <Pressable onPress={stop} accessibilityRole="button" style={({ pressed }) => [styles.choice, styles.keep, pressed && styles.pressed]}>
-              <Text style={styles.keepLabel}>Keep</Text>
-            </Pressable>
-            <Pressable onPress={discard} accessibilityRole="button" style={({ pressed }) => [styles.choice, styles.discard, pressed && styles.pressed]}>
-              <Text style={styles.discardLabel}>Discard</Text>
-            </Pressable>
-          </View>
+        <Sheet onClose={stop}>
+          <Text style={styles.askTitle} accessibilityRole="header">
+            Stop and keep it, or throw it away?
+          </Text>
+          <Text style={styles.askLine}>{`${formatDuration(state.durationMillis)} so far. Discarding deletes the audio now; nothing is written up.`}</Text>
+          <Pressable onPress={stop} accessibilityRole="button" style={({ pressed }) => [styles.keep, pressed && styles.pressed]}>
+            <Text style={styles.keepLabel}>Keep</Text>
+          </Pressable>
+          <Pressable onPress={discard} hitSlop={10} accessibilityRole="button" style={styles.discard}>
+            <Text style={styles.discardLabel}>Discard</Text>
+          </Pressable>
         </Sheet>
       )}
     </View>
@@ -263,12 +261,12 @@ const styles = StyleSheet.create({
   bottom: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingBottom: 46 },
   stop: { width: 84, height: 84, borderRadius: 42, backgroundColor: hero.ink, alignItems: 'center', justifyContent: 'center' },
   stopGlyph: { width: 26, height: 26, borderRadius: 6, backgroundColor: hero.lime },
-  // ×'s sheet: two full-width pills, Keep in lime first.
-  choices: { gap: 10, marginTop: 22, marginBottom: 6 },
-  choice: { height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  keep: { backgroundColor: hero.lime },
-  keepLabel: { fontSize: 17, fontWeight: '600', color: hero.ink },
-  discard: { backgroundColor: hero.fill },
-  discardLabel: { fontSize: 17, fontWeight: '600', color: '#D93025' },
+  // ×'s sheet (Figma 1787:5, D1): title Semibold 17, line 12/16 grey, Keep a 52-high lime pill, Discard red text.
+  askTitle: { fontSize: 17, fontWeight: '600', color: hero.ink, textAlign: 'center' },
+  askLine: { fontSize: 12, lineHeight: 16, color: hero.secondary, textAlign: 'center', marginTop: 8 },
+  keep: { height: 52, borderRadius: 26, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  keepLabel: { fontSize: 16, fontWeight: '600', color: hero.ink },
+  discard: { alignItems: 'center', paddingVertical: 18 },
+  discardLabel: { fontSize: 15, fontWeight: '600', color: '#DB332B' },
   pressed: { transform: [{ scale: 0.98 }] },
 })

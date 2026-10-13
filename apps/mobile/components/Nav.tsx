@@ -40,7 +40,8 @@ export type Room = 'home' | 'explore' | 'mini'
 /**
  * @param room     which room is selected
  * @param listening the ⊕'s one state: a lime halo pulses while Ivy is hearing a take through
- * @param onHome   Home tapped (on Home: scroll to top)
+ * @param onHome   Home tapped while on Home: back to All, at the top (lib/backToTop.ts). From any other room
+ *                 Home just switches — no reload.
  */
 export function Nav({ room, listening = false, onHome }: { room: Room; listening?: boolean; onHome?: () => void }) {
   const supabase = useSupabase()

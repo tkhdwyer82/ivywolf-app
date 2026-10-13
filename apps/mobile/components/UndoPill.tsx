@@ -1,5 +1,5 @@
 // apps/mobile/components/UndoPill.tsx
-// "Writing it up · Undo" (Job B.3): on Home for 6 s once a voice take is saved and Home is back, just above the nav. Undo discards
+// "Writing it up… · Undo" (Job B.3, Figma 1787:142 in D2): on Home for 6 s once a voice take is saved and Home is back, just above the nav. Undo discards
 // the take — stamps it, which stops the pipeline, then deletes the recording and anything already derived from it
 // (lib/discard.ts). The pill goes as soon as Undo is tapped; if the delete fails it says so.
 
@@ -51,10 +51,9 @@ export function UndoPill({ onUndone }: { onUndone: () => void }) {
           </Text>
         ) : (
           <>
-            <Text style={styles.label}>Writing it up</Text>
-            <Text style={styles.dot}>·</Text>
-            <Pressable onPress={undo} hitSlop={12} testID="undo-take" accessibilityRole="button" accessibilityLabel="Undo, discard this recording">
-              <Text style={styles.undo}>Undo</Text>
+            <Text style={styles.label}>Writing it up…</Text>
+            <Pressable onPress={undo} hitSlop={12} testID="undo-take" accessibilityRole="button" accessibilityLabel="Undo, discard this recording" style={styles.undo}>
+              <Text style={styles.undoLabel}>Undo</Text>
             </Pressable>
           </>
         )}
@@ -63,20 +62,22 @@ export function UndoPill({ onUndone }: { onUndone: () => void }) {
   )
 }
 
-// Sits 12 above the nav pill row (Nav.tsx: BAR_BOTTOM + (bar-h − nav) / 2, nav tall).
+// Figma D2: 44 high, radius 22, ink; "Writing it up…" Regular 14 white, 14 to a white Undo chip (radius 14, 12 × 6,
+// Semibold 13 ink); 16 in on the left, 8 on the right. Its bottom sits on the nav row's top (Nav.tsx).
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', bottom: BAR_BOTTOM + (size['bar-h'] - size.nav) / 2 + size.nav + 12 },
+  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', bottom: BAR_BOTTOM + (size['bar-h'] - size.nav) / 2 + size.nav },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 14,
     height: 44,
-    paddingHorizontal: 20,
+    paddingLeft: 16,
+    paddingRight: 8,
     borderRadius: 22,
     backgroundColor: hero.ink,
     maxWidth: 340,
   },
-  label: { fontSize: 15, fontWeight: '500', color: '#FFFFFF' },
-  dot: { fontSize: 15, color: 'rgba(255,255,255,0.5)' },
-  undo: { fontSize: 15, fontWeight: '600', color: hero.lime },
+  label: { fontSize: 14, color: '#FFFFFF' },
+  undo: { backgroundColor: '#FFFFFF', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 },
+  undoLabel: { fontSize: 13, fontWeight: '600', color: hero.ink },
 })
