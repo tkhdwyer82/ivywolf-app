@@ -7,7 +7,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "eval": "tsx --env-file=../../.env.local eval/run.ts",
-    "ingest": "tsx --env-file=../../.env.local ingest.ts"
+    "ingest": "tsx --env-file=../../.env.local ingest.ts",
+    "test": "tsx --test __tests__/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

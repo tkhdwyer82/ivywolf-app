@@ -55,6 +55,8 @@ import { CollapsingHeader, LOGO_ROW_H, useCollapsingHeader, useHeaderInset } fro
 import { Nav } from '@/components/Nav'
 import { BAR_BOTTOM } from '@/components/ActionBar'
 import { FailedRecordings } from '@/components/FailedRecordings'
+import { UndoPill } from '@/components/UndoPill'
+import { useBackToTop } from '@/lib/backToTop'
 import { deleteRecording } from '@/lib/deleteRecording'
 import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
 import { useCardActions } from '@/components/CardActions'
@@ -92,6 +94,7 @@ function HomeScreen() {
   const [ivy, setIvy] = useState<IvySentence[] | null>(null)
   const [dissolve, setDissolve] = useState(false)
   const list = useRef<FlashListRef<Row>>(null)
+  const backToTop = useBackToTop(project, setProject, list)
   // Ivy's line (162:2) plays from where it was said, without leaving Home.
   const player = useAudioPlayer(null)
   const [playing, setPlaying] = useState<string | null>(null)
@@ -392,7 +395,8 @@ function HomeScreen() {
           }}
         />
       )}
-      {actions.layer(<Nav room="home" listening={data.inFlight > 0} onHome={() => list.current?.scrollToOffset({ offset: 0, animated: true })} />)}
+      {actions.layer(<Nav room="home" listening={data.inFlight > 0} onHome={backToTop} />)}
+      <UndoPill onUndone={load} />
     </View>
   )
 }

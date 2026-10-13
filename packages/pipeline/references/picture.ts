@@ -95,7 +95,7 @@ export async function referencePicturesForRecording(creatorId: string, recording
 /** Backfill: a creator's cards with no picture (scripts/backfill-reference-pictures.ts). Returns how many were stored. */
 export async function backfillReferencePictures(creatorId: string): Promise<{ stored: number; missed: string[] }> {
   const supabase = db()
-  const { data, error } = await supabase.from('cards').select(COLUMNS).eq('creator_id', creatorId).is('reference_picture', null)
+  const { data, error } = await supabase.from('cards').select(COLUMNS).eq('creator_id', creatorId).is('reference_picture', null).is('trashed_at', null)
   if (error) throw new Error(`cards for ${creatorId}: ${error.message}`)
   let stored = 0
   const missed: string[] = []

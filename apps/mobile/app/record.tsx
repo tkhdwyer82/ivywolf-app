@@ -9,12 +9,18 @@
 // it (pipeline stub for now).
 // ?importKind=image|video&original=…&poster=… (from Add to ideas): Ivy asks what it's for; the line rides with the
 // import and the pipeline makes the card (packages/pipeline/imports.ts).
+//
+// × (Job B.3, lib/discard.ts): under 5 s or no speech, it closes and the take is deleted on the phone, silently.
+// Otherwise the take pauses and a sheet asks (Figma 1787:5, D1) — Keep (lime) saves it, as stop does; Discard (red
+// text) deletes it; dismissing the sheet is Keep. After a voice take is saved, Home shows "Writing it up… · Undo"
+// for 6 s (D2).
 
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
+import { File } from 'expo-file-system'
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
@@ -25,8 +31,10 @@ import {
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { submitRecording } from '@/lib/record'
+import { closeDecision, setJustRecorded, SILENT_DB } from '@/lib/discard'
 import { hero, text } from '@/lib/theme'
 import { LiveWaveform } from '@/components/LiveWaveform'
+import { Sheet } from '@/components/Sheet'
 
 // Metering drives the live waveform; polling at 100 ms keeps it in step with the voice.
 const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled: true }
@@ -35,9 +43,8 @@ const RECORDING_OPTIONS = { ...RecordingPresets.HIGH_QUALITY, isMeteringEnabled:
 // peaks around −30 to −15 dBFS; a silent room sits below −50), the take is dropped on the phone with "Nothing to
 // save". Imports are kept whatever — the picture is the idea. A take the mic never reported a level for is kept
 // too: no level data isn't silence, and dropping a real take is worse than uploading a silent one. The server's
-// junk gate (< 3 s, no speech) catches anything that gets through.
+// junk gate (< 3 s, no speech) catches anything that gets through. SILENT_DB is shared with × (lib/discard.ts).
 const MIN_TAKE_MS = 2000
-const SILENT_DB = -50
 const NOTHING_CLOSE_MS = 1200
 
 type Phase =
@@ -65,6 +72,7 @@ export default function Record() {
   const supabase = useSupabase()
   const { userId, getToken } = useAuth()
   const [phase, setPhase] = useState<Phase>({ kind: 'starting' })
+  const [asking, setAsking] = useState(false)
   const startedAt = useRef<Date | null>(null)
   const peakDb = useRef<number | null>(null)
   useEffect(() => {
@@ -92,14 +100,52 @@ export default function Record() {
 
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'))
 
-  /** Stop and keep. Closing mid-take keeps it too — nothing she said is thrown away by a tap. */
-  async function stop() {
+  // The recorder's own clock, or wall time since start if its status never updated — a stalled clock isn't a short take.
+  const tookMs = () => Math.max(state.durationMillis, startedAt.current ? Date.now() - startedAt.current.getTime() : 0)
+
+  /** The take, gone from the phone. Nothing was uploaded, so there's nothing else to delete. */
+  async function dropTake() {
+    await recorder.stop()
+    const uri = recorder.uri
+    if (uri) {
+      try {
+        new File(uri).delete()
+      } catch {
+        // Already gone, or never written: either way it's not kept.
+      }
+    }
+  }
+
+  /** ×: drop a short or silent take without a word; otherwise pause and ask. */
+  async function onClose() {
     if (phase.kind !== 'recording') return close()
-    // The recorder's own clock, or wall time since start if its status never updated — a stalled clock isn't a short take.
+    if (closeDecision({ tookMs: tookMs(), peakDb: peakDb.current, imported: !!imported }) === 'drop') {
+      await dropTake()
+      return close()
+    }
+    recorder.pause()
+    setAsking(true)
+  }
+
+  async function discard() {
+    setAsking(false)
+    await dropTake()
+    // An import's picture was uploaded before Record opened (lib/imports.ts); discarding it removes both files.
+    if (imported) {
+      await supabase.storage.from('imports').remove([imported.original_path]).catch(() => {})
+      await supabase.storage.from('frames').remove([imported.poster_path]).catch(() => {})
+    }
+    close()
+  }
+
+  /** Stop and keep (the stop button, or Keep on ×'s sheet). */
+  async function stop() {
+    setAsking(false)
+    if (phase.kind !== 'recording') return close()
     const durationMs = state.durationMillis
-    const tookMs = Math.max(durationMs, startedAt.current ? Date.now() - startedAt.current.getTime() : 0)
+    const took = tookMs()
     const silent = peakDb.current !== null && peakDb.current < SILENT_DB
-    if (!imported && (tookMs < MIN_TAKE_MS || silent)) {
+    if (!imported && (took < MIN_TAKE_MS || silent)) {
       await recorder.stop()
       setPhase({ kind: 'nothing' })
       setTimeout(close, NOTHING_CLOSE_MS)
@@ -115,7 +161,7 @@ export default function Record() {
     try {
       const token = await getToken()
       if (!token) throw new Error('Signed out')
-      await submitRecording({
+      const saved = await submitRecording({
         supabase,
         userId,
         token,
@@ -125,6 +171,8 @@ export default function Record() {
         projectId: projectId ?? null,
         meta: imported ? { import: imported } : correctionOf ? { correction_of: correctionOf } : undefined,
       })
+      // Undo on Home is for a voice take. An import's picture isn't on a card yet, so undoing it would orphan it.
+      if (!imported) setJustRecorded({ recordingId: saved.recordingId, storagePath: saved.storagePath, shownAt: Date.now() })
       close()
     } catch (e) {
       setPhase({ kind: 'failed', message: e instanceof Error ? e.message : 'Upload failed' })
@@ -150,7 +198,7 @@ export default function Record() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.header}>
-        <Pressable onPress={stop} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
+        <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
           <SymbolView name="xmark" tintColor={hero.ink} size={20} weight="medium" />
         </Pressable>
       </View>
@@ -176,6 +224,21 @@ export default function Record() {
         </Pressable>
         <Text style={[text.caption, styles.secondary]}>{phase.kind === 'recording' ? 'Tap to stop' : ' '}</Text>
       </View>
+
+      {asking && (
+        <Sheet onClose={stop}>
+          <Text style={styles.askTitle} accessibilityRole="header">
+            Stop and keep it, or throw it away?
+          </Text>
+          <Text style={styles.askLine}>{`${formatDuration(state.durationMillis)} so far. Discarding deletes the audio now; nothing is written up.`}</Text>
+          <Pressable onPress={stop} accessibilityRole="button" style={({ pressed }) => [styles.keep, pressed && styles.pressed]}>
+            <Text style={styles.keepLabel}>Keep</Text>
+          </Pressable>
+          <Pressable onPress={discard} hitSlop={10} accessibilityRole="button" style={styles.discard}>
+            <Text style={styles.discardLabel}>Discard</Text>
+          </Pressable>
+        </Sheet>
+      )}
     </View>
   )
 }
@@ -198,4 +261,12 @@ const styles = StyleSheet.create({
   bottom: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 12, paddingBottom: 46 },
   stop: { width: 84, height: 84, borderRadius: 42, backgroundColor: hero.ink, alignItems: 'center', justifyContent: 'center' },
   stopGlyph: { width: 26, height: 26, borderRadius: 6, backgroundColor: hero.lime },
+  // ×'s sheet (Figma 1787:5, D1): title Semibold 17, line 12/16 grey, Keep a 52-high lime pill, Discard red text.
+  askTitle: { fontSize: 17, fontWeight: '600', color: hero.ink, textAlign: 'center' },
+  askLine: { fontSize: 12, lineHeight: 16, color: hero.secondary, textAlign: 'center', marginTop: 8 },
+  keep: { height: 52, borderRadius: 26, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  keepLabel: { fontSize: 16, fontWeight: '600', color: hero.ink },
+  discard: { alignItems: 'center', paddingVertical: 18 },
+  discardLabel: { fontSize: 15, fontWeight: '600', color: '#DB332B' },
+  pressed: { transform: [{ scale: 0.98 }] },
 })

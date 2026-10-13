@@ -258,7 +258,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
       .order('created_at', { ascending: false })
       .limit(LIMIT),
     supabase.from('threads').select('id, title, return_count, stage, thread_cards(card_id)'),
-    supabase.from('recordings').select('id, status, received_at').in('status', ['queued', 'processing']),
+    supabase.from('recordings').select('id, status, received_at').in('status', ['queued', 'processing']).is('discarded_at', null),
     supabase.from('creators').select('last_opened_at').eq('id', userId).maybeSingle(),
   ])
   const links = await loadLinks(supabase)
@@ -268,6 +268,7 @@ export async function loadHome(supabase: SupabaseClient, userId: string): Promis
       .from('recordings')
       .select('id, storage_path, received_at, duration_ms')
       .eq('status', 'failed')
+      .is('discarded_at', null)
       .order('received_at', { ascending: false })
       .limit(20)
   ) as FailedRecording[]

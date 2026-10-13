@@ -26,7 +26,7 @@ import { setShared } from '@/lib/share'
 import { ShareSheet } from '@/components/ShareSheet'
 import { AddContextSheet } from '@/components/AddContextSheet'
 import { CardFace, Credit, SHAPE_NAME } from '@/components/CardFace'
-import { deleteCard } from '@/lib/deleteRecording'
+import { trashCard, TRASH_IDEA_LINE } from '@/lib/trash'
 import { Glass, Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, radius, size, space, type } from '@ivywolf/ui'
 import { Shimmer } from '@/components/Shimmer'
@@ -141,17 +141,17 @@ export default function IdeaPage() {
 
   function trash() {
     if (!idea) return
-    Alert.alert('Move to trash?', 'The idea and its frame are deleted. The recording stays in Voice notes.', [
+    Alert.alert('Move to trash?', TRASH_IDEA_LINE, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Move to trash',
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteCard(supabase, idea.id)
+            await trashCard(supabase, idea.id)
             router.back()
           } catch (e) {
-            setError(e instanceof Error ? e.message : 'That didn’t delete')
+            setError(e instanceof Error ? e.message : 'That didn’t move to the trash')
           }
         },
       },

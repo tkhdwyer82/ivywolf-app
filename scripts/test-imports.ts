@@ -16,7 +16,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { claimRecording, processRecording } from '../packages/pipeline/process'
-import { deleteRecording, framePath } from '../apps/mobile/lib/deleteRecording'
+import { deleteRecording, framePath } from '../packages/schema/deletion'
 
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false },

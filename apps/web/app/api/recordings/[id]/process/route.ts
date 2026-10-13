@@ -11,7 +11,7 @@
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-import { claimRecording, markFailed, processRecording } from '@ivywolf/pipeline'
+import { claimRecording, isDiscarded, markFailed, processRecording } from '@ivywolf/pipeline'
 import { supabaseAsUser } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
@@ -37,6 +37,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     try {
       await processRecording(id)
     } catch (err) {
+      // Undo on Home: she discarded it mid-run. The app deletes the row; there's nothing to mark.
+      if (isDiscarded(err)) return console.log(`[recordings/process] ${id} discarded, stopped`)
       console.error(`[recordings/process] ${id} failed:`, err)
       await markFailed(id, err instanceof Error ? err.message : String(err)).catch((e) =>
         console.error(`[recordings/process] ${id} could not be marked failed:`, e)

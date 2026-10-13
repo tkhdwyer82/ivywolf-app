@@ -78,6 +78,7 @@ export async function loadProjectInput(projectId: string, supabase = admin()): P
     .from('cards')
     .select('id, title, gist, shape, source, source_url, recording_id, play_from_ms, pinned_at, hearted_at, segments(text), recordings(recorded_at, recorded_tz, source), thread_cards(threads(return_count)), card_context(kind, content, url)')
     .eq('project_id', projectId)
+    .is('trashed_at', null)
     .order('created_at')
   if (error) throw new Error(`cards: ${error.message}`)
   const cards = (rows ?? []).map((r) => {
