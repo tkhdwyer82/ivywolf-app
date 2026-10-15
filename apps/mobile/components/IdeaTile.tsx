@@ -7,10 +7,14 @@
 // A take from the Create flow shows its still with "▶ 0:03" (1737:143); on Home video plays only when earned, so it
 // never plays here. The hue block carries the title itself (1737:140) and "finding a picture…" in the meta while the
 // pipeline is still looking.
-// Under the picture: 8, the title (Semibold 13, two lines), 3, the meta (Regular 11) — then 18 to the next tile.
+// B.5: a card filed in one of her projects carries the project over the picture — a gradient on its lower 40 % (ink
+// 35 % → clear) and the name bottom-left, Semibold 13 white, 12 in, with a ›. Tapping the name opens the project; the
+// rest of the tile opens the card. Unfiled cards (My things) have no overlay.
+// Under the picture: 8, the title (Semibold 15, two lines), 3, the time (Regular 11) — then 18 to the next tile.
 // The credit is shown on tap of the words under the picture; opening its source is "use" (Unsplash's download event).
 
 import { useState } from 'react'
+import { router } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -25,8 +29,9 @@ import { findingPicture, takeLength, type Picture } from '@/lib/picture'
 /** The picture box: corners, clipped, Shimmer grey under a picture that's still loading. */
 export const pictureBox = () => styles.picture
 
+/** Under the tile, the time only (B.5) — the project is on the picture — and "finding a picture…" while it's new. */
 export function ideaMeta(card: CardItem, picture: Picture = card.picture): string {
-  return [clock(card.playFromMs), card.projectName, findingPicture(picture, card.createdAt) ? 'finding a picture…' : null].filter(Boolean).join(' · ')
+  return [clock(card.playFromMs), findingPicture(picture, card.createdAt) ? 'finding a picture…' : null].filter(Boolean).join(' · ')
 }
 
 export function IdeaTile({
@@ -35,6 +40,7 @@ export function IdeaTile({
   trio,
   pinned,
   onCredit,
+  overlay = false,
 }: {
   card: CardItem
   /** The picture's height (the masonry's stable jitter). */
@@ -44,11 +50,13 @@ export function IdeaTile({
   pinned?: boolean
   /** She opened the credit's source (the download event, for Unsplash). */
   onCredit?: (p: Picture) => void
+  /** Home and search: the project's name over a filed card's picture (B.5). Not on the project's own page. */
+  overlay?: boolean
 }) {
   return (
     <View>
       <View style={[styles.picture, { height }]}>
-        <IdeaPicture card={card} trio={trio} pinned={pinned} />
+        <IdeaPicture card={card} trio={trio} pinned={pinned} overlay={overlay} />
       </View>
       <IdeaCaption card={card} onCredit={onCredit} />
     </View>
@@ -56,8 +64,16 @@ export function IdeaTile({
 }
 
 /** What fills an idea's picture box: the picture, its form on it, the pin. The box (size, corners) is the caller's. */
-export function IdeaPicture({ card, trio, pinned, badged }: { card: CardItem; trio?: Picture[]; pinned?: boolean; badged?: boolean }) {
+export function IdeaPicture({ card, trio, pinned, badged, overlay }: {
+  card: CardItem
+  trio?: Picture[]
+  pinned?: boolean
+  badged?: boolean
+  /** A tile in a feed: the project's name over the picture when it's filed (B.5). */
+  overlay?: boolean
+}) {
   const p = card.picture
+  const project = overlay && card.filed && card.projectName ? card.projectName : null
   const quote = card.shape === 'quote' && card.quote && p.source !== 'hue'
   const board = card.shape === 'board' && p.source !== 'hue'
   const three = board ? distinct([p, ...(trio ?? [])]) : []
@@ -77,16 +93,39 @@ export function IdeaPicture({ card, trio, pinned, badged }: { card: CardItem; tr
       {quote && (
         <>
           <LinearGradient colors={SCRIM} style={StyleSheet.absoluteFill} pointerEvents="none" />
-          <Text style={styles.quote} numberOfLines={4}>
+          <Text style={[styles.quote, project && styles.quoteOverProject]} numberOfLines={4}>
             “{card.quote!.text}”
           </Text>
         </>
       )}
+      {project && <ProjectOverlay name={project} projectId={card.projectId} />}
       {pinned && (
         <View style={styles.pin} pointerEvents="none" accessibilityLabel="Pinned">
           <SymbolView name="pin.fill" tintColor={p.source === 'hue' ? colour.Ink : colour.Surface} size={PIN} />
         </View>
       )}
+    </>
+  )
+}
+
+/** The project over a filed card's picture (B.5): its own tap opens the project, inside the tile's tap for the card. */
+export function ProjectOverlay({ name, projectId }: { name: string; projectId: string }) {
+  return (
+    <>
+      <LinearGradient colors={PROJECT_SCRIM} style={styles.projectScrim} pointerEvents="none" testID="project-overlay" />
+      <Pressable
+        onPress={() => router.push(`/project/${projectId}`)}
+        hitSlop={OVERLAY_SLOP}
+        style={styles.project}
+        accessibilityRole="link"
+        accessibilityLabel={`Open ${name}`}
+        testID="project-overlay-name"
+      >
+        <Text style={styles.projectName} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.projectChevron}>›</Text>
+      </Pressable>
     </>
   )
 }
@@ -179,6 +218,10 @@ function TakeStill({ uri }: { uri: string }) {
 // caption sits 4 in from the picture's edge (24 against 20).
 const HUE_PAD = 14
 const SCRIM = ['rgba(0,0,0,0)', 'rgba(0,0,0,0.65)'] as const
+// B.5: the project overlay — the lower 40 %, ink #1D1D1F from clear to 35 %; the name Semibold 13 white, 12 in.
+const PROJECT_SCRIM = ['rgba(29,29,31,0)', 'rgba(29,29,31,0.35)'] as const
+const PROJECT_INSET = 12
+const OVERLAY_SLOP = { top: 10, bottom: 10, left: 12, right: 12 }
 const TRIO_GAP = 2
 const CAPTION_INSET = 4
 const PIN = 16
@@ -190,6 +233,12 @@ const styles = StyleSheet.create({
   // A deck's 🔗 badge sits top right; its hue title starts under it.
   underBadge: { marginTop: 22 },
   quote: { position: 'absolute', left: HUE_PAD, right: HUE_PAD, bottom: HUE_PAD, fontSize: 15, lineHeight: 18, fontWeight: '600', color: colour.Surface },
+  // With the project under it, the quote sits a line higher.
+  quoteOverProject: { bottom: PROJECT_INSET + 16 + 8 },
+  projectScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '40%' },
+  project: { position: 'absolute', left: PROJECT_INSET, bottom: PROJECT_INSET, right: PROJECT_INSET, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  projectName: { fontSize: 13, lineHeight: 16, fontWeight: '600', color: colour.Surface, flexShrink: 1 },
+  projectChevron: { fontSize: 15, lineHeight: 16, fontWeight: '600', color: colour.Surface },
   trio: { flexDirection: 'row', gap: TRIO_GAP },
   trioMain: { flex: 2, overflow: 'hidden' },
   trioSide: { flex: 1, gap: TRIO_GAP },

@@ -53,6 +53,8 @@ export interface Idea {
   shapeSetBy: 'ivy' | 'creator' | null
   /** It has a visual_query, so a photo can be found for it. */
   hasVisualQuery: boolean
+  /** Her words (B.5): the span of the recording it came from. Null for a pinned or imported card with no segment. */
+  said: string | null
 }
 
 function need<T>(label: string, r: { data: T; error: { message: string } | null }): T {
@@ -63,6 +65,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 type Row = CardRow & {
   source: CardSource; source_url: string | null; hearted_at: string | null; shape_set_by: 'ivy' | 'creator' | null
   visual_query: string | null
+  segments: { text: string } | null
   projects: { id: string; name: string; kind: string; hue: HueName } | null
   thread_cards: { threads: { id: string; title: string; return_count: number; stage: ThreadStage } | null }[]
 }
@@ -73,7 +76,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, pinned_at, shared_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, reference_picture, recordings(recorded_at, storage_path, source), projects(id, name, kind, hue), thread_cards(threads(id, title, return_count, stage))'
+        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, pinned_at, shared_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, reference_picture, recordings(recorded_at, storage_path, source), segments(text), projects(id, name, kind, hue), thread_cards(threads(id, title, return_count, stage))'
       )
       .eq('id', id)
       .maybeSingle()
@@ -127,6 +130,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     card: toCardItem(row, { size: siblings.length + 1, stage: t?.stage ?? null }),
     shapeSetBy: row.shape_set_by,
     hasVisualQuery: !!row.visual_query?.trim(),
+    said: row.segments?.text?.trim() || null,
   }
 }
 

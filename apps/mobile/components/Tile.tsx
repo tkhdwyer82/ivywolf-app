@@ -12,6 +12,7 @@
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native'
 import { SymbolView } from 'expo-symbols'
+import { router } from 'expo-router'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { colour, radius, space, type } from '@ivywolf/ui'
 import { frameHeight, type CardItem, type Item } from '@/lib/home'
@@ -49,6 +50,7 @@ export function Tile({
   onCredit,
   deck,
   onDeck,
+  overlay = false,
 }: {
   item: Item
   /** A to-do's meta line ("My things · Thu"). Ideas carry no text. */
@@ -71,6 +73,8 @@ export function Tile({
   deck?: CardItem[]
   /** The deck was swiped: which link is showing (null on the card itself), and whether it's still moving. */
   onDeck?: (active: CardItem | null, swiping: boolean) => void
+  /** Home and search: a filed card carries its project's name over the picture (B.5). */
+  overlay?: boolean
 }) {
   const [page, setPage] = useState(0)
   const decked = item.kind === 'card' && !!deck?.length && !mark && !pinned
@@ -112,6 +116,9 @@ export function Tile({
       accessibilityRole={open ? 'button' : undefined}
       accessibilityLabel={unsure ? `${item.title}. Ivy isn’t sure.` : item.title}
       accessibilityHint={onLongPress ? 'Hold for Like, Link ideas, Add context and Share.' : undefined}
+      // The project's name over the picture (B.5) is inside this button, so VoiceOver gets it as an action.
+      accessibilityActions={overlay && item.filed && item.projectName ? [{ name: 'project', label: `Open ${item.projectName}` }] : undefined}
+      onAccessibilityAction={(e) => e.nativeEvent.actionName === 'project' && router.push(`/project/${item.projectId}`)}
       style={[width !== undefined && { width }]}
       testID={`tile-${item.id}`}
     >
@@ -129,9 +136,10 @@ export function Tile({
             onSwiping={(s) => s && onDeck?.(page > 0 ? deck![page - 1] : null, true)}
             trio={trio}
             onCredit={onCredit}
+            overlay={overlay}
           />
         ) : (
-          <IdeaTile card={item} height={frameHeight(item)} trio={trio} pinned={pinned} onCredit={onCredit} />
+          <IdeaTile card={item} height={frameHeight(item)} trio={trio} pinned={pinned} onCredit={onCredit} overlay={overlay} />
         )}
       </View>
       {!mark && !pinned && !decked && <LinkBadge count={item.links} />}

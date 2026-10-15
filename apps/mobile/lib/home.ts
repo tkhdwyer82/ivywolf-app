@@ -65,6 +65,11 @@ export interface CardItem extends Base {
   /** Its project's hue and name. Null where the project wasn't read. */
   hue: HueName | null
   projectName: string | null
+  /**
+   * Filed in a project of hers (B.5): the tile carries the project's name over its picture. False for My things (the
+   * default — "unfiled") and wherever the project wasn't read.
+   */
+  filed: boolean
   /** Pin to top (0034): pinned cards sit in the Pinned row, newest pin first. */
   pinnedAt: string | null
   /** Copy link made its public page (0034); null = private. */
@@ -123,7 +128,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 
 /** The columns every card tile needs. Callers add their own thread embedding (for size and stage). */
 export const CARD_COLUMNS =
-  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, reference_picture, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, hue)'
+  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, reference_picture, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, hue, kind)'
 
 export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
@@ -200,6 +205,7 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     createdAt: c.created_at,
     hue: c.projects?.hue ?? null,
     projectName: c.projects?.name ?? null,
+    filed: !!c.projects?.kind && c.projects.kind !== 'things',
     pinnedAt: c.pinned_at ?? null,
     sharedAt: c.shared_at ?? null,
     heartedAt: c.hearted_at ?? null,
@@ -356,6 +362,26 @@ export function thingsRow(items: Item[], now = new Date()): ThingsRow | null {
   return { today: open.length, first: open.slice(0, 3).map((a) => a.text) }
 }
 
+/**
+ * Ivy's line about My things (B.5), in the place the My things row was: "13 things today · get some milk first" — her
+ * open to-dos due today, overdue or undated, and the oldest of them, cited to the recording it was said in (rule 2).
+ * Null when nothing is on her plate today: then Ivy says nothing.
+ */
+export function thingsSentence(items: Item[], now = new Date()): IvySentence | null {
+  const today = localDay(now.toISOString())
+  const open = items
+    .filter((i): i is ActionItem => i.kind === 'action' && !i.done)
+    .filter((a) => !a.dueDate || a.dueDate <= today)
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+  if (open.length === 0) return null
+  const first = open[0]
+  const what = first.text.trim().replace(/[.!]$/, '')
+  return {
+    text: `${open.length} ${open.length === 1 ? 'thing' : 'things'} today · ${what.charAt(0).toLowerCase()}${what.slice(1)} first`,
+    cites: [{ recordingId: first.recordingId, ms: 0 }],
+  }
+}
+
 /** "3 today · milk · visa · wipes" — or, with nothing due yet, how many are open. */
 export function thingsLine(row: ThingsRow, open: number): string {
   if (row.today === 0) return `${open} open`
@@ -452,7 +478,7 @@ export function groupByDay(items: Item[], now = new Date()): DayGroup[] {
  * gutter 13, margins 20, corners 16. Under each picture: 8, the title (Semibold 13, line 16, two lines at most), 3,
  * the meta (Regular 11, line 13), then 18 to the next tile.
  */
-export const GRID = { gutter: 13, margin: 20, corner: 16, titleGap: 8, title: 13, titleLine: 16, metaGap: 3, meta: 11, metaLine: 13, after: 18 } as const
+export const GRID = { gutter: 13, margin: 20, corner: 16, titleGap: 8, title: 15, titleLine: 18, metaGap: 3, meta: 11, metaLine: 13, after: 18 } as const
 
 /** Small stable number from an id, so a tile keeps its height across renders and refreshes. */
 function jitter(id: string, spread: number): number {
@@ -605,7 +631,7 @@ export function ivyOnOpen(data: HomeData): IvySentence[] {
   return line ? [line] : []
 }
 
-/** Meta line under a tile: "0:31 · Launch video", "0:31 · 2 cards", "My things · Thu", "My things · done". */
+/** Meta line under a tile: an idea's time, "0:31" (B.5: its project is on the picture, not here); "My things · Thu". */
 export function metaLine(item: Item, projects: Project[]): string {
   const project = projects.find((p) => p.id === item.projectId)
   if (item.kind === 'action') {
@@ -613,9 +639,7 @@ export function metaLine(item: Item, projects: Project[]): string {
     return [project?.name ?? 'My things', when].filter(Boolean).join(' · ')
   }
   const s = Math.floor(item.playFromMs / 1000)
-  const time = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-  const where = project && project.kind === 'user' ? project.name : item.threadSize > 1 ? `${item.threadSize} cards` : null
-  return [time, where].filter(Boolean).join(' · ')
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
 /** Retry a failed recording: clear the failed run's partial writes and queue it (0020), then ask for processing. */

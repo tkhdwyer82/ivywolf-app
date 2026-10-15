@@ -1,16 +1,18 @@
 // apps/mobile/app/index.tsx
 // Home (P1; v4, Figma 1737:5 — visual first). Ideas in a two-column masonry, newest first, with a divider per local
-// day; every idea is a picture (lib/picture.ts). To-dos aren't tiles: the My things row at the top opens their list.
-// One Ivy direction tile a day sits among the ideas. An idea with links is a deck (1742:2): swipe it through its links,
-// and its lines draw in each link's project hue. Project chips filter it — an idea appears under its own project and
-// under every project it's linked into — except My things, which opens its room (P4); the chip's underline is the hue. The header has search and the avatar (Voice notes); the
-// nav is Home · Explore · ⊕ · Mini (1739:2–14). The header collapses Pinterest-style
+// day; every idea is a picture (lib/picture.ts), and a filed one carries its project's name over it (B.5; tap the name
+// for the project). To-dos aren't tiles: the header's My things entry opens their list. One Ivy direction tile a day
+// sits among the ideas. An idea with links is a deck (1742:2): swipe it through its links, and its lines draw in each
+// link's project hue. Project chips filter it — an idea appears under its own project and under every project it's
+// linked into; all ink, the selected one underlined, no My things chip. The header has My things, search and the
+// avatar (Voice notes); the nav is Home · Explore · ⊕ · Mini (1739:2–14). The header collapses Pinterest-style
 // (components/CollapsingHeader.tsx): the logo row slides away on scroll-down and back on any scroll-up; the chips
 // stay, under an always-opaque status bar.
 // No blank state (rule 1): before the first card exists Home is First open (L1, 170:5) — Ivy's one line, "Say an
 // idea out loud.", and a lime arrow down to the ⊕. No grid, no setup.
 // Ivy on open (162:2): one line from the graph, only when something changed since her last look, written in under the
-// chips with its cite; tap to hear that moment; gone after ~6 s or on scroll.
+// chips with its cite; tap to hear that moment; gone after ~6 s or on scroll. When nothing changed, the My things line
+// takes its place (B.5): "13 things today · get some milk first", 4 s, then it fades; nothing when her plate is clear.
 // While a recording is being processed, or a frame is on its way, Home re-polls so the card and its frame appear
 // on their own.
 // Job C+: pinned cards sit in a Pinned row above Today (and leave the days); hold any card for its arc (Like · Link
@@ -44,11 +46,11 @@ import {
   deckOf,
   feedItems,
   GRID,
-  thingsRow,
+  thingsSentence,
   type CardItem,
 } from '@/lib/home'
 import { colour, hueLineOf, size, type } from '@ivywolf/ui'
-import { IvyNote } from '@/components/IvyNote'
+import { IvyNote, DISSOLVE_AFTER_MS, THINGS_DISSOLVE_MS } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
 import { ProjectChips } from '@/components/HomeChrome'
 import { CollapsingHeader, LOGO_ROW_H, useCollapsingHeader, useHeaderInset } from '@/components/CollapsingHeader'
@@ -62,7 +64,7 @@ import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
 import { useCardActions } from '@/components/CardActions'
 import { LinkBanner, LinkLines, type LinkLinesHandle } from '@/components/LinkMode'
 import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
-import { MyThingsRow } from '@/components/MyThingsRow'
+import { MyThingsIcon } from '@/components/MyThingsIcon'
 import { HomeDirectionTile } from '@/components/HomeDirectionTile'
 import { useOpenCredit } from '@/components/useOpenCredit'
 import { dismissForToday, directionOfDay, directionPicture, type HomeDirection } from '@/lib/directionOfDay'
@@ -92,6 +94,8 @@ function HomeScreen() {
   const [error, setError] = useState<string | null>(null)
   const [project, setProject] = useState<string | null>(null)
   const [ivy, setIvy] = useState<IvySentence[] | null>(null)
+  // B.5: the My things line stays 4 s; Ivy on open keeps 162:2's ~6.
+  const [ivyAfter, setIvyAfter] = useState(DISSOLVE_AFTER_MS)
   const [dissolve, setDissolve] = useState(false)
   const list = useRef<FlashListRef<Row>>(null)
   const backToTop = useBackToTop(project, setProject, list)
@@ -164,7 +168,13 @@ function HomeScreen() {
   )
   useEffect(() => {
     if (!data || !focused || !userId) return
-    if (ivy === null) setIvy(ivyOnOpen(data))
+    if (ivy === null) {
+      // Something new since she last looked comes first; otherwise what's on her plate (where the My things row was).
+      const said = ivyOnOpen(data)
+      const things = said.length ? null : thingsSentence(data.items)
+      setIvyAfter(things ? THINGS_DISSOLVE_MS : DISSOLVE_AFTER_MS)
+      setIvy(said.length ? said : things ? [things] : [])
+    }
     markSeen(supabase, userId, data.items).catch(() => {})
   }, [data, focused, ivy, supabase, userId])
 
@@ -203,8 +213,6 @@ function HomeScreen() {
     () => toRows(groupByDay(visible.filter((i) => !i.pinnedAt)), project === null ? direction : null),
     [visible, project, direction]
   )
-  const things = useMemo(() => (data ? thingsRow(data.items) : null), [data])
-  const openThings = useMemo(() => (data ? data.items.filter((i) => i.kind === 'action' && !i.done).length : 0), [data])
   // A board's 3-up: two more pictures from its thread.
   const trioOf = useCallback(
     (card: CardItem): Picture[] => {
@@ -250,7 +258,7 @@ function HomeScreen() {
     return (
       <Hold
         actions={() => actions.actionsFor(item)}
-        face={() => <Tile item={item} meta={meta} pinned={inPinned} deck={linking || inPinned ? undefined : deckOf(item, data?.links, byId)} />}
+        face={() => <Tile item={item} meta={meta} pinned={inPinned} overlay={!linking} deck={linking || inPinned ? undefined : deckOf(item, data?.links, byId)} />}
         viewRef={actions.viewRef(item.id)}
         disabled={!!linking}
       >
@@ -267,6 +275,7 @@ function HomeScreen() {
             onCredit={openCredit}
             deck={linking || inPinned ? undefined : deckOf(item, data?.links, byId)}
             onDeck={(active, swiping) => setDeckFocus(active || swiping ? { from: item.id, active: active?.id ?? null } : null)}
+            overlay={!linking}
           />
         )}
       </Hold>
@@ -338,11 +347,10 @@ function HomeScreen() {
             {linking ? (
               <LinkBanner title={linking.from.title} />
             ) : (
-              ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
+              ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} after={ivyAfter} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
             )}
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}
-            {project === null && !linking && <MyThingsRow row={things} open={openThings} />}
             <PinnedRow cards={pinned} render={(c, w) => tile(c, w, true)} />
           </View>
         }
@@ -429,10 +437,13 @@ function Wordmark() {
   )
 }
 
-/** The logo row's right: search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
+/** The logo row's right: My things (B.5), search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
 function HeaderActions() {
   return (
     <>
+      <Pressable onPress={() => router.push('/things')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="My things" testID="header-things">
+        <MyThingsIcon />
+      </Pressable>
       <Pressable onPress={() => router.push('/search')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Search">
         <SymbolView name="magnifyingglass" tintColor={colour.Ink} size={size.icon} />
       </Pressable>
