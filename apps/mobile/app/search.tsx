@@ -112,7 +112,7 @@ function Results({
         <View key={c} style={{ width: tileWidth }}>
           {col.map((item) => (
             <View key={item.id} style={{ paddingBottom: space.gutter }}>
-              <Tile item={item} width={tileWidth} onOpen={(i) => router.push(`/idea/${i.id}`)} />
+              <Tile item={item} width={tileWidth} onOpen={(i) => router.push(`/idea/${i.id}`)} overlay />
             </View>
           ))}
         </View>

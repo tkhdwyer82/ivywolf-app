@@ -167,6 +167,30 @@ An idea with at least one link (`card_links`) renders as a deck (`components/Dec
 - **Never decked:** errands (to-dos), tiles in the Pinned row, and tiles in link mode. A deck's own hold arc works as
   before, for its top card.
 
+## 8. B.5 — header, chips, project on the tile, idea page
+
+- **Chips** (`components/HomeChrome.tsx`): All and her projects, every chip ink #1D1D1F at 17 pt; the selected one
+  has a 2-pt ink rule, the rest none (no grey, no hue underline). There is no My things chip.
+- **Header**: My things moves to the logo row, left of search — `components/MyThingsIcon.tsx`, 28 pt, a ☰ in ink
+  until the mascot asset lands. It opens `/things`.
+- **No My things row.** In its place Ivy's line (`components/IvyNote.tsx`): when nothing is new since her last look,
+  `thingsSentence()` says "13 things today · get some milk first" — her open to-dos due today, overdue or undated, and
+  the oldest, cited to its recording (rule 2) — for 4 s, then it fades. Nothing on her plate: no line. Something new:
+  Ivy on open (§ above) comes first, as before.
+- **Project on the tile** (`ProjectOverlay` in `components/IdeaTile.tsx`): a card filed in one of her projects has a
+  gradient on the picture's lower 40 % (ink 35 % → clear) and the project's name bottom-left, Semibold 13 white, 12 in,
+  with a ›. The name opens `/project/[id]`; the rest of the tile opens the card; VoiceOver has "Open {project}" as an
+  action. Unfiled cards (My things) have none, and neither do tiles on the project's own page. Home and search only.
+- **Under the tile**: the title Semibold 15 (two lines) and the time alone, Regular 11 grey — the project left the
+  meta (`ideaMeta`, `metaLine`).
+- **Idea page** (`app/idea/[id].tsx`): the to-do page's layout since B.4 (1797:59). The full-bleed slot, 393 × 440,
+  holds the card's form, so Change view moves the page and the tile together: a photo card's picture (rule 1, else its
+  hue) with its credit under it; a quote large on its hue with the ▶ chip, a text card's title and gist, a comparison's
+  rows (CardFace, page size, full-bleed); a board's 3-up — its picture and two from its thread, as its tile — once the
+  thread has three different pictures, else its hook and beats. Back · ♥ · Share · ••• over it. Then the title Bold
+  28; her words 17/24 (the card's segment, cut to its sentence; the gist when there's no recording); More in this
+  thread. The project pill and the old byline are gone; Move to project sits under ••• beside Move to trash.
+
 ## Tests
 
 - `apps/mobile/lib/__tests__/homeV4.test.ts`:
@@ -178,7 +202,11 @@ An idea with at least one link (`card_links`) renders as a deck (`components/Dec
   - Decks: a card linked across projects appears under both chips and once under All; appears-in is derived and
     project_id is unchanged; links page newest first; errands never deck.
 - `apps/mobile/components/__tests__/Tile.test.tsx`: the v4 tile (picture, caption, credit on tap, quote on the
-  picture, hue block).
+  picture, hue block) and B.5's project overlay (present when filed, absent unfiled or on the project page; the name
+  opens the project, the rest the card).
+- B.5: `components/__tests__/Chips.test.tsx` (ink chips, one underline, no My things), `IdeaPage.test.tsx` (no summary
+  block or project pill; Move to project under •••), `lib/__tests__/homeB5.test.ts` (Ivy's things line, time-only
+  meta).
 - `scripts/test-0039.sql`, a rolled-back migration test:
   - Every project has a hue, and My things (and only My things) is cool-grey.
   - The backfill cycles coral, sage, … in creation order.

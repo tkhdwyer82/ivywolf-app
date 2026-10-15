@@ -26,6 +26,7 @@ export function DeckTile({
   trio,
   pinned,
   onCredit,
+  overlay = false,
 }: {
   card: CardItem
   /** The ideas it's linked to, in page order. */
@@ -39,6 +40,8 @@ export function DeckTile({
   trio?: Picture[]
   pinned?: boolean
   onCredit?: (p: Picture) => void
+  /** Each page carries its project's name when filed (B.5). */
+  overlay?: boolean
 }) {
   const [width, setWidth] = useState(0)
   const [swiping, setSwiping] = useState(false)
@@ -77,7 +80,7 @@ export function DeckTile({
             >
               {pages.map((c, i) => (
                 <View key={c.id} style={{ width, height }}>
-                  <IdeaPicture card={c} trio={i === 0 ? trio : undefined} pinned={i === 0 && pinned} badged />
+                  <IdeaPicture card={c} trio={i === 0 ? trio : undefined} pinned={i === 0 && pinned} badged overlay={overlay} />
                 </View>
               ))}
             </ScrollView>

@@ -15,6 +15,8 @@ import type { IvySentence } from '@/lib/home'
 export const WORDS_PER_MINUTE = 220
 /** 162:2 "02 Dissolving": after ~6 s. */
 export const DISSOLVE_AFTER_MS = 6000
+/** B.5: Home's My things line ("13 things today · …") stays 4 s. */
+export const THINGS_DISSOLVE_MS = 4000
 const FADE_MS = 300 // words, then the timestamp (162:2: "words fade out, the timestamp last")
 const COLLAPSE_MS = 400
 
@@ -32,6 +34,7 @@ export function IvyNote({
   onGone,
   onPlay,
   quiet = false,
+  after = DISSOLVE_AFTER_MS,
 }: {
   sentences: IvySentence[]
   dissolve: boolean
@@ -40,6 +43,8 @@ export function IvyNote({
   quiet?: boolean
   /** Tap the line: play the moment its cite points at. */
   onPlay?: (cite: NonNullable<IvySentence['cite']>) => void
+  /** How long the whole line stays before it fades. */
+  after?: number
 }) {
   const words = useMemo(
     () => sentences.flatMap((s, si) => s.text.split(/\s+/).map((w) => ({ w, si }))),
@@ -65,7 +70,7 @@ export function IvyNote({
 
   useEffect(() => {
     if (shown >= words.length) {
-      const t = setTimeout(leave, DISSOLVE_AFTER_MS)
+      const t = setTimeout(leave, after)
       return () => clearTimeout(t)
     }
     const t = setTimeout(() => setShown((n) => n + 1), 60_000 / WORDS_PER_MINUTE)
