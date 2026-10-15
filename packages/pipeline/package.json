@@ -14,7 +14,8 @@
     "@anthropic-ai/sdk": "^0.127.0",
     "@supabase/supabase-js": "^2.116.0",
     "zod": "^4.6.5",
-    "@ivywolf/schema": "*"
+    "@ivywolf/schema": "*",
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

@@ -55,6 +55,9 @@ type ActionRow = {
 }
 const ACTION_COLUMNS = 'id, text, due_date, done, done_at, created_at, frame_url, frame_status, projects(name, hue), recordings(recorded_at)'
 
+/** The list serves a house render at 256 (its copy beside the 512, packages/pipeline/houseRender.ts thumbOf). */
+export const thumbOf = (url: string) => url.replace(/-512\.jpg(\?.*)?$/, '-256.jpg$1')
+
 export function toTodo(a: ActionRow): Todo {
   return {
     id: a.id,
@@ -64,7 +67,7 @@ export function toTodo(a: ActionRow): Todo {
     doneAt: a.done_at,
     saidAt: a.recordings?.recorded_at ?? a.created_at,
     project: a.projects?.name ?? 'My things',
-    picture: a.frame_status === 'done' && a.frame_url ? a.frame_url : null,
+    picture: a.frame_status === 'done' && a.frame_url ? thumbOf(a.frame_url) : null,
     hue: hueOf(a.projects?.hue ?? 'cool-grey'),
   }
 }
