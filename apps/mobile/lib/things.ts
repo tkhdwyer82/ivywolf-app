@@ -1,9 +1,11 @@
 // apps/mobile/lib/things.ts
-// My things (P4), the one room Ivy speaks in. From Ivy: her merge proposals ("Ivy thinks these might be one idea")
-// and threads she keeps coming back to (return_count ≥ COMEBACK, the same bar as Ivy on open). To do: open to-dos,
-// then the ones done in the last few days. No Loose ends section (brief, Job 4.7).
+// My things (P4, v4.6 — Figma 1797:2, M1/M3), the one room Ivy speaks in. From Ivy: her merge proposals ("Ivy thinks
+// these might be one idea") and threads she keeps coming back to (return_count ≥ COMEBACK, the same bar as Ivy on
+// open). Then her to-dos as Pinterest rows in Granola's groups — Today, Yesterday, a header per day for the last week,
+// then by week — and a Done group at the bottom with what got done this week. No Loose ends section (Job 4.7).
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { hueOf } from '@ivywolf/ui'
 import { COMEBACK } from '@/lib/home'
 
 export type FromIvy =
@@ -13,10 +15,15 @@ export type FromIvy =
 export interface Todo {
   id: string
   text: string
-  scope: 'personal' | 'work'
   dueDate: string | null
   done: boolean
   doneAt: string | null
+  /** When she said it: the recording's time, else the row's. Groups and the meta's time come from this. */
+  saidAt: string
+  project: string
+  /** The row's picture: its drawn frame, else null (the project's hue block). */
+  picture: string | null
+  hue: string
 }
 
 export interface Things {
@@ -24,8 +31,8 @@ export interface Things {
   todo: Todo[]
 }
 
-/** Done to-dos stay on the list this long, greyed, so a tick can be seen and taken back. */
-const DONE_SHOWN_DAYS = 3
+/** Done to-dos stay on the list for the week, in the Done group, so the week reads back. */
+const DONE_SHOWN_DAYS = 7
 
 function need<T>(label: string, r: { data: T; error: { message: string } | null }): T {
   if (r.error) throw new Error(`${label}: ${r.error.message}`)
@@ -40,7 +47,30 @@ type ThreadRow = {
   projects: { id: string; name: string; kind: string } | null
   thread_cards: { cards: { id: string; created_at: string } | null }[]
 }
-type ActionRow = { id: string; text: string; scope: Todo['scope']; due_date: string | null; done: boolean; done_at: string | null; created_at: string }
+type ActionRow = {
+  id: string; text: string; due_date: string | null; done: boolean; done_at: string | null; created_at: string
+  frame_url: string | null; frame_status: string
+  projects: { name: string; hue: string | null } | null
+  recordings: { recorded_at: string | null } | null
+}
+const ACTION_COLUMNS = 'id, text, due_date, done, done_at, created_at, frame_url, frame_status, projects(name, hue), recordings(recorded_at)'
+
+/** The list serves a house render at 256 (its copy beside the 512, packages/pipeline/houseRender.ts thumbOf). */
+export const thumbOf = (url: string) => url.replace(/-512\.jpg(\?.*)?$/, '-256.jpg$1')
+
+export function toTodo(a: ActionRow): Todo {
+  return {
+    id: a.id,
+    text: a.text,
+    dueDate: a.due_date,
+    done: a.done,
+    doneAt: a.done_at,
+    saidAt: a.recordings?.recorded_at ?? a.created_at,
+    project: a.projects?.name ?? 'My things',
+    picture: a.frame_status === 'done' && a.frame_url ? thumbOf(a.frame_url) : null,
+    hue: hueOf(a.projects?.hue ?? 'cool-grey'),
+  }
+}
 
 export async function loadThings(supabase: SupabaseClient): Promise<Things> {
   const since = new Date(Date.now() - DONE_SHOWN_DAYS * 86_400_000).toISOString()
@@ -55,10 +85,10 @@ export async function loadThings(supabase: SupabaseClient): Promise<Things> {
       .select('id, title, return_count, projects(id, name, kind), thread_cards(cards(id, created_at))')
       .gte('return_count', COMEBACK)
       .order('last_seen', { ascending: false }),
-    supabase.from('actions').select('id, text, scope, due_date, done, done_at, created_at').eq('done', false),
+    supabase.from('actions').select(ACTION_COLUMNS).eq('done', false),
     supabase
       .from('actions')
-      .select('id, text, scope, due_date, done, done_at, created_at')
+      .select(ACTION_COLUMNS)
       .eq('done', true)
       .gte('done_at', since)
       .order('done_at', { ascending: false }),
@@ -83,18 +113,7 @@ export async function loadThings(supabase: SupabaseClient): Promise<Things> {
     }),
   ]
 
-  // Open to-dos: dated ones first, soonest first; then undated, newest first.
-  const openRows = (need('open', open) as ActionRow[]).sort((x, y) =>
-    x.due_date && y.due_date ? x.due_date.localeCompare(y.due_date) : x.due_date ? -1 : y.due_date ? 1 : y.created_at.localeCompare(x.created_at)
-  )
-  const todo = [...openRows, ...(need('done', done) as ActionRow[])].map((a) => ({
-    id: a.id,
-    text: a.text,
-    scope: a.scope,
-    dueDate: a.due_date,
-    done: a.done,
-    doneAt: a.done_at,
-  }))
+  const todo = [...(need('open', open) as unknown as ActionRow[]), ...(need('done', done) as unknown as ActionRow[])].map(toTodo)
   return { fromIvy, todo }
 }
 
@@ -112,33 +131,81 @@ export async function keepSeparate(supabase: SupabaseClient, suggestionId: strin
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const DAY_MS = 86_400_000
 const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+/** Whole days between her local calendar days: 0 today, 1 yesterday. */
+const daysAgo = (at: Date, now: Date) => Math.round((dayStart(now) - dayStart(at)) / DAY_MS)
+/** '2026-09-30' is her calendar day, not UTC. */
+const localDay = (iso: string) => {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+/** "Wed 30 Sep". */
+const shortDate = (d: Date) => `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`
+/** "7:40", "12:21" — her clock, no am/pm (the frame's meta). */
+const clockTime = (d: Date) => `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`
 
-/** Days from today to a local date ('2026-09-24' is her calendar day, not UTC). */
-function daysFromToday(isoDate: string, now = new Date()): number {
-  const [y, m, d] = isoDate.split('-').map(Number)
-  return Math.round((new Date(y, m - 1, d).getTime() - dayStart(now)) / 86_400_000)
+/** When she said it, for the meta: "Today 7:40", "Mon 12:05" (this past week), else "Wed 30 Sep". */
+export function saidLabel(iso: string, now = new Date()): string {
+  const at = new Date(iso)
+  const n = daysAgo(at, now)
+  if (n <= 0) return `Today ${clockTime(at)}`
+  if (n < 7) return `${DAYS[at.getDay()]} ${clockTime(at)}`
+  return shortDate(at)
 }
 
-/** "due today", "due tomorrow", "due Sat" (this week), "due Thu 24 Sep", "overdue · Tue 22 Sep". */
-export function dueLabel(isoDate: string, now = new Date()): string {
-  const n = daysFromToday(isoDate, now)
-  const [y, m, d] = isoDate.split('-').map(Number)
-  const date = new Date(y, m - 1, d)
-  const full = `${DAYS[date.getDay()]} ${d} ${MONTHS[m - 1]}`
-  if (n < 0) return `overdue · ${full}`
-  if (n === 0) return 'due today'
-  if (n === 1) return 'due tomorrow'
-  if (n < 7) return `due ${DAYS[date.getDay()]}`
-  return `due ${full}`
+export function isOverdue(t: Pick<Todo, 'dueDate' | 'done'>, now = new Date()): boolean {
+  return !t.done && !!t.dueDate && localDay(t.dueDate).getTime() < dayStart(now)
 }
 
-/** "done today", "done yesterday", "done Mon"; plain "done" for ticks from before 0021 kept a time. */
-export function doneLabel(doneAt: string | null, now = new Date()): string {
-  if (!doneAt) return 'done'
-  const at = new Date(doneAt)
-  const n = Math.round((dayStart(now) - dayStart(at)) / 86_400_000)
-  if (n <= 0) return 'done today'
-  if (n === 1) return 'done yesterday'
-  return `done ${DAYS[at.getDay()]}`
+/**
+ * The row's meta (M1): "{when she said it} · {project}". Overdue is the whole line in red, with the due day in it,
+ * so overdue is never the only date: "Overdue · Wed 30 Sep · Home". No work/personal tag.
+ */
+export function metaLine(t: Pick<Todo, 'dueDate' | 'done' | 'saidAt' | 'project'>, now = new Date()): { text: string; overdue: boolean } {
+  if (isOverdue(t, now)) return { text: `Overdue · ${shortDate(localDay(t.dueDate!))} · ${t.project}`, overdue: true }
+  return { text: `${saidLabel(t.saidAt, now)} · ${t.project}`, overdue: false }
+}
+
+export type Group = { key: string; title: string; note?: string; rows: Todo[] }
+
+/** Monday of her week, local. */
+const weekOf = (d: Date) => {
+  const start = new Date(dayStart(d))
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7))
+  return start
+}
+
+/** The group a row sits in, by the day she said it: TODAY, YESTERDAY, WED 30 SEP (the past week), WEEK OF 21 SEP. */
+export function groupOf(saidAt: string, now = new Date()): { key: string; title: string } {
+  const at = new Date(saidAt)
+  const n = daysAgo(at, now)
+  if (n <= 0) return { key: 'today', title: 'TODAY' }
+  if (n === 1) return { key: 'yesterday', title: 'YESTERDAY' }
+  if (n < 7) return { key: `day:${dayStart(at)}`, title: shortDate(at).toUpperCase() }
+  const w = weekOf(at)
+  return { key: `week:${w.getTime()}`, title: `WEEK OF ${w.getDate()} ${MONTHS[w.getMonth()]}`.toUpperCase() }
+}
+
+/**
+ * The list (M1, M3). Open to-dos in their groups, newest first; a row ticked within the last 6 s (`settling`) stays
+ * where it was, faded, so nothing moves under her finger. Then DONE at the bottom: done rows, newest tick first, with
+ * "N this week" beside the header. Groups with no rows aren't shown.
+ */
+export function groupTodos(todos: Todo[], settling: ReadonlySet<string> = new Set(), now = new Date()): Group[] {
+  const open = todos.filter((t) => !t.done || settling.has(t.id)).sort((a, b) => b.saidAt.localeCompare(a.saidAt))
+  const groups: Group[] = []
+  for (const t of open) {
+    const g = groupOf(t.saidAt, now)
+    const last = groups[groups.length - 1]
+    if (last?.key === g.key) last.rows.push(t)
+    else groups.push({ ...g, rows: [t] })
+  }
+  const done = todos.filter((t) => t.done && !settling.has(t.id)).sort((a, b) => (b.doneAt ?? '').localeCompare(a.doneAt ?? ''))
+  if (done.length) {
+    const week = weekOf(now).getTime()
+    const thisWeek = done.filter((t) => t.doneAt && new Date(t.doneAt).getTime() >= week).length
+    groups.push({ key: 'done', title: 'DONE', note: thisWeek ? `${thisWeek} this week` : undefined, rows: done })
+  }
+  return groups
 }

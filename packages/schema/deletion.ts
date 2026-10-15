@@ -19,6 +19,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 const FRAMES_PREFIX = '/storage/v1/object/public/frames/'
 
+/** A to-do's house render is stored at 512 with a 256 copy beside it (houseRender.ts): both go together. */
+export function withThumb(path: string): string[] {
+  return /-512\.jpg$/.test(path) ? [path, path.replace(/-512\.jpg$/, '-256.jpg')] : [path]
+}
+
 /** Public frame URL → its path in the frames bucket; null for anything else. */
 export function framePath(url: string | null): string | null {
   if (!url) return null
@@ -59,7 +64,7 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
       .neq('recording_id', recording.id)
     if (error) throw new Error(`to-do frame references: ${error.message}`)
     const path = framePath(url)
-    if (count === 0 && path) paths.push(path)
+    if (count === 0 && path) paths.push(...withThumb(path))
   }
 
   // A text recording (0026: an idea added through Muse) has no audio to remove.
@@ -131,7 +136,7 @@ export async function deleteAction(supabase: SupabaseClient, actionId: string) {
       .neq('id', actionId)
     if (error) throw new Error(`to-do frame references: ${error.message}`)
     if (count === 0) {
-      const r = await supabase.storage.from('frames').remove([path])
+      const r = await supabase.storage.from('frames').remove(withThumb(path))
       if (r.error) throw new Error(`frame: ${r.error.message}`)
     }
   }

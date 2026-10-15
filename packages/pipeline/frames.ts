@@ -6,8 +6,8 @@
 // diagram, board and text cards are drawn natively by the app ('typographic'). No card frame is generated: a photo
 // search that finds nothing turns the card into a text card. A card she imported keeps her picture (imports.ts).
 //
-// To-dos, as before (Job 4): each action with a frame_brief is drawn in the creator's style pack; one with no brief is
-// left for the app to render typographically.
+// To-dos (Job B.4): each action with a frame_brief gets the house render (houseRender.ts — one fixed nano-banana
+// prompt, so My things reads as one set); one with no brief is left for the app to show in its project's hue.
 //
 //   frame_status: none → queued → done | typographic | failed
 //
@@ -23,6 +23,7 @@ import { createClient } from '@supabase/supabase-js'
 import { fetchAndUpload } from './storage'
 import { searchPhoto, trackDownload } from './unsplash'
 import { peopleFor, stripPeople } from './redact'
+import { renderTodo } from './houseRender'
 
 const MODEL = 'fal-ai/flux/schnell'
 const ENDPOINT = `https://fal.run/${MODEL}`
@@ -291,8 +292,8 @@ export async function frameRecording(creatorId: string, recordingId: string): Pr
 
   const people = await peopleFor(supabase, creatorId, recordingId)
 
-  // To-dos first and one at a time, so two to-dos with the same brief share one generation.
-  for (const a of actions ?? []) await frameOne(creatorId, pack, { kind: 'action', id: a.id as string, brief: a.frame_brief as string | null }, people)
+  // To-dos first and one at a time, so two to-dos with the same brief share one render.
+  for (const a of actions ?? []) await renderTodo(creatorId, { id: a.id as string, brief: a.frame_brief as string | null }, people, pack.id)
 
   await Promise.all(
     (cards ?? []).map(async (c) => {

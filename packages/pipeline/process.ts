@@ -19,6 +19,7 @@ import { Discarded, stillWanted } from './discard'
 export { claimRecording, markFailed } from './graph'
 export { Discarded, isDiscarded, stillWanted } from './discard'
 export { purgePlan, purgeTrash, TRASH_DAYS } from './trash'
+export { backfillTodoRenders, housePrompt, nounOf, thumbOf } from './houseRender'
 // For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
 export { photoForCard } from './frames'
 export { backfillReferencePictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
