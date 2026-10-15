@@ -19,7 +19,7 @@ export interface Todo {
   syncedReminderId: string | null
   frameUrl: string | null
   frameStatus: string
-  project: { id: string; name: string } | null
+  project: { id: string; name: string; hue: string | null } | null
   recordingId: string | null
   recordingTitle: string | null
   recordedAt: string | null
@@ -37,7 +37,7 @@ type Row = {
   id: string; text: string; scope: Todo['scope']; priority: string; due_date: string | null; done: boolean
   hearted_at: string | null; remind_at: string | null; synced_reminder_id: string | null; frame_url: string | null
   frame_status: string; recording_id: string | null; created_at: string
-  projects: { id: string; name: string } | null
+  projects: { id: string; name: string; hue: string | null } | null
   recordings: { title: string | null; recorded_at: string | null; storage_path: string } | null
   segments: { start_ms: number; text: string } | null
 }
@@ -48,7 +48,7 @@ export async function loadTodo(supabase: SupabaseClient, id: string): Promise<To
     await supabase
       .from('actions')
       .select(
-        'id, text, scope, priority, due_date, done, hearted_at, remind_at, synced_reminder_id, frame_url, frame_status, recording_id, created_at, projects(id, name), recordings(title, recorded_at, storage_path), segments(start_ms, text)'
+        'id, text, scope, priority, due_date, done, hearted_at, remind_at, synced_reminder_id, frame_url, frame_status, recording_id, created_at, projects(id, name, hue), recordings(title, recorded_at, storage_path), segments(start_ms, text)'
       )
       .eq('id', id)
       .maybeSingle()

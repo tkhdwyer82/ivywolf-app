@@ -4,7 +4,7 @@ Figma: section **1787:2**, "v4.2 — Discard" (file H9nRPbwfGDwkho3gacQT53).
 
 | Frame | What it is | Built in |
 |---|---|---|
-| **D1** 1787:5 — Listening · × tapped | Under 5 s or nothing heard, × closes and deletes on the phone, no question. Otherwise this sheet: "Stop and keep it, or throw it away?", "0:14 so far. Discarding deletes the audio now; nothing is written up.", Keep (lime pill, 52 high), Discard (red text). Swipe down = Keep. | `apps/mobile/app/record.tsx`, `lib/discard.ts` (`closeDecision`) |
+| **D1** 1787:5 — Listening · × tapped | Nothing heard: × closes and deletes on the phone, no question, and Home shows a grey "Nothing saved" for 2 s (B.3.1 dropped the frame's under-5 s rule: any take with speech asks). Otherwise this sheet: "Stop and keep it, or throw it away?", "0:14 so far. Discarding deletes the audio now; nothing is written up.", Keep (lime pill, 52 high), Discard (red text). Swipe down = Keep. | `apps/mobile/app/record.tsx`, `lib/discard.ts` (`closeDecision`) |
 | **D2** 1787:68 — Home just after stop | The toast 1787:142, "Writing it up…" + white Undo chip, for 6 s on the nav row. Undo cancels the pipeline, deletes the recording, spends nothing. | `components/UndoPill.tsx`, `lib/discard.ts`, `packages/pipeline/discard.ts` |
 | **D3** 1787:149 — Once it's a card | No new UI: ••• → Move to trash (30 days, takes its audio and derived errands). | `lib/trash.ts`, `app/trash.tsx`, `packages/pipeline/trash.ts`, migrations 0040–0041 |
 

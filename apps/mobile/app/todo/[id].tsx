@@ -1,13 +1,14 @@
 // apps/mobile/app/todo/[id].tsx
-// To-do (P17), the pin page's shape for a to-do. The visual (its frame, or the words set in the palette) with the
-// "To-do · {project}" pill; the to-do as the heading; what she said, cut to the sentence, and where; heart · mic ·
-// share; the calendar button, with its orange dot, only when Ivy heard a date; the dark project button; the due
-// line; Mark done. The calendar button opens the Date sheet (P18): the day Ivy heard and Hear it; Change date,
-// Remind me (a notification), Add to Reminders. Add to Calendar is for ideas with a time, so not here.
-// Reached from a to-do tile on Home, a row in My things, or a reminder's notification.
+// The card page for a to-do (v4.6 M2, Figma 1797:59). Picture full-bleed at the top — its frame, else its project's
+// hue — with back, Share and ••• over it; the to-do in Bold 28 and what she said, as a quote. Nothing else: the date
+// and project live in My things' row, and Ivy speaks in the list and on Home, not here. Under it, Done (lime) and a
+// white ✦ "Muse" circle that hands the to-do on — a stub for now (the share sheet with its words; Muse's report()
+// receipt comes in Job F). ••• keeps Date (the Date sheet, P18, when Ivy heard a day), Correct by voice, Like and Move
+// to trash. Reached from a row in My things, a to-do on Home's arc, or a reminder's notification.
 
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native'
+import { Image } from 'expo-image'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView, type SFSymbol } from 'expo-symbols'
@@ -19,7 +20,6 @@ import {
   clock,
   defaultRemindAt,
   deleteTodo,
-  dueLine,
   heard,
   isoDay,
   loadTodo,
@@ -33,10 +33,10 @@ import {
   shortDay,
   type Todo,
 } from '@/lib/todo'
-import { Glass, Menu } from '@/components/PinChrome'
+import { Menu } from '@/components/PinChrome'
+import { Nav } from '@/components/Nav'
+import { hueOf } from '@ivywolf/ui'
 import { hero, text } from '@/lib/theme'
-
-const DUE = '#D2461E'
 
 export default function TodoPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -70,10 +70,21 @@ export default function TodoPage() {
     if (!todo) return
     const was = todo
     setTodo({ ...todo, done: !todo.done })
-    await setTodoDone(supabase, todo.id, !was.done).catch((e) => {
+    try {
+      await setTodoDone(supabase, todo.id, !was.done)
+      // Done goes back to the list, where it sits in Done; taking it back stays here.
+      if (!was.done) router.back()
+    } catch (e) {
       setTodo(was)
       fail('That didn’t save')(e)
-    })
+    }
+  }
+
+  /** ✦ Muse (stub): the share sheet with the to-do and her words. Job F replaces it with Muse's report() receipt. */
+  function muse() {
+    if (!todo) return
+    const said = todo.said ? heard(todo.said.text) : null
+    Share.share({ message: [todo.text, said && `“${said.quote}”`].filter(Boolean).join('\n\n') })
   }
 
   function trash() {
@@ -100,91 +111,69 @@ export default function TodoPage() {
     )
   }
 
-  const drawn = todo.frameStatus === 'done' && !!todo.frameUrl
   const said = todo.said ? heard(todo.said.text) : null
-  const where = [todo.said && `said at ${clock(todo.said.startMs)}`, todo.recordingTitle && `in ${todo.recordingTitle}`].filter(Boolean).join(' ')
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.screen} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 32 }}>
-        <View style={styles.visual}>
-          {drawn ? (
-            <Image source={{ uri: todo.frameUrl! }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          ) : (
-            <View style={styles.typographic}>
-              <Text style={[text.titleScreen, { color: hero.ink }]}>{todo.text}</Text>
-            </View>
-          )}
-          <Glass icon="chevron.left" label="Back" onPress={() => router.back()} style={{ left: 12, top: 12 }} />
-          <Glass icon="ellipsis" label="More" onPress={() => setMenu(true)} style={{ right: 12, top: 12 }} />
-          <View style={styles.pill}>
-            <Text style={text.labelPill}>To-do · {todo.project?.name ?? 'My things'}</Text>
-          </View>
+      <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: insets.bottom + 140 }} contentInsetAdjustmentBehavior="never">
+        <View style={[styles.picture, { backgroundColor: hueOf(todo.project?.hue ?? 'cool-grey') }]}>
+          {todo.frameStatus === 'done' && todo.frameUrl && <Image source={{ uri: todo.frameUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />}
         </View>
 
         <View style={styles.body}>
           <Text style={[styles.heading, todo.done && styles.secondary]}>{todo.text}</Text>
-          {(said || where) && (
-            <Text style={styles.said}>{[said && `“${said.quote}”`, where].filter(Boolean).join(' — ')}</Text>
-          )}
-
-          <View style={styles.actions}>
-            <Pressable onPress={heart} hitSlop={10} accessibilityRole="button" accessibilityLabel={todo.heartedAt ? 'Unheart' : 'Heart'}>
-              <SymbolView name={todo.heartedAt ? 'heart.fill' : 'heart'} tintColor={hero.ink} size={24} />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push({ pathname: '/record', params: { correctionOf: todo.id, what: 'to-do' } })}
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel="Correct by voice"
-            >
-              <SymbolView name="mic" tintColor={hero.ink} size={24} />
-            </Pressable>
-            <Pressable onPress={() => Share.share({ message: todo.text })} hitSlop={10} accessibilityRole="button" accessibilityLabel="Share">
-              <SymbolView name="square.and.arrow.up" tintColor={hero.ink} size={24} />
-            </Pressable>
-
-            <View style={styles.right}>
-              {todo.dueDate && (
-                <Pressable onPress={() => setSheet(true)} style={styles.calendar} accessibilityRole="button" accessibilityLabel={`Date: ${longDay(todo.dueDate)}`}>
-                  <SymbolView name="calendar" tintColor={hero.ink} size={22} />
-                  <View style={styles.dot} />
-                </Pressable>
-              )}
-              <View style={styles.project}>
-                <Text style={styles.projectName} numberOfLines={1}>
-                  {todo.project?.name ?? 'My things'}
-                </Text>
-                <View style={styles.projectRule} />
-                {/* Save to (P10) moves ideas; a to-do lives in My things. */}
-                <View style={styles.chevron}>
-                  <SymbolView name="chevron.down" tintColor="rgba(255,255,255,0.4)" size={16} weight="semibold" />
-                </View>
-              </View>
-            </View>
-          </View>
-
-          <Text style={[styles.due, (todo.done || !todo.dueDate) && styles.secondary]}>{dueLine(todo)}</Text>
+          {said && <Text style={styles.said}>“{said.quote}”</Text>}
           {error && <Text style={[text.caption, styles.secondary, { marginTop: 8 }]}>{error}</Text>}
 
-          <Pressable onPress={markDone} style={styles.markDone} accessibilityRole="checkbox" accessibilityState={{ checked: todo.done }}>
-            <View style={[styles.tick, todo.done && styles.ticked]}>
-              {todo.done && <SymbolView name="checkmark" tintColor="#FFFFFF" size={13} weight="bold" />}
+          <View style={styles.actions}>
+            <Pressable
+              onPress={markDone}
+              style={({ pressed }) => [styles.done, todo.done && styles.undone, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityState={{ checked: todo.done }}
+              testID="todo-done"
+            >
+              <Text style={styles.doneLabel}>{todo.done ? 'Not done' : 'Done'}</Text>
+            </Pressable>
+            <View style={styles.museWrap}>
+              <Pressable onPress={muse} style={({ pressed }) => [styles.muse, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Muse">
+                <Text style={styles.museMark}>✦</Text>
+              </Pressable>
+              <Text style={styles.museLabel}>Muse</Text>
             </View>
-            <Text style={styles.markDoneLabel}>{todo.done ? 'Done' : 'Mark done'}</Text>
-          </Pressable>
+          </View>
         </View>
       </ScrollView>
+
+      <View style={[styles.chrome, { top: insets.top + 4 }]} pointerEvents="box-none">
+        <Pressable onPress={() => router.back()} style={styles.circle} accessibilityRole="button" accessibilityLabel="Back">
+          <SymbolView name="chevron.left" tintColor={hero.ink} size={18} weight="semibold" />
+        </Pressable>
+        <View style={styles.chromeRight}>
+          <Pressable onPress={() => Share.share({ message: todo.text })} style={styles.share} accessibilityRole="button">
+            <Text style={styles.shareLabel}>Share</Text>
+          </Pressable>
+          <Pressable onPress={() => setMenu(true)} style={styles.circle} accessibilityRole="button" accessibilityLabel="More">
+            <SymbolView name="ellipsis" tintColor={hero.ink} size={18} weight="semibold" />
+          </Pressable>
+        </View>
+      </View>
+
+      <Nav room="home" onHome={() => router.dismissTo('/')} />
 
       {menu && (
         <Menu
           top={insets.top + 10}
           onClose={() => setMenu(false)}
           items={[
-            // The hold arc's to-do actions, as a list (Job C+). Date opens the Date sheet, which needs a date heard.
-            { icon: todo.done ? 'arrow.uturn.backward' : 'checkmark', label: todo.done ? 'Not done' : 'Done', onPress: markDone },
+            // What left the page (M2) lives here. Date opens the Date sheet, which needs a date heard.
             ...(todo.dueDate ? [{ icon: 'calendar' as const, label: 'Date', onPress: () => setSheet(true) }] : []),
-            { icon: 'square.and.arrow.up', label: 'Share', onPress: () => Share.share({ message: todo.text }) },
+            { icon: todo.heartedAt ? 'heart.fill' : 'heart', label: todo.heartedAt ? 'Unlike' : 'Like', onPress: heart },
+            {
+              icon: 'mic',
+              label: 'Correct by voice',
+              onPress: () => router.push({ pathname: '/record', params: { correctionOf: todo.id, what: 'to-do' } }),
+            },
             { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
           ]}
         />
@@ -335,8 +324,8 @@ function DateSheet({
         </View>
         {error && <Text style={[text.caption, styles.secondary, { marginTop: 10 }]}>{error}</Text>}
 
-        <Pressable onPress={onClose} style={styles.done} accessibilityRole="button">
-          <Text style={styles.doneLabel}>Done</Text>
+        <Pressable onPress={onClose} style={styles.sheetDone} accessibilityRole="button">
+          <Text style={styles.sheetDoneLabel}>Done</Text>
         </Pressable>
       </View>
     </Modal>
@@ -378,29 +367,31 @@ function Toggle({ value, busy, onChange, label }: { value: boolean; busy: boolea
 // Figma 83:523 (P18) — sheet from y 422, radius 28, grabber 40 × 5; title Bold 22; heard line Regular 12
 // secondary; Hear it pill 26 high; rows 353 × 60 fill radius 16 every 68, icon 22, title Semibold 15, sub
 // Regular 12; switch lime; Done 353 × 52 ink, radius 26.
+// Figma 1797:59 (M2): picture 393 × 440 from the top; back and ••• white circles 44, Share an ink pill 78 × 44 (Semibold
+// 15 white); title Bold 28 at 24 under the picture; her words Regular 17/24, 7 under; Done lime 281 × 52 radius 26
+// (Semibold 15) and the ✦ circle 52 (hairline ring) 20 after it, "Muse" Regular 10 grey under it.
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: hero.room },
   centered: { alignItems: 'center', justifyContent: 'center', padding: 20 },
   secondary: { color: hero.secondary },
-  visual: { marginHorizontal: 8, height: 300, borderRadius: 28, overflow: 'hidden', backgroundColor: hero.fill },
-  typographic: { flex: 1, justifyContent: 'center', padding: 24, paddingBottom: 56, borderLeftWidth: 6, borderLeftColor: hero.lime },
-  pill: { position: 'absolute', left: 16, bottom: 19, height: 25, borderRadius: 12.5, paddingHorizontal: 10, justifyContent: 'center', backgroundColor: hero.lime },
-  body: { paddingHorizontal: 20, paddingTop: 16 },
-  heading: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4, color: hero.ink },
-  said: { fontSize: 14, lineHeight: 18, color: hero.secondary, marginTop: 6 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 18, paddingLeft: 2 },
-  right: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 3 },
-  calendar: { width: 44, height: 44, borderRadius: 14, backgroundColor: hero.fill, alignItems: 'center', justifyContent: 'center' },
-  dot: { position: 'absolute', left: 32, top: 3, width: 9, height: 9, borderRadius: 4.5, backgroundColor: DUE, borderWidth: 1.5, borderColor: hero.fill },
-  project: { width: 170, height: 44, borderRadius: 14, backgroundColor: '#333330', flexDirection: 'row', alignItems: 'center', overflow: 'hidden' },
-  projectName: { flex: 1, paddingLeft: 16, fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
-  projectRule: { width: StyleSheet.hairlineWidth * 2, height: 44, backgroundColor: 'rgba(255,255,255,0.25)' },
-  chevron: { width: 43, height: 44, alignItems: 'center', justifyContent: 'center' },
-  due: { fontSize: 13, fontWeight: '500', color: DUE, marginTop: 18 },
-  markDone: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 56, borderRadius: 16, backgroundColor: hero.fill, paddingHorizontal: 16, marginTop: 18 },
-  tick: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: hero.secondary, alignItems: 'center', justifyContent: 'center' },
-  ticked: { backgroundColor: hero.ink, borderColor: hero.ink },
-  markDoneLabel: { fontSize: 15, fontWeight: '600', color: hero.ink },
+  picture: { height: 440, overflow: 'hidden' },
+  chrome: { position: 'absolute', left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between' },
+  chromeRight: { flexDirection: 'row', gap: 7 },
+  circle: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  share: { width: 78, height: 44, borderRadius: 22, backgroundColor: hero.ink, alignItems: 'center', justifyContent: 'center' },
+  shareLabel: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
+  body: { paddingHorizontal: 20, paddingTop: 24 },
+  heading: { fontSize: 28, fontWeight: '700', color: hero.ink },
+  said: { fontSize: 17, lineHeight: 24, color: hero.ink, marginTop: 7 },
+  actions: { flexDirection: 'row', alignItems: 'flex-start', gap: 20, marginTop: 44 },
+  done: { flex: 1, height: 52, borderRadius: 26, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center' },
+  undone: { backgroundColor: hero.fill },
+  doneLabel: { fontSize: 15, fontWeight: '600', color: hero.ink },
+  pressed: { transform: [{ scale: 0.97 }] },
+  museWrap: { alignItems: 'center', gap: 6 },
+  muse: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E5EA', alignItems: 'center', justifyContent: 'center' },
+  museMark: { fontSize: 20, fontWeight: '600', color: hero.ink },
+  museLabel: { fontSize: 10, color: hero.secondary },
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   sheet: { backgroundColor: hero.room, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 20, paddingTop: 12 },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 2.5, backgroundColor: '#D9D9DE', marginBottom: 19 },
@@ -419,6 +410,6 @@ const styles = StyleSheet.create({
   dayChipTop: { fontSize: 11, color: hero.secondary },
   dayChipNum: { fontSize: 17, fontWeight: '600', color: hero.ink, marginTop: 2 },
   dayChipTextOn: { color: '#FFFFFF' },
-  done: { height: 52, borderRadius: 26, backgroundColor: hero.ink, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
-  doneLabel: { fontSize: 17, fontWeight: '600', color: '#FFFFFF' },
+  sheetDone: { height: 52, borderRadius: 26, backgroundColor: hero.ink, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
+  sheetDoneLabel: { fontSize: 17, fontWeight: '600', color: '#FFFFFF' },
 })

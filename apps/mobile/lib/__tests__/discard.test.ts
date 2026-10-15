@@ -1,5 +1,5 @@
 // Job B.3 — Discard: × on the listening screen, Undo on Home, and Move to trash.
-import { closeDecision, DISCARD_SILENT_MS, justRecorded, onJustRecorded, setJustRecorded, undoLeft, UNDO_MS } from '../discard'
+import { closeDecision, justRecorded, notice, NOTICE_MS, onJustRecorded, onNotice, setJustRecorded, showNotice, undoLeft, UNDO_MS } from '../discard'
 import { discardRecording } from '../deleteRecording'
 import { purgeLine, restore, trashAction, trashCard } from '../trash'
 
@@ -41,21 +41,27 @@ function fakeSupabase(result: (table: string, ops: string[]) => { data?: unknown
   return { client: client as never, log }
 }
 
-describe('× on the listening screen', () => {
-  it('drops a take under 5 s silently', () => {
-    expect(closeDecision({ tookMs: DISCARD_SILENT_MS - 1, peakDb: -20, imported: false })).toBe('drop')
+describe('× on the listening screen (B.3.1)', () => {
+  it('drops a take with no speech in it', () => {
+    expect(closeDecision({ peakDb: -60, imported: false })).toBe('drop')
   })
-  it('drops a take with no speech, however long', () => {
-    expect(closeDecision({ tookMs: 30_000, peakDb: -60, imported: false })).toBe('drop')
-  })
-  it('asks (Keep / Discard) for 5 s or more with speech', () => {
-    expect(closeDecision({ tookMs: DISCARD_SILENT_MS, peakDb: -25, imported: false })).toBe('ask')
+  it('asks (Keep / Discard) for any take with speech, however short — there is no length rule', () => {
+    expect(closeDecision({ peakDb: -25, imported: false })).toBe('ask')
   })
   it('asks when the mic never reported a level — no level isn’t silence', () => {
-    expect(closeDecision({ tookMs: 8000, peakDb: null, imported: false })).toBe('ask')
+    expect(closeDecision({ peakDb: null, imported: false })).toBe('ask')
   })
   it('always asks for an import: its picture is already uploaded', () => {
-    expect(closeDecision({ tookMs: 500, peakDb: -70, imported: true })).toBe('ask')
+    expect(closeDecision({ peakDb: -70, imported: true })).toBe('ask')
+  })
+  it('a silent close leaves a grey “Nothing saved” on Home for 2 s', () => {
+    const seen: (string | null)[] = []
+    const off = onNotice((n) => seen.push(n?.label ?? null))
+    showNotice('Nothing saved', NOTICE_MS, 1000)
+    expect(notice()).toEqual({ label: 'Nothing saved', until: 1000 + NOTICE_MS })
+    expect(NOTICE_MS).toBe(2000)
+    off()
+    expect(seen).toEqual(['Nothing saved'])
   })
 })
 

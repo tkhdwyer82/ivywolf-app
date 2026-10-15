@@ -10,8 +10,8 @@
 // ?importKind=image|video&original=…&poster=… (from Add to ideas): Ivy asks what it's for; the line rides with the
 // import and the pipeline makes the card (packages/pipeline/imports.ts).
 //
-// × (Job B.3, lib/discard.ts): under 5 s or no speech, it closes and the take is deleted on the phone, silently.
-// Otherwise the take pauses and a sheet asks (Figma 1787:5, D1) — Keep (lime) saves it, as stop does; Discard (red
+// × (Job B.3.1, lib/discard.ts): with no speech in the take, it closes, the take is deleted on the phone, and Home
+// shows a grey "Nothing saved" for 2 s. Any take with speech, however short, pauses and a sheet asks (Figma 1787:5, D1) — Keep (lime) saves it, as stop does; Discard (red
 // text) deletes it; dismissing the sheet is Keep. After a voice take is saved, Home shows "Writing it up… · Undo"
 // for 6 s (D2).
 
@@ -31,7 +31,7 @@ import {
 import { useAuth } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { submitRecording } from '@/lib/record'
-import { closeDecision, setJustRecorded, SILENT_DB } from '@/lib/discard'
+import { closeDecision, setJustRecorded, showNotice, SILENT_DB } from '@/lib/discard'
 import { hero, text } from '@/lib/theme'
 import { LiveWaveform } from '@/components/LiveWaveform'
 import { Sheet } from '@/components/Sheet'
@@ -116,11 +116,12 @@ export default function Record() {
     }
   }
 
-  /** ×: drop a short or silent take without a word; otherwise pause and ask. */
+  /** ×: drop a take with no speech in it ("Nothing saved" on Home); otherwise pause and ask. */
   async function onClose() {
     if (phase.kind !== 'recording') return close()
-    if (closeDecision({ tookMs: tookMs(), peakDb: peakDb.current, imported: !!imported }) === 'drop') {
+    if (closeDecision({ peakDb: peakDb.current, imported: !!imported }) === 'drop') {
       await dropTake()
+      showNotice('Nothing saved')
       return close()
     }
     recorder.pause()
