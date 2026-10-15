@@ -1,7 +1,9 @@
 // apps/mobile/app/idea/[id].tsx
-// Idea (P9), laid out like the to-do page since B.4 (Figma 1797:59; B.5). Its picture full-bleed at the top, 393 ×
-// 440 — her own, its Unsplash photo or its reference (lib/picture.ts), else its project's hue — with back, ♥, Share and
-// ••• over it; an Unsplash photo is credited under it. Then the title in Bold 28 and her words, 17/24 — the span of
+// Idea (P9), laid out like the to-do page since B.4 (Figma 1797:59; B.5). The full-bleed slot at the top, 393 × 440,
+// holds the card's form: a photo card's picture — her own, its Unsplash photo or its reference (lib/picture.ts), else
+// its project's hue — credited under it; a board's grid, as its tile draws it (its picture and two more from its
+// thread, once the thread has three different ones; until then the board itself, hook and beats); a quote, text or
+// comparison card drawn large on its hue (CardFace). Change view moves the page and the tile together. Back, ♥, Share and ••• sit over it. Then the title in Bold 28 and her words, 17/24 — the span of
 // the recording it came from (tap to hear it), or the gist when there's no recording; "Ivy isn't sure" under 0.6;
 // and More in this thread. No summary block and no project pill: Move to project is under •••, beside Move to trash.
 // The mic in the bar is the voice correction: Record, tagged to this card (a stub in the pipeline for now).
@@ -24,7 +26,9 @@ import { heard } from '@/lib/todo'
 import { setShared } from '@/lib/share'
 import { ShareSheet } from '@/components/ShareSheet'
 import { AddContextSheet } from '@/components/AddContextSheet'
-import { Credit, SHAPE_NAME } from '@/components/CardFace'
+import { CardFace, Credit, SHAPE_NAME } from '@/components/CardFace'
+import { distinct, ThreeUp } from '@/components/IdeaTile'
+import type { Picture } from '@/lib/picture'
 import { trashCard, TRASH_IDEA_LINE } from '@/lib/trash'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, hueOf, radius, size, space, type } from '@ivywolf/ui'
@@ -170,6 +174,13 @@ export default function IdeaPage() {
   }
 
   const picture = idea.card.picture
+  // Every form but photo is drawn in the slot (CardFace falls back to text when a form's payload is missing).
+  const drawnForm = idea.card.shape !== 'photo'
+  // A board's grid: the same 3-up as its tile, from its own picture and its thread's.
+  const grid =
+    idea.card.shape === 'board'
+      ? distinct([picture, ...idea.siblings.filter((s) => s.frameUrl).map((s): Picture => ({ source: 'reference', uri: s.frameUrl, kind: 'image', credit: null, linkUrl: null, trackUrl: null }))])
+      : []
   const unsure = idea.confidence < LOW_CONFIDENCE
   const pill = threadPill(idea)
   const badge = sourceBadge(idea)
@@ -182,17 +193,41 @@ export default function IdeaPage() {
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{ paddingBottom: BAR_BOTTOM + size['bar-h'] + space.section }}
       >
-        <View style={[styles.picture, { backgroundColor: hueOf(idea.card.hue) }]} testID="idea-picture">
-          {picture.uri && picture.kind !== 'video' && (
-            <Image source={{ uri: picture.uri }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
-          )}
-          {badge && (
-            <View style={styles.badge} pointerEvents="none">
-              <Text style={type['Label / Pill']}>{badge}</Text>
-            </View>
-          )}
-        </View>
-        {idea.card.credit && picture.source === 'unsplash' && (
+        {grid.length >= 3 ? (
+          <View style={styles.picture} testID="idea-grid">
+            <ThreeUp pictures={grid.slice(0, 3)} recyclingKey={idea.id} />
+          </View>
+        ) : drawnForm ? (
+          // The form, large, filling the slot; the chrome's row is kept clear above it.
+          <View style={styles.picture} testID="idea-form">
+            <CardFace
+              card={idea.card}
+              size="page"
+              photoHeight={PICTURE_H}
+              playing={playing === idea.id}
+              onPlay={idea.storagePath ? () => play(idea.id, idea.storagePath, idea.playFromMs) : undefined}
+              footer={false}
+              style={[styles.form, { paddingTop: insets.top + CHROME_H }]}
+            />
+            {badge && (
+              <View style={[styles.badge, styles.badgeOnForm]} pointerEvents="none">
+                <Text style={type['Label / Pill']}>{badge}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.picture, { backgroundColor: hueOf(idea.card.hue) }]} testID="idea-picture">
+            {picture.uri && picture.kind !== 'video' && (
+              <Image source={{ uri: picture.uri }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+            )}
+            {badge && (
+              <View style={styles.badge} pointerEvents="none">
+                <Text style={type['Label / Pill']}>{badge}</Text>
+              </View>
+            )}
+          </View>
+        )}
+        {!drawnForm && idea.card.credit && picture.source === 'unsplash' && (
           <View style={styles.credit}>
             <Credit card={idea.card} linked />
           </View>
@@ -313,6 +348,7 @@ export default function IdeaPage() {
 // 7 under; More in this thread a section under that, its thumbs 14 under the heading. The source badge (P12d) sits on
 // the picture, 8 × 4.
 const PICTURE_H = 440
+const CHROME_H = 4 + 44 + 12 // the chrome row over the slot, and 12 under it
 const COUNT_R = 16
 const COUNT_PAD_H = 10
 const COUNT_PAD_V = 6
@@ -325,6 +361,8 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.margin },
   secondary: { color: colour.Grey },
   picture: { height: PICTURE_H, overflow: 'hidden' },
+  // CardFace's page box made full-bleed: square corners, the slot's height, the form at the bottom of it.
+  form: { height: PICTURE_H, borderRadius: 0, justifyContent: 'flex-end' },
   chrome: { position: 'absolute', left: space.margin, right: space.margin, flexDirection: 'row', justifyContent: 'space-between' },
   chromeRight: { flexDirection: 'row', gap: 7 },
   circle: { width: 44, height: 44, borderRadius: 22, backgroundColor: colour.Surface, alignItems: 'center', justifyContent: 'center' },
@@ -346,6 +384,8 @@ const styles = StyleSheet.create({
     paddingVertical: BADGE_PAD_V,
     backgroundColor: colour.Lime,
   },
+  // On a drawn form the badge sits top-left, under the chrome, clear of the form's words.
+  badgeOnForm: { bottom: undefined, top: 112 },
   thumbs: { paddingHorizontal: space.margin, paddingTop: THUMBS_GAP, gap: space.gutter },
   credit: { paddingHorizontal: space.margin },
   thumbTitle: { ...type['Body / Small'], fontWeight: '600', padding: space.gutter + 2 },

@@ -183,10 +183,13 @@ An idea with at least one link (`card_links`) renders as a deck (`components/Dec
   action. Unfiled cards (My things) have none, and neither do tiles on the project's own page. Home and search only.
 - **Under the tile**: the title Semibold 15 (two lines) and the time alone, Regular 11 grey — the project left the
   meta (`ideaMeta`, `metaLine`).
-- **Idea page** (`app/idea/[id].tsx`): the to-do page's layout since B.4 (1797:59) — picture full-bleed 393 × 440 (the
-  card's picture by rule 1, else its hue), back · ♥ · Share · ••• over it; the title Bold 28; her words 17/24 (the
-  card's segment, cut to its sentence; the gist when there's no recording); More in this thread. The grey summary
-  block (the card face and byline) and the project pill are gone; Move to project sits under ••• beside Move to trash.
+- **Idea page** (`app/idea/[id].tsx`): the to-do page's layout since B.4 (1797:59). The full-bleed slot, 393 × 440,
+  holds the card's form, so Change view moves the page and the tile together: a photo card's picture (rule 1, else its
+  hue) with its credit under it; a quote large on its hue with the ▶ chip, a text card's title and gist, a comparison's
+  rows (CardFace, page size, full-bleed); a board's 3-up — its picture and two from its thread, as its tile — once the
+  thread has three different pictures, else its hook and beats. Back · ♥ · Share · ••• over it. Then the title Bold
+  28; her words 17/24 (the card's segment, cut to its sentence; the gist when there's no recording); More in this
+  thread. The project pill and the old byline are gone; Move to project sits under ••• beside Move to trash.
 
 ## Tests
 

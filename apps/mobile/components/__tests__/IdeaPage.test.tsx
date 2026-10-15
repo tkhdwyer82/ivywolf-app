@@ -25,7 +25,22 @@ jest.mock('@/components/ShareSheet', () => ({ ShareSheet: () => null }))
 jest.mock('@/components/AddContextSheet', () => ({ AddContextSheet: () => null }))
 jest.mock('@/components/CardFace', () => {
   const { Text } = require('react-native')
-  return { CardFace: () => <Text>SUMMARY BLOCK</Text>, Credit: () => null, SHAPE_NAME: {} }
+  return { CardFace: ({ card }: { card: { shape: string } }) => <Text>{`FORM:${card.shape}`}</Text>, Credit: () => null, SHAPE_NAME: {} }
+})
+jest.mock('expo-video', () => {
+  const { View } = require('react-native')
+  return { useVideoPlayer: () => ({ status: 'idle', duration: 0 }), VideoView: View }
+})
+jest.mock('expo-linear-gradient', () => {
+  const { View } = require('react-native')
+  return { LinearGradient: View }
+})
+jest.mock('@/components/IdeaTile', () => {
+  const { Text } = require('react-native')
+  return {
+    ...jest.requireActual('@/components/IdeaTile'),
+    ThreeUp: ({ pictures }: { pictures: { uri: string }[] }) => <Text>{`GRID:${pictures.map((p) => p.uri).join(',')}`}</Text>,
+  }
 })
 jest.mock('@/lib/idea', () => ({
   ...jest.requireActual('@/lib/idea'),
@@ -53,7 +68,7 @@ const idea = {
   project: { id: 'p-launch', name: 'Launch video', kind: 'user' },
   thread: { id: 't1', title: 'Rooftop', returnCount: 3 },
   siblings: [{ id: 'c2', title: 'Second take', frameUrl: null, frameStatus: 'typographic', playFromMs: 0, storagePath: null, recordedAt: null }],
-  card: { kind: 'card', id: 'c1', title: 'Rooftop chase, night', shape: 'text', hue: 'coral', picture: resolvePicture({ own: [], unsplash: null, reference: null }), credit: null, pinnedAt: null, sharedAt: null } ,
+  card: { kind: 'card', id: 'c1', title: 'Rooftop chase, night', shape: 'photo', hue: 'coral', picture: resolvePicture({ own: [], unsplash: null, reference: null }), credit: null, pinnedAt: null, sharedAt: null } ,
   shapeSetBy: null,
   hasVisualQuery: false,
   said: 'So the chase ends on the roof. She leaps and radios through.',
@@ -70,12 +85,36 @@ describe('Idea page (B.5)', () => {
     expect(screen.getByText('More in this thread')).toBeTruthy()
   })
 
-  it('has no grey summary block and no project pill', async () => {
+  it('a photo card: the picture fills the slot — no grey summary block, no project pill', async () => {
     await render(<IdeaPage />)
     await screen.findByTestId('idea-picture')
-    expect(screen.queryByText('SUMMARY BLOCK')).toBeNull()
+    expect(screen.queryByText(/^FORM:/)).toBeNull()
     expect(screen.queryByLabelText('Open Launch video')).toBeNull()
     expect(screen.queryByLabelText('Save to another project')).toBeNull()
+  })
+
+  it.each(['quote', 'text', 'board'] as const)('a %s card draws its form in the slot instead of a picture', async (shape) => {
+    loadIdea.mockResolvedValue({ ...idea, card: { ...idea.card, shape } })
+    await render(<IdeaPage />)
+    expect(await screen.findByTestId('idea-form')).toBeTruthy()
+    expect(screen.getByText(`FORM:${shape}`)).toBeTruthy()
+    expect(screen.queryByTestId('idea-picture')).toBeNull()
+  })
+
+  it('a board whose thread has three different pictures draws its grid, as its tile does', async () => {
+    const own = resolvePicture({ own: [{ uri: 'https://x/own.jpg', kind: 'image', at: '2026-10-14T09:00:00Z', from: 'context' }], unsplash: null, reference: null })
+    loadIdea.mockResolvedValue({
+      ...idea,
+      card: { ...idea.card, shape: 'board', picture: own },
+      siblings: [
+        { ...idea.siblings[0], id: 'c2', frameUrl: 'https://x/b.jpg' },
+        { ...idea.siblings[0], id: 'c3', frameUrl: 'https://x/c.jpg' },
+      ],
+    })
+    await render(<IdeaPage />)
+    expect(await screen.findByTestId('idea-grid')).toBeTruthy()
+    expect(screen.getByText('GRID:https://x/own.jpg,https://x/b.jpg,https://x/c.jpg')).toBeTruthy()
+    expect(screen.queryByText('FORM:board')).toBeNull()
   })
 
   it('keeps heart and share over the picture; Move to project sits under ••• beside Move to trash', async () => {

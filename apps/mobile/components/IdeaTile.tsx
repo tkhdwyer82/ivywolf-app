@@ -172,10 +172,10 @@ function Layer({ picture, recyclingKey }: { picture: Picture; recyclingKey: stri
 }
 
 /** Pictures with a uri, each once. */
-const distinct = (pictures: Picture[]) => pictures.filter((x, i) => x.uri && pictures.findIndex((y) => y.uri === x.uri) === i)
+export const distinct = (pictures: Picture[]) => pictures.filter((x, i) => x.uri && pictures.findIndex((y) => y.uri === x.uri) === i)
 
-/** A board: its picture on the left, two more stacked on the right, 2 apart. */
-function ThreeUp({ pictures, recyclingKey }: { pictures: Picture[]; recyclingKey: string }) {
+/** A board: its picture on the left, two more stacked on the right, 2 apart. The idea page draws it full-bleed. */
+export function ThreeUp({ pictures, recyclingKey }: { pictures: Picture[]; recyclingKey: string }) {
   const [a, b, c] = pictures
   return (
     <View style={[StyleSheet.absoluteFill, styles.trio]}>
