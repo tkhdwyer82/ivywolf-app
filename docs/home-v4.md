@@ -171,8 +171,8 @@ An idea with at least one link (`card_links`) renders as a deck (`components/Dec
 
 - **Chips** (`components/HomeChrome.tsx`): All and her projects, every chip ink #1D1D1F at 17 pt; the selected one
   has a 2-pt ink rule, the rest none (no grey, no hue underline). There is no My things chip.
-- **Header**: My things moves to the logo row, left of search — `components/MyThingsIcon.tsx`, 28 pt, a ☰ in ink
-  until the mascot asset lands. It opens `/things`.
+- **Header**: My things moves to the logo row, left of search — `components/MyThingsIcon.tsx`. It opens `/things`.
+  It was a 28 pt ☰ in ink until the mascot landed (B.6, §9).
 - **No My things row.** In its place Ivy's line (`components/IvyNote.tsx`): when nothing is new since her last look,
   `thingsSentence()` says "13 things today · get some milk first" — her open to-dos due today, overdue or undated, and
   the oldest, cited to its recording (rule 2) — for 4 s, then it fades. Nothing on her plate: no line. Something new:
@@ -190,6 +190,16 @@ An idea with at least one link (`card_links`) renders as a deck (`components/Dec
   thread has three different pictures, else its hook and beats. Back · ♥ · Share · ••• over it. Then the title Bold
   28; her words 17/24 (the card's segment, cut to its sentence; the gist when there's no recording); More in this
   thread. The project pill and the old byline are gone; Move to project sits under ••• beside Move to trash.
+
+## 9. B.6 — Ivy as the My things icon
+
+- `components/MyThingsIcon.tsx`: the mascot in a 44 pt slot left of search, on the logo row's centre line. The whole
+  slot is the tap to `/things` ("My things" to VoiceOver), with no hit slop needed.
+- On a cold open she plays once: the 36 frames in `assets/mascot/` (`ivy-mascot-00@3x.png`…`35`) at 12 fps (3 s),
+  swapped on one Image by an `Animated` clock, then she holds `ivy-mascot-still@3x.png`. Every frame is preloaded
+  with `Asset.loadAsync` before the first one moves; if the preload fails she goes straight to the still.
+- Once per launch: a module-level flag, so coming back to Home or resuming from the background shows the still.
+- Reduce Motion on: the still only. If the still fails to load: the ☰ again.
 
 ## Tests
 
