@@ -437,13 +437,11 @@ function Wordmark() {
   )
 }
 
-/** The logo row's right: My things (B.5), search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
+/** The logo row's right: My things (Ivy, B.6 — her own 44 pt tap), search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
 function HeaderActions() {
   return (
     <>
-      <Pressable onPress={() => router.push('/things')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="My things" testID="header-things">
-        <MyThingsIcon />
-      </Pressable>
+      <MyThingsIcon />
       <Pressable onPress={() => router.push('/search')} hitSlop={TAP_SLOP} accessibilityRole="button" accessibilityLabel="Search">
         <SymbolView name="magnifyingglass" tintColor={colour.Ink} size={size.icon} />
       </Pressable>
