@@ -207,7 +207,7 @@ test('apply: credits are charged before any generation, then N cards land in ste
   const cards = f.inserted.cards as { title: string; source: string; created_at: string }[]
   assert.deepEqual(cards.map((c) => c.title), ['For the jar: Hook', 'For the jar: Show it', 'For the jar: Post it'])
   assert.ok(cards.every((c) => c.source === 'recipe'))
-  assert.ok(Date.parse(cards[0].created_at) < Date.parse(cards[1].created_at))
+  assert.ok(Date.parse(cards[0].created_at) > Date.parse(cards[1].created_at)) // step 1 newest: reads first
   const links = f.inserted.links as { step_id: string; card_id: string; make_prompt: string | null }[]
   assert.deepEqual(links.map((l) => [l.step_id, l.card_id]), [['s1', 'c1'], ['s2', 'c2'], ['s3', 'c3']])
   assert.equal(links[2].make_prompt, null) // make_kind none: a plain card, no Make button
@@ -243,7 +243,7 @@ test('apply: a published recipe with an accepted author pays the author share', 
   assert.deepEqual(f.inserted.earnings, { author_id: 'a1', application_id: 'app1', credits: price.author })
 })
 
-test('cardRows: one per mapped card, a millisecond apart', () => {
+test('cardRows: one per mapped card, a millisecond apart, step 1 newest', () => {
   const rows = cardRows(
     [
       { step_id: 'a', ordinal: 1, title: 'A', body: 'a', make_prompt: 'x' },
@@ -251,7 +251,7 @@ test('cardRows: one per mapped card, a millisecond apart', () => {
     ],
     { creatorId: 'u1', projectId: 'p1', startMs: 0 }
   )
-  assert.deepEqual(rows.map((r) => r.created_at), ['1970-01-01T00:00:00.000Z', '1970-01-01T00:00:00.001Z'])
+  assert.deepEqual(rows.map((r) => r.created_at), ['1970-01-01T00:00:00.001Z', '1970-01-01T00:00:00.000Z'])
 })
 
 test('validateMapping: a skipped step or an over-long body fails the whole application', () => {

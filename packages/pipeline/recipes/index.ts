@@ -247,7 +247,7 @@ export const priceOf = (r: Pick<RecipeRow, 'status' | 'recipe_authors'>) =>
 
 /**
  * Price first: the charge comes before the model call, and is refunded if anything after it fails — no cards, no
- * charge. Each card is inserted a millisecond apart so Home and the project show them in step order.
+ * charge. Each card is inserted a millisecond apart so Home and the project show them in step order (cardRows).
  */
 export async function applyRecipe(input: ApplyInput, deps: ApplyDeps = liveApply): Promise<ApplyResult> {
   const supabase = deps.db()
@@ -300,8 +300,8 @@ export async function applyRecipe(input: ApplyInput, deps: ApplyDeps = liveApply
     const rows = cardRows(result.cards, { creatorId: input.creatorId, projectId, startMs: deps.now() })
     const { data: inserted, error: cErr } = await supabase.from('cards').insert(rows).select('id, created_at')
     if (cErr || !inserted) throw new Error(`cards: ${cErr?.message ?? 'not saved'}`)
-    // Back in step order: created_at is a millisecond per step.
-    const ids = (inserted as { id: string; created_at: string }[]).sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)).map((c) => c.id)
+    // Back in step order: step 1 is the newest (cardRows).
+    const ids = (inserted as { id: string; created_at: string }[]).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).map((c) => c.id)
     made.push(...ids)
 
     const { error: aErr } = await supabase.from('recipe_applications').insert({
@@ -335,7 +335,10 @@ export async function applyRecipe(input: ApplyInput, deps: ApplyDeps = liveApply
   }
 }
 
-/** One card row per mapped step, a millisecond apart from startMs. Step cards were never said: source 'recipe'. */
+/**
+ * One card row per mapped step, a millisecond apart from startMs. Home and the project list newest first, so step 1
+ * gets the newest time and reads first. Step cards were never said: source 'recipe'.
+ */
 export function cardRows(cards: MappedCard[], at: { creatorId: string; projectId: string; startMs: number }) {
   return cards.map((c, i) => ({
     creator_id: at.creatorId,
@@ -346,7 +349,7 @@ export function cardRows(cards: MappedCard[], at: { creatorId: string; projectId
     confidence: 1,
     source: 'recipe',
     shape: 'text',
-    created_at: new Date(at.startMs + i).toISOString(),
+    created_at: new Date(at.startMs + (cards.length - 1 - i)).toISOString(),
   }))
 }
 
