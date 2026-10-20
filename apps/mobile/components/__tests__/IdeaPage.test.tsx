@@ -20,7 +20,8 @@ jest.mock('expo-router', () => {
 jest.mock('@clerk/clerk-expo', () => ({
   // A new getToken every render, as Clerk's — the page must not reload because of it.
   useAuth: () => ({ getToken: async () => 'tok', userId: 'u1' }),
-  useUser: () => ({ user: { fullName: 'Tim Dwyer', firstName: 'Tim', imageUrl: null } }),
+  // No photo of her own: Clerk still hands out an imageUrl — its generated purple placeholder — with hasImage false.
+  useUser: () => ({ user: { fullName: 'Tim Dwyer', firstName: 'Tim', imageUrl: 'https://img.clerk.com/default-purple', hasImage: false } }),
 }))
 // One client for every render, as the real hook gives (lib/supabase.ts).
 jest.mock('@/lib/supabase', () => {
@@ -181,6 +182,12 @@ describe('Idea page (B.8a)', () => {
     await open(SAVED)
     expect(screen.getByText('Tim Dwyer')).toBeTruthy()
     expect(screen.getByTestId('idea-who')).toHaveTextContent('0:31 · Launch video')
+  })
+
+  it("who-line avatar: her initials on the blue gradient, never Clerk's purple placeholder", async () => {
+    await open(base as unknown as Idea)
+    expect(screen.getByText('TD', { includeHiddenElements: true })).toBeTruthy()
+    expect(JSON.stringify(screen.toJSON())).not.toContain('default-purple')
   })
 
   it('the snippet is her words in quotes, two lines, then View idea', async () => {

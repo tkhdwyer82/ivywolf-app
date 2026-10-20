@@ -46,6 +46,7 @@ import type { Picture } from '@/lib/picture'
 import { trashCard, TRASH_IDEA_LINE } from '@/lib/trash'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { Pill } from '@/components/UndoPill'
+import { AvatarInitials } from '@/components/AvatarInitials'
 import { colour, hueOf, space, type } from '@ivywolf/ui'
 
 const GREY = '#6E6E73'
@@ -313,13 +314,8 @@ export default function IdeaPage() {
         <View style={styles.body}>
           {/* 3. Who */}
           <View style={styles.who}>
-            {user?.imageUrl ? (
-              <Image source={{ uri: user.imageUrl }} style={styles.avatar} accessibilityIgnoresInvertColors />
-            ) : (
-              <View style={[styles.avatar, styles.avatarBlank]}>
-                <Text style={styles.initial}>{name.slice(0, 1).toUpperCase()}</Text>
-              </View>
-            )}
+            {/* Her photo only if she has one (Clerk's imageUrl is a generated purple placeholder otherwise). */}
+            <AvatarInitials name={name} uri={user?.hasImage ? user.imageUrl : null} size={AVATAR} testID="idea-avatar" />
             <View style={styles.whoText}>
               <Text style={styles.name} numberOfLines={1}>
                 {name}
@@ -478,6 +474,7 @@ const SQUARE_SYMBOL = 30
 const ICON_WEIGHT = 'semibold' as const
 const CHROME_H = 4 + SQUARE + 12
 const TOOL = 52
+const AVATAR = 32
 const TOAST_MS = 2000
 /** The Make squares, in W1's order, before Recipe. Placeholders until B.8b. */
 const MAKES: { kind: Exclude<MakeKind, 'write' | 'none'>; label: string; icon: SFSymbol }[] = [
@@ -504,9 +501,6 @@ const styles = StyleSheet.create({
   savedText: { color: colour.Surface },
   body: { paddingHorizontal: space.margin, paddingTop: 18 },
   who: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 32, height: 32, borderRadius: 16 },
-  avatarBlank: { backgroundColor: colour.Lime, alignItems: 'center', justifyContent: 'center' },
-  initial: { fontSize: 14, fontWeight: '700', color: colour.Ink },
   whoText: { flex: 1 },
   name: { fontSize: 15, fontWeight: '600', color: colour.Ink },
   meta: { fontSize: 13, color: GREY, marginTop: 1 },

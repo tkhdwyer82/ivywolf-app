@@ -275,6 +275,8 @@ exports[`snapshots saved state 1`] = `
           }
         >
           <View
+            accessibilityElementsHidden={true}
+            importantForAccessibility="no-hide-descendants"
             style={
               [
                 {
@@ -284,22 +286,59 @@ exports[`snapshots saved state 1`] = `
                 },
                 {
                   "alignItems": "center",
-                  "backgroundColor": "#D8F27A",
                   "justifyContent": "center",
+                  "overflow": "hidden",
                 },
+                undefined,
               ]
             }
+            testID="idea-avatar"
           >
-            <Text
-              style={
+            <View
+              colors={
+                [
+                  "#A9BAE6",
+                  "#7888B8",
+                ]
+              }
+              end={
                 {
-                  "color": "#1D1D1F",
-                  "fontSize": 14,
-                  "fontWeight": "700",
+                  "x": 1,
+                  "y": 1,
                 }
               }
+              start={
+                {
+                  "x": 0,
+                  "y": 0,
+                }
+              }
+              style={
+                {
+                  "bottom": 0,
+                  "left": 0,
+                  "position": "absolute",
+                  "right": 0,
+                  "top": 0,
+                }
+              }
+            />
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={
+                [
+                  {
+                    "color": "#FFFFFF",
+                    "fontWeight": "600",
+                  },
+                  {
+                    "fontSize": 13,
+                  },
+                ]
+              }
             >
-              T
+              TD
             </Text>
           </View>
           <View
@@ -1146,6 +1185,8 @@ exports[`snapshots text idea 1`] = `
           }
         >
           <View
+            accessibilityElementsHidden={true}
+            importantForAccessibility="no-hide-descendants"
             style={
               [
                 {
@@ -1155,22 +1196,59 @@ exports[`snapshots text idea 1`] = `
                 },
                 {
                   "alignItems": "center",
-                  "backgroundColor": "#D8F27A",
                   "justifyContent": "center",
+                  "overflow": "hidden",
                 },
+                undefined,
               ]
             }
+            testID="idea-avatar"
           >
-            <Text
-              style={
+            <View
+              colors={
+                [
+                  "#A9BAE6",
+                  "#7888B8",
+                ]
+              }
+              end={
                 {
-                  "color": "#1D1D1F",
-                  "fontSize": 14,
-                  "fontWeight": "700",
+                  "x": 1,
+                  "y": 1,
                 }
               }
+              start={
+                {
+                  "x": 0,
+                  "y": 0,
+                }
+              }
+              style={
+                {
+                  "bottom": 0,
+                  "left": 0,
+                  "position": "absolute",
+                  "right": 0,
+                  "top": 0,
+                }
+              }
+            />
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={
+                [
+                  {
+                    "color": "#FFFFFF",
+                    "fontWeight": "600",
+                  },
+                  {
+                    "fontSize": 13,
+                  },
+                ]
+              }
             >
-              T
+              TD
             </Text>
           </View>
           <View
@@ -2417,6 +2495,8 @@ exports[`snapshots video idea 1`] = `
           }
         >
           <View
+            accessibilityElementsHidden={true}
+            importantForAccessibility="no-hide-descendants"
             style={
               [
                 {
@@ -2426,22 +2506,59 @@ exports[`snapshots video idea 1`] = `
                 },
                 {
                   "alignItems": "center",
-                  "backgroundColor": "#D8F27A",
                   "justifyContent": "center",
+                  "overflow": "hidden",
                 },
+                undefined,
               ]
             }
+            testID="idea-avatar"
           >
-            <Text
-              style={
+            <View
+              colors={
+                [
+                  "#A9BAE6",
+                  "#7888B8",
+                ]
+              }
+              end={
                 {
-                  "color": "#1D1D1F",
-                  "fontSize": 14,
-                  "fontWeight": "700",
+                  "x": 1,
+                  "y": 1,
                 }
               }
+              start={
+                {
+                  "x": 0,
+                  "y": 0,
+                }
+              }
+              style={
+                {
+                  "bottom": 0,
+                  "left": 0,
+                  "position": "absolute",
+                  "right": 0,
+                  "top": 0,
+                }
+              }
+            />
+            <Text
+              allowFontScaling={false}
+              numberOfLines={1}
+              style={
+                [
+                  {
+                    "color": "#FFFFFF",
+                    "fontWeight": "600",
+                  },
+                  {
+                    "fontSize": 13,
+                  },
+                ]
+              }
             >
-              T
+              TD
             </Text>
           </View>
           <View
