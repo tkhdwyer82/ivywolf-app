@@ -44,6 +44,8 @@ function Routes() {
         <Stack.Screen name="todo/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="project/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="suggestion/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen name="recipe/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen name="author/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
       </Stack.Protected>
       <Stack.Protected guard={!isSignedIn}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
