@@ -9,7 +9,7 @@ import { writeStyleSignal } from '@/lib/styleSignals'
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL!
 
-export type CardSource = 'voice' | 'import' | 'muse' | 'youtube' | 'tiktok' | 'pinterest' | 'graph'
+export type CardSource = 'voice' | 'import' | 'muse' | 'youtube' | 'tiktok' | 'pinterest' | 'graph' | 'recipe'
 // A pinned suggestion's source, as its badge names it. 'pinterest' stays readable for the type, but no Pinterest pin
 // becomes a card: pinning would store pin data, which Pinterest's terms forbid (packages/schema/pinterest.ts). 'graph' came from her own notes via More ideas (0031): it
 // sits on her recording, but it wasn't something she said, and the badge says so.

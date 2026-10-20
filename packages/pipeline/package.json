@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "eval": "tsx --env-file=../../.env.local eval/run.ts",
     "ingest": "tsx --env-file=../../.env.local ingest.ts",
-    "test": "tsx --test __tests__/*.test.ts"
+    "test": "tsx --test __tests__/*.test.ts",
+    "eval:recipes": "tsx --env-file-if-exists=../../.env.local eval/recipes/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

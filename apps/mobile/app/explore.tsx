@@ -4,10 +4,13 @@
 // sample video (lib/explore.ts VIDEOS; a flat placeholder until the file is in), with "Connected ✓" on the
 // Higgsfield-run tools and "Coming soon" on anything not live. Tap a live tool → Pick an idea (1464:124); a tool page
 // isn't built yet. Nothing here spends credits.
+// Recipes (Job B.10, R1): a shelf above the tools — published recipes only, each with its author, title and uses; a
+// private draft never shows here, hers included. Its + is "Paste a reel link" (door 1 until the share extension).
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
+import { SymbolView } from 'expo-symbols'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { useVideoPlayer, VideoView } from 'expo-video'
@@ -17,12 +20,25 @@ import { GRID } from '@/lib/home'
 import { Nav } from '@/components/Nav'
 import { BAR_BOTTOM } from '@/components/ActionBar'
 import { PickIdeaSheet } from '@/components/PickIdeaSheet'
+import { PasteReelSheet } from '@/components/PasteReelSheet'
+import { useSupabase } from '@/lib/supabase'
+import { loadShelf, type Recipe } from '@/lib/recipes'
 
 export default function Explore() {
   const insets = useSafeAreaInsets()
   const [category, setCategory] = useState<Category>('All')
   const [q, setQ] = useState('')
   const [trying, setTrying] = useState<Tool | null>(null)
+  const supabase = useSupabase()
+  const [recipes, setRecipes] = useState<Recipe[]>([])
+  const [pasting, setPasting] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      loadShelf(supabase)
+        .then(setRecipes)
+        .catch(() => setRecipes([]))
+    }, [supabase])
+  )
   const tools = useMemo(() => filterTools(TOOLS, category, q), [category, q])
   const [left, right] = useMemo(() => columns(tools), [tools])
 
@@ -70,6 +86,40 @@ export default function Explore() {
           </Pressable>
         )}
 
+        {category === 'All' && !q.trim() && (
+          <>
+            <Text style={styles.shelfTitle} accessibilityRole="header">
+              Recipes
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelf}>
+              <Pressable onPress={() => setPasting(true)} style={[styles.recipe, styles.recipeAdd]} accessibilityRole="button" accessibilityLabel="Paste a reel link" testID="recipes-paste">
+                <SymbolView name="plus" tintColor={colour.Ink} size={22} weight="semibold" />
+                <Text style={styles.recipeAddText}>Paste a reel link</Text>
+              </Pressable>
+              {recipes.map((r) => (
+                <Pressable
+                  key={r.id}
+                  onPress={() => router.push(`/recipe/${r.id}`)}
+                  style={styles.recipe}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${r.title}, by @${r.handle}. ${r.uses} used.`}
+                  testID={`recipe-${r.id}`}
+                >
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{(r.author?.name ?? r.handle).slice(0, 1).toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.recipeTitle} numberOfLines={3}>
+                    {r.title}
+                  </Text>
+                  <Text style={styles.recipeMeta} numberOfLines={1}>
+                    @{r.handle} · {r.uses} used
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
         <View style={styles.grid}>
           {[left, right].map((col, i) => (
             <View key={i} style={styles.column}>
@@ -84,6 +134,7 @@ export default function Explore() {
 
       <Nav room="explore" />
       {trying && <PickIdeaSheet tool={trying} onClose={() => setTrying(null)} />}
+      {pasting && <PasteReelSheet onClose={() => setPasting(false)} />}
     </View>
   )
 }
@@ -174,4 +225,14 @@ const styles = StyleSheet.create({
   name: { fontSize: 14, fontWeight: '600', color: colour.Ink, marginTop: 8 },
   line: { fontSize: 11, color: colour.Grey, marginTop: 2, marginBottom: GRID.after },
   empty: { fontSize: 15, color: colour.Grey, marginHorizontal: GRID.margin, marginTop: 20 },
+  // B.10 R1: recipe tiles 140 × 150 on the field fill, radius 18 like the tool tiles; the author's initial in a lime 32.
+  shelfTitle: { fontSize: 17, fontWeight: '700', color: colour.Ink, marginHorizontal: GRID.margin, marginTop: 4 },
+  shelf: { paddingHorizontal: GRID.margin, gap: GRID.gutter, paddingTop: 10, paddingBottom: 16 },
+  recipe: { width: 140, height: 150, borderRadius: 18, borderCurve: 'continuous', backgroundColor: FIELD, padding: 12, justifyContent: 'space-between' },
+  recipeAdd: { alignItems: 'center', justifyContent: 'center', gap: 8 },
+  recipeAddText: { fontSize: 13, fontWeight: '600', color: colour.Ink, textAlign: 'center' },
+  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colour.Lime, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 14, fontWeight: '700', color: colour.Ink },
+  recipeTitle: { fontSize: 14, fontWeight: '600', color: colour.Ink },
+  recipeMeta: { fontSize: 11, color: colour.Grey },
 })

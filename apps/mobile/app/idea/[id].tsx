@@ -34,6 +34,8 @@ import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { colour, hueOf, radius, size, space, type } from '@ivywolf/ui'
 import { Shimmer } from '@/components/Shimmer'
 import { ActionBar, BAR_BOTTOM } from '@/components/ActionBar'
+import { RecipeSheet } from '@/components/RecipeSheet'
+import { loadStepCard, MAKE_LABEL, type StepCard } from '@/lib/recipes'
 
 export default function IdeaPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -44,13 +46,18 @@ export default function IdeaPage() {
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState<string | null>(null)
   const [menu, setMenu] = useState(false)
-  const [sheet, setSheet] = useState<'share' | 'context' | null>(null)
+  const [sheet, setSheet] = useState<'share' | 'context' | 'recipe' | null>(null)
+  // A card a recipe made (B.10): its "Step n of … · @handle" tag and its Make button.
+  const [step, setStep] = useState<StepCard | null>(null)
   const player = useAudioPlayer(null)
 
   const load = useCallback(() => {
     loadIdea(supabase, id)
       .then(setIdea)
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
+    loadStepCard(supabase, id)
+      .then(setStep)
+      .catch(() => setStep(null))
   }, [supabase, id])
   useFocusEffect(load)
 
@@ -78,6 +85,15 @@ export default function IdeaPage() {
       setIdea({ ...idea })
       setError(e instanceof Error ? e.message : 'That didn’t save')
     }
+  }
+
+  /**
+   * A step card's Make: pre-filled with the step's make_prompt; nothing generates until Generate.
+   * TODO(B.8): open the Make page — router.push({ pathname: '/make/[id]', params: { id: idea.id, prompt: step.makePrompt, kind: step.makeKind } }).
+   */
+  function make() {
+    if (!step?.makePrompt) return
+    Alert.alert(MAKE_LABEL[step.makeKind as keyof typeof MAKE_LABEL] ?? 'Make', `${step.makePrompt}\n\nThis opens the Make page once it’s built. Nothing was spent.`)
   }
 
   async function copy() {
@@ -248,6 +264,19 @@ export default function IdeaPage() {
               </Text>
             </Pressable>
           )}
+          {step && (
+            <View style={styles.step}>
+              <Text style={styles.stepTag} testID="step-tag">
+                {step.tag}
+              </Text>
+              {step.makePrompt && step.makeKind !== 'none' && (
+                <Pressable onPress={make} style={styles.make} accessibilityRole="button" accessibilityHint="Opens Make with this step's prompt. Nothing generates until you tap Generate." testID="step-make">
+                  <SymbolView name="sparkles" tintColor={colour.Ink} size={14} weight="semibold" />
+                  <Text style={styles.makeText}>{MAKE_LABEL[step.makeKind]}</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
           {unsure && <Text style={[type['Caption'], styles.unsure]}>Ivy isn’t sure about this one.</Text>}
           {error && <Text style={[type['Caption'], styles.unsure]}>{error}</Text>}
 
@@ -320,6 +349,9 @@ export default function IdeaPage() {
             { icon: idea.heartedAt ? 'heart.fill' : 'heart', label: idea.heartedAt ? 'Unlike' : 'Like', onPress: heart },
             { icon: 'link', label: 'Link ideas', onPress: linkIdeas },
             { icon: 'paperclip', label: 'Add context', onPress: () => setSheet('context') },
+            // TODO(B.8): the Recipe circle ✦ in the Make with row opens this sheet (with draftCount() as its badge); this
+            // ••• item is the way in until B.8 lands.
+            ...(idea.source !== 'recipe' ? [{ icon: 'sparkles' as const, label: 'Apply a recipe', onPress: () => setSheet('recipe') }] : []),
             { icon: 'square.and.arrow.up', label: 'Share', onPress: () => setSheet('share') },
             ...(idea.card.sharedAt ? [{ icon: 'eye.slash' as const, label: 'Stop sharing link', onPress: stopSharing }] : []),
             { icon: 'pencil', label: 'Edit idea', onPress: () => router.push(`/idea/edit/${idea.id}`) },
@@ -339,6 +371,17 @@ export default function IdeaPage() {
       )}
       {sheet === 'share' && <ShareSheet card={idea.card} onClose={() => setSheet(null)} onShared={load} />}
       {sheet === 'context' && <AddContextSheet card={idea.card} onClose={() => setSheet(null)} />}
+      {sheet === 'recipe' && (
+        <RecipeSheet
+          idea={idea.card}
+          projectId={idea.project?.id ?? null}
+          onClose={() => setSheet(null)}
+          onApplied={(a) => {
+            setSheet(null)
+            router.push({ pathname: '/project/[id]', params: { id: a.projectId, applied: a.applicationId, appliedCount: String(a.count) } })
+          }}
+        />
+      )}
     </View>
   )
 }
@@ -372,6 +415,11 @@ const styles = StyleSheet.create({
   heading: { fontSize: 28, fontWeight: '700', color: colour.Ink },
   said: { fontSize: 17, lineHeight: 24, color: colour.Ink, marginTop: 7 },
   unsure: { marginTop: 8 },
+  // B.10: "Step n of … · @handle", and the step's Make — a squarer lime button, 44 tall.
+  step: { marginTop: 14, gap: 10, alignItems: 'flex-start' },
+  stepTag: { ...type['Caption'], color: colour.Grey },
+  make: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 16, borderRadius: 12, backgroundColor: colour.Lime },
+  makeText: { fontSize: 15, fontWeight: '600', color: colour.Ink },
   moreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.section },
   count: { borderRadius: COUNT_R, paddingHorizontal: COUNT_PAD_H, paddingVertical: COUNT_PAD_V, backgroundColor: colour.Chip },
   // P12d's "via YouTube · pinned just now" — here, never on the tile.

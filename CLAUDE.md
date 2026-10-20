@@ -71,6 +71,10 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
   clean tree, matches its remote, typecheck and tests), then `eas build --wait`, then `eas submit --latest` as a
   separate step. Any step that fails stops the script, non-zero, with a message saying what did and didn't happen
   (no `--auto-submit`: it exits 0 when its submission is refused).
+- Add `-- --local` to either (`npm run build:preview -- --local`) to build on this Mac with `eas build --local`
+  instead of EAS's cloud — same pre-build checks, then the .ipa it makes is submitted with `eas submit --path`. Use
+  it when the Expo plan's cloud builds have run out; don't upgrade the plan without Tim. It needs Xcode, CocoaPods
+  and fastlane; signing credentials come from EAS (`eas credentials`), never pasted.
 - Run the build scripts directly; never pipe them through `tail`, `head` or anything else, which hides their exit
   code (a refused build then reads as exit 0). To keep a log, redirect to a file instead.
 - In a worktree, run `npm ci` after any lock file change or branch switch, before building: a stale `node_modules`

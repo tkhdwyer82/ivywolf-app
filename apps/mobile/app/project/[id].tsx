@@ -41,6 +41,7 @@ import { Hold, HoldProvider, useHolding } from '@/components/HoldArc'
 import { useCardActions } from '@/components/CardActions'
 import { LinkBanner } from '@/components/LinkMode'
 import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
+import { RecipeUndo } from '@/components/RecipeUndo'
 import type { CardItem } from '@/lib/home'
 
 export default function Project() {
@@ -52,7 +53,9 @@ export default function Project() {
 }
 
 function ProjectScreen() {
-  const { id, linkFrom, tab: openOn } = useLocalSearchParams<{ id: string; linkFrom?: string; tab?: string }>()
+  const { id, linkFrom, tab: openOn, applied, appliedCount } = useLocalSearchParams<{ id: string; linkFrom?: string; tab?: string; applied?: string; appliedCount?: string }>()
+  // B.10: a recipe's cards just landed here (?applied=<application>&appliedCount=n) — "Remove these n cards" for 10 s.
+  const [justApplied, setJustApplied] = useState<string | null>(applied ?? null)
   const holding = useHolding()
   const supabase = useSupabase()
   const insets = useSafeAreaInsets()
@@ -258,6 +261,16 @@ function ProjectScreen() {
           </Pressable>
         </View>
         {menu && <ProjectMenu top={insets.top + MENU_OFFSET} onClose={() => setMenu(false)} onRename={rename} onDelete={remove} />}
+      {justApplied && (
+        <RecipeUndo
+          applicationId={justApplied}
+          count={Number(appliedCount) || 0}
+          onDone={(removed) => {
+            setJustApplied(null)
+            if (removed) load()
+          }}
+        />
+      )}
       </View>
     )
   }
