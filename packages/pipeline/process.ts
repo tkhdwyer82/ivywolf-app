@@ -25,6 +25,17 @@ export { photoForCard } from './frames'
 export { backfillReferencePictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
 export { findReferences, pinterestAvailable, trackReferenceUse, type Reference, type ReferenceSource } from './references'
 export { generateDirections, shouldGenerate, MIN_CARDS as DIRECTIONS_MIN_CARDS } from './suggest'
+export {
+  applyRecipe,
+  extractRecipe,
+  inviteAuthor,
+  loadRecipeForApply,
+  priceOf as recipePriceOf,
+  undoApplication,
+  RecipeError,
+  type ApplyResult,
+  type ExtractOutcome,
+} from './recipes'
 export { transcribe } from './transcribe'
 // For the MCP server's search_ideas (apps/web/lib/mcp/handlers.ts): the same embedding and similarity threading uses.
 export { embed } from './embed'
