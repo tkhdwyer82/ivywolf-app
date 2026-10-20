@@ -44,6 +44,8 @@ export interface Idea {
   recordingId: string | null
   storagePath: string | null
   recordedAt: string | null
+  /** The recording's length (B.8a's "0:31 · Launch video"); null for a card with no recording. */
+  durationMs: number | null
   project: { id: string; name: string; kind: string } | null
   thread: { id: string; title: string; returnCount: number } | null
   siblings: Sibling[]
@@ -66,6 +68,7 @@ type Row = CardRow & {
   source: CardSource; source_url: string | null; hearted_at: string | null; shape_set_by: 'ivy' | 'creator' | null
   visual_query: string | null
   segments: { text: string } | null
+  recordings: (NonNullable<CardRow['recordings']> & { duration_ms?: number | null }) | null
   projects: { id: string; name: string; kind: string; hue: HueName } | null
   thread_cards: { threads: { id: string; title: string; return_count: number; stage: ThreadStage } | null }[]
 }
@@ -76,7 +79,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     await supabase
       .from('cards')
       .select(
-        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, pinned_at, shared_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, reference_picture, recordings(recorded_at, storage_path, source), segments(text), projects(id, name, kind, hue), thread_cards(threads(id, title, return_count, stage))'
+        'id, recording_id, project_id, title, gist, confidence, play_from_ms, frame_url, frame_status, frame_at, source, source_url, hearted_at, pinned_at, shared_at, created_at, shape, shape_set_by, visual_query, quote, diagram, board, frame_attribution, reference_picture, recordings(recorded_at, storage_path, source, duration_ms), segments(text), projects(id, name, kind, hue), thread_cards(threads(id, title, return_count, stage))'
       )
       .eq('id', id)
       .maybeSingle()
@@ -124,6 +127,7 @@ export async function loadIdea(supabase: SupabaseClient, id: string): Promise<Id
     recordingId: row.recording_id,
     storagePath: row.recordings?.storage_path ?? null,
     recordedAt: row.recordings?.recorded_at ?? row.created_at,
+    durationMs: row.recordings?.duration_ms ?? null,
     project: row.projects,
     thread,
     siblings,
@@ -213,4 +217,25 @@ export function sourceBadge(idea: Idea, now = new Date()): string | null {
 export async function setPinned(supabase: SupabaseClient, id: string, on: boolean) {
   const { error } = await supabase.from('cards').update({ pinned_at: on ? new Date().toISOString() : null }).eq('id', id)
   if (error) throw new Error(`pin: ${error.message}`)
+}
+
+// ── The idea page, B.8a (Figma v5.0 I1 2151:5) ─────────────────────────────────────────────────────────────────
+
+/** Saved = filed in one of her own projects. My things and Ivy Mini are where unfiled ideas live, so not "saved". */
+export const savedTo = (idea: Pick<Idea, 'project'>): string | null => (idea.project?.kind === 'user' ? idea.project.name : null)
+
+/** "0:31" — a recording's length, m:ss. */
+export function duration(ms: number | null): string | null {
+  if (ms == null || ms < 0) return null
+  const s = Math.round(ms / 1000)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+/** Who's line: "0:31 · Launch video" (no recording → just the project; My things when unfiled). */
+export const whoLine = (idea: Pick<Idea, 'durationMs' | 'project'>) => [duration(idea.durationMs), idea.project?.name ?? 'My things'].filter(Boolean).join(' · ')
+
+/** The snippet: her words (the span she said), else the gist. Quoted; the page clips it to two lines. */
+export function snippet(idea: Pick<Idea, 'said' | 'gist'>): string | null {
+  const words = idea.said?.trim() || idea.gist?.trim()
+  return words ? `“${words.replace(/^["“]|["”]$/g, '')}”` : null
 }

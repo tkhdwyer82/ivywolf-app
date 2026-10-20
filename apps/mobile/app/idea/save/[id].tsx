@@ -3,6 +3,8 @@
 // ("Psst!"), Top choices, Your projects, and a lime Create new project. Tap a project and the idea moves there.
 // Create turns the search field into the name field (what she'd typed carries over), makes it, and moves the idea.
 // Only the card moves — its thread and the rest of the thread stay where they are.
+// B.8a (I2 2151:82): from the idea page's Save button too, with a squarer "New project" at the top (44, soft fill); the
+// lime button at the foot is only there while she names it ("Create and save here").
 
 import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Image, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
@@ -110,6 +112,19 @@ export default function SaveTo() {
         <Text style={text.headingSmall}>{naming ? 'New project' : 'Save to'}</Text>
       </View>
 
+      {!naming && (
+        <Pressable
+          onPress={create}
+          disabled={busy || !picker}
+          style={({ pressed }) => [styles.newProject, (pressed || busy) && { opacity: 0.6 }]}
+          accessibilityRole="button"
+          testID="save-new-project"
+        >
+          <SymbolView name="plus" tintColor={hero.ink} size={16} weight="semibold" />
+          <Text style={styles.newProjectText}>New project</Text>
+        </Pressable>
+      )}
+
       <View style={styles.search}>
         <SymbolView name={naming ? 'folder.badge.plus' : 'magnifyingglass'} tintColor={hero.secondary} size={18} />
         <TextInput
@@ -157,14 +172,16 @@ export default function SaveTo() {
         </ScrollView>
       )}
 
-      <Pressable
-        onPress={create}
-        disabled={busy || !picker}
-        style={({ pressed }) => [styles.create, { marginBottom: insets.bottom + 6 }, (pressed || busy) && { opacity: 0.6 }]}
-        accessibilityRole="button"
-      >
-        <Text style={styles.createText}>{busy ? 'Saving…' : naming ? 'Create and save here' : 'Create new project'}</Text>
-      </Pressable>
+      {naming && (
+        <Pressable
+          onPress={create}
+          disabled={busy || !picker}
+          style={({ pressed }) => [styles.create, { marginBottom: insets.bottom + 6 }, (pressed || busy) && { opacity: 0.6 }]}
+          accessibilityRole="button"
+        >
+          <Text style={styles.createText}>{busy ? 'Saving…' : 'Create and save here'}</Text>
+        </Pressable>
+      )}
     </KeyboardAvoidingView>
   )
 }
@@ -199,6 +216,9 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: '600', color: hero.ink, lineHeight: 22 },
   sub: { fontSize: 12, color: hero.secondary, marginTop: 1 },
   none: { marginTop: 20 },
+  // B.8a I2: New project, squarer — 44 tall, r12, soft #F2F2F7.
+  newProject: { height: 44, borderRadius: 12, backgroundColor: '#F2F2F7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4, marginBottom: 12 },
+  newProjectText: { fontSize: 15, fontWeight: '600', color: hero.ink },
   create: { height: 56, borderRadius: 28, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   createText: { fontSize: 17, fontWeight: '600', color: hero.ink },
 })
