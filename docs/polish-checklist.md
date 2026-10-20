@@ -53,3 +53,4 @@ apart. `scripts/build-ios.sh` prints the line to add after each build.
 | 24 | PREVIEW: job-b10-recipes (local) | c16df9c |
 | 26 | PREVIEW: job-b8a-idea-page (local) | fdb99da |
 | 27 | PREVIEW: job-b8a-idea-page (local) | 884d82e |
+| 28 | PREVIEW: job-b8a-idea-page (local) | 1119dee |
