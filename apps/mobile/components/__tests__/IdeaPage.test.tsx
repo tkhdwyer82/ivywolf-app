@@ -214,14 +214,23 @@ describe('Idea page (B.8a)', () => {
     expect(screen.getByTestId('poster')).toBeTruthy()
   })
 
-  it('the Unsplash credit moved under ••• → Photo credit', async () => {
+  it('an Unsplash photo: one 11pt grey credit line under the picture, and ••• → Photo credit', async () => {
     const credit = { photographer: 'Ana Lee', photographerUrl: 'https://unsplash.com/@ana', photoUrl: 'https://unsplash.com/photos/x' }
     await open(
       idea({ card: card({ credit, picture: { source: 'unsplash', uri: 'https://images/x.jpg', kind: 'image', credit: null, linkUrl: null, trackUrl: null } }) })
     )
-    expect(screen.queryByText(/Photo by/)).toBeNull()
+    const line = screen.getByTestId('idea-credit')
+    expect(line).toHaveTextContent('Photo by Ana Lee on Unsplash')
+    expect(line).toHaveStyle({ fontSize: 11, color: '#6E6E73' })
     await fireEvent.press(screen.getByTestId('idea-more'))
     expect(await screen.findByText('Photo credit')).toBeTruthy()
+  })
+
+  it('her own photo or a render: no credit line', async () => {
+    await open(idea({ card: card({ picture: { source: 'own', uri: 'https://x/mine.jpg', kind: 'image', credit: null, linkUrl: null, trackUrl: null } }) }))
+    expect(screen.queryByTestId('idea-credit')).toBeNull()
+    await open(idea({ card: card({ picture: { source: 'created', uri: 'https://x/render.png', kind: 'image', credit: null, linkUrl: null, trackUrl: null } }) }))
+    expect(screen.queryByTestId('idea-credit')).toBeNull()
   })
 })
 

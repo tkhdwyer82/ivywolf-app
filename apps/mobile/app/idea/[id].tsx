@@ -3,7 +3,9 @@
 //   1. The picture, full-bleed in a 440 slot: a photo card's picture (her own, its Unsplash photo or its reference —
 //      lib/picture.ts — else its project's hue; a video idea's poster); a board's 3-up once its thread has three
 //      pictures; any other form drawn large on its hue (CardFace, as B.5). Over it only two translucent 40 squares:
-//      back, and ••• (where Change view, Move to project, Photo credit and the rest live).
+//      back, and ••• (where Change view, Move to project, Photo credit and the rest live). Under an Unsplash photo, and
+//      only then, its credit: one 11 grey line, "Photo by {name} on Unsplash", both names linked — the attribution
+//      Unsplash's terms expect. Her own photos and renders get no line.
 //   2. One action row: ♥ (like) · ◯ (View idea, I3) · ↑ (Share) left, 26 outline icons; Save right — lime 84 × 44
 //      r12, or ink "Saved · {project}" once it's filed in one of her projects. Save opens Save to (I2).
 //   3. Who: her avatar 32, her name, "{duration} · {project}" grey.
@@ -12,8 +14,8 @@
 //      Make square too (TODO(B.8b): the Make page) and the step's tag. Make video / stills / cut join in B.8b.
 //   6. More to explore: a 2-column masonry of her ideas most like this one (GET /api/cards/{id}/related). Each tile opens
 //      its own idea page; nothing links.
-// Gone since B.5: More in this thread (in I3 now), the thread pill, the credit line under the picture (••• → Photo
-// credit), the source badge and the bottom Talk bar — the mic lives in the nav.
+// Gone since B.5: More in this thread (in I3 now), the thread pill, the source badge and the bottom Talk bar — the mic
+// lives in the nav.
 
 import { useCallback, useState } from 'react'
 import { ActionSheetIOS, ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
@@ -259,6 +261,20 @@ export default function IdeaPage() {
           </View>
         )}
 
+        {/* Unsplash's attribution: only under an Unsplash photo in the slot. */}
+        {!drawnForm && grid.length < 3 && picture.source === 'unsplash' && idea.card.credit && (
+          <Text style={styles.credit} numberOfLines={1} testID="idea-credit">
+            Photo by{' '}
+            <Text style={styles.creditLink} onPress={() => Linking.openURL(idea.card.credit!.photographerUrl)} accessibilityRole="link">
+              {idea.card.credit.photographer}
+            </Text>{' '}
+            on{' '}
+            <Text style={styles.creditLink} onPress={() => Linking.openURL(idea.card.credit!.photoUrl)} accessibilityRole="link">
+              Unsplash
+            </Text>
+          </Text>
+        )}
+
         {/* 2. The action row */}
         <View style={styles.actions}>
           <View style={styles.icons}>
@@ -445,6 +461,8 @@ const styles = StyleSheet.create({
   form: { height: PICTURE_H, borderRadius: 0, justifyContent: 'flex-end' },
   chrome: { position: 'absolute', left: space.margin, right: space.margin, flexDirection: 'row', justifyContent: 'space-between' },
   square: { width: SQUARE, height: SQUARE, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
+  credit: { fontSize: 11, color: GREY, paddingHorizontal: space.margin, paddingTop: 6 },
+  creditLink: { textDecorationLine: 'underline' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin, paddingTop: 16 },
   icons: { flexDirection: 'row', alignItems: 'center', gap: 22 },
   icon: { width: ICON, height: ICON, alignItems: 'center', justifyContent: 'center' },
