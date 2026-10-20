@@ -199,12 +199,22 @@ describe('Idea page (B.8a)', () => {
     expect(router.push).toHaveBeenCalledWith('/idea/view/c1')
   })
 
-  it('Make with: the full row — Make video · Make stills · Make a cut · Recipe, labels 15 grey and 13 ink', async () => {
+  it('Make with: Video · Stills · Cut · Recipe (no repeated verb), 13 ink, "Soon" 11 grey under the three placeholders', async () => {
     await open(base as unknown as Idea)
-    expect(screen.getByText('Make with')).toHaveStyle({ fontSize: 15, color: '#6E6E73' })
     expect(['make-video', 'make-still', 'make-cut', 'make-recipe'].map((t) => !!screen.getByTestId(t))).toEqual([true, true, true, true])
-    expect(screen.getByText('Make video')).toHaveStyle({ fontSize: 13, color: '#1D1D1F' })
-    expect(screen.getAllByText('Soon')).toHaveLength(3)
+    for (const label of ['Video', 'Stills', 'Cut', 'Recipe']) expect(screen.getByText(label)).toHaveStyle({ fontSize: 13, color: '#1D1D1F' })
+    expect(screen.queryByText('Make video')).toBeNull()
+    const soon = screen.getAllByText('Soon')
+    expect(soon).toHaveLength(3)
+    expect(soon[0]).toHaveStyle({ fontSize: 11, color: '#6E6E73' })
+  })
+
+  it('section headers as Pinterest\'s: Semibold 20 ink, 28 above and 12 below', async () => {
+    loadRelated.mockResolvedValue([card({ id: 'c7', title: 'Stairwell burst' })])
+    await open(base as unknown as Idea)
+    const header = { fontSize: 20, fontWeight: '600', color: '#1D1D1F', marginTop: 28, marginBottom: 12 }
+    expect(screen.getByText('Make with')).toHaveStyle(header)
+    expect(await screen.findByText('More to explore')).toHaveStyle(header)
   })
 
   it('a Make placeholder only says it is coming, for 2 s — nothing else', async () => {

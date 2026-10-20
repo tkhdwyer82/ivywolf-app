@@ -5,13 +5,13 @@
 //      pictures; any other form drawn large on its hue (CardFace, as B.5). Over it only two translucent 40 squares:
 //      back, and ••• (where Change view, Move to project, Photo credit and the rest live). An Unsplash photo's
 //      attribution is ••• → Photo credit for now; a visible line under the picture is deferred (B.8a, 21 Oct).
-//   2. One action row: ♥ (like) · ◯ (View idea, I3 — a bottom sheet over the page) · ↑ (Share) left, 30pt icons in
-//      the Home hold menu's set and weight; Save right — lime 84 × 44 r12, or ink "Saved · {project}" once it's filed
-//      in one of her projects. Save opens Save to (I2).
+//   2. One action row, as Pinterest's: ♥ (outline; filled only once liked) · ◯ (a plain round speech bubble — View
+//      idea, I3, a bottom sheet over the page) · ↑ (Share) left, 28 pt outline icons, regular weight, 20 apart; Save
+//      right — lime 84 × 44 r12, or ink "Saved · {project}" once it's filed in one of her projects (Save to, I2).
 //   3. Who: her avatar 32, her name, "{duration} · {project}" grey.
 //   4. The snippet: her words in quotes, two lines, 15 — tap to hear them — then "View idea" (I3).
-//   5. Make with: Make video · Make stills · Make a cut · ✦ Recipe. The three Make squares are placeholders until B.8b
-//      ("Soon"; a tap says it's coming, nothing runs or spends). Recipe is live: the B.10 recipe sheet, her private
+//   5. Make with: Video · Stills · Cut · ✦ Recipe (the header says "Make", so the squares don't). The first three are
+//      placeholders until B.8b ("Soon"; a tap says it's coming, nothing runs or spends). Recipe is live: the B.10 recipe sheet, her private
 //      drafts as its badge. On a card a recipe made, the step's square is lime and opens its prompt (TODO(B.8b): the
 //      Make page), and the step's tag shows under the snippet.
 //   6. More to explore: a 2-column masonry of her ideas most like this one (GET /api/cards/{id}/related). Each tile opens
@@ -295,7 +295,7 @@ export default function IdeaPage() {
         <View style={styles.actions}>
           <View style={styles.icons}>
             <Icon name={idea.heartedAt ? 'heart.fill' : 'heart'} label={idea.heartedAt ? 'Unlike' : 'Like'} onPress={heart} testID="idea-like" />
-            <Icon name="bubble.left" label="View idea" onPress={() => router.push(`/idea/view/${idea.id}`)} testID="idea-thread" />
+            <Icon name="message" label="View idea" onPress={() => router.push(`/idea/view/${idea.id}`)} testID="idea-thread" />
             <Icon name="square.and.arrow.up" label="Share" onPress={() => setSheet('share')} testID="idea-share" />
           </View>
           <Pressable
@@ -342,14 +342,16 @@ export default function IdeaPage() {
           {error && <Text style={styles.small}>{error}</Text>}
 
           {/* 5. Make with */}
-          <Text style={styles.rowLabel}>Make with</Text>
+          <Text style={styles.header} accessibilityRole="header">
+            Make with
+          </Text>
           <View style={styles.tools}>
-            {stepWrites && <ToolSquare icon="text.quote" label={MAKE_LABEL.write} onPress={make} lime testID="step-make" />}
+            {stepWrites && <ToolSquare icon="text.quote" label="Words" onPress={make} lime testID="step-make" />}
             {MAKES.map((m) =>
               stepMake?.makeKind === m.kind ? (
-                <ToolSquare key={m.kind} icon={m.icon} label={m.label} onPress={make} lime testID="step-make" />
+                <ToolSquare key={m.kind} icon={m.icon} label={m.label} spoken={m.name} onPress={make} lime testID="step-make" />
               ) : (
-                <ToolSquare key={m.kind} icon={m.icon} label={m.label} sub="Soon" onPress={() => soon(m.label)} testID={`make-${m.kind}`} />
+                <ToolSquare key={m.kind} icon={m.icon} label={m.label} spoken={m.name} sub="Soon" onPress={() => soon(m.name)} testID={`make-${m.kind}`} />
               )
             )}
             {showRecipe && <ToolSquare icon="sparkles" label="Recipe" badge={drafts} onPress={() => setSheet('recipe')} testID="make-recipe" />}
@@ -359,7 +361,9 @@ export default function IdeaPage() {
         {/* 6. More to explore */}
         {related && related.length > 0 && (
           <View testID="more-to-explore">
-            <Text style={[styles.rowLabel, styles.exploreLabel]}>More to explore</Text>
+            <Text style={[styles.header, styles.exploreHeader]} accessibilityRole="header">
+              More to explore
+            </Text>
             <View style={styles.grid}>
               {[left, right].map((col, i) => (
                 <View key={i} style={styles.column}>
@@ -376,12 +380,12 @@ export default function IdeaPage() {
       </ScrollView>
 
       {/* Over the picture: back and •••, nothing else. */}
-      <View style={[styles.chrome, { top: insets.top + 4 }]} pointerEvents="box-none">
+      <View style={[styles.chrome, { top: insets.top + CHROME_TOP }]} pointerEvents="box-none">
         <Pressable onPress={() => router.back()} style={styles.square} accessibilityRole="button" accessibilityLabel="Back" testID="idea-back">
-          <SymbolView name="chevron.left" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={ICON_WEIGHT} />
+          <SymbolView name="chevron.left" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={SQUARE_WEIGHT} />
         </Pressable>
         <Pressable onPress={() => setMenu(true)} style={styles.square} accessibilityRole="button" accessibilityLabel="More" testID="idea-more">
-          <SymbolView name="ellipsis" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={ICON_WEIGHT} />
+          <SymbolView name="ellipsis" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={SQUARE_WEIGHT} />
         </Pressable>
       </View>
 
@@ -440,9 +444,19 @@ function Icon({ name, label, onPress, testID }: { name: SFSymbol; label: string;
 }
 
 /** W1's tool square: 52, r14, its label under it; a count badge top-right when there's one. */
-function ToolSquare({ icon, label, onPress, badge = 0, lime, sub, testID }: { icon: SFSymbol; label: string; onPress: () => void; badge?: number; lime?: boolean; sub?: string; testID?: string }) {
+function ToolSquare({ icon, label, spoken, onPress, badge = 0, lime, sub, testID }: {
+  icon: SFSymbol
+  label: string
+  /** What VoiceOver says, when the label leans on the header ("Video" under "Make with" → "Make video"). */
+  spoken?: string
+  onPress: () => void
+  badge?: number
+  lime?: boolean
+  sub?: string
+  testID?: string
+}) {
   return (
-    <Pressable onPress={onPress} style={styles.tool} accessibilityRole="button" accessibilityLabel={[label, sub, badge ? `${badge} yours` : null].filter(Boolean).join(', ')} testID={testID}>
+    <Pressable onPress={onPress} style={styles.tool} accessibilityRole="button" accessibilityLabel={[spoken ?? label, sub, badge ? `${badge} yours` : null].filter(Boolean).join(', ')} testID={testID}>
       <View style={[styles.toolSquare, lime && styles.toolLime]}>
         <SymbolView name={icon} tintColor={colour.Ink} size={22} weight="semibold" />
         {badge > 0 && (
@@ -459,28 +473,32 @@ function ToolSquare({ icon, label, onPress, badge = 0, lime, sub, testID }: { ic
   )
 }
 
-// Figma v5.0 I1 (2151:5), with the build-26 phone fixes: picture 393 × 440 full-bleed; back and ••• translucent white
-// squares 44, r12, 24 pt icons; the action row 16 under the picture, 30 pt icons 22 apart, Save 84 × 44 r12; who 32
-// avatar, name Semibold 15, meta Regular 13 grey; snippet Regular 15/21 two lines, "View idea" Semibold 13; "Make with"
-// Regular 15 grey, squares 52 r14 14 apart with Regular 13 ink labels ("Soon" 11 grey under); More to explore the Home
-// masonry.
+// Figma v5.0 I1 (2151:5), matched to Pinterest's idea page: picture 393 × 440 full-bleed; back and ••• each a 48 white
+// square at 0.85, r14, 16 from the edges, 24 pt icons at stroke 2; the action row 16 under the picture, 28 pt outline
+// icons at stroke 1.8, 20 apart, Save 84 × 44 r12; who 32 avatar, name Semibold 15, meta Regular 13 grey; snippet
+// Regular 15/21 two lines, "View idea" Semibold 13; "Make with" and "More to explore" Semibold 20 ink, 28 above and 12
+// below; squares 52 r14 with Regular 13 ink labels ("Soon" 11 grey under); More to explore the Home masonry.
 const PICTURE_H = 440
-// Icons: the Home hold menu's set and weight (SF Symbols, semibold — HoldArc's ICON). An SF Symbol draws at about 0.8
-// of its size (size 30 is HoldArc's 24 pt glyph), so a 30 pt glyph is size 38 and a 24 pt one size 30.
-const ICON = 30
-const ICON_SYMBOL = 38
-const SQUARE = 44
+// Icons are SF Symbols (the Home hold menu's set). A symbol's glyph draws at about 0.8 of its size (HoldArc: size 30
+// is a 24 pt glyph), so a 28 pt glyph is size 35 and a 24 pt one size 30. Stroke is the symbol's weight: regular is
+// about 1.8, medium about 2.
+const ICON = 28
+const ICON_SYMBOL = 35
+const ICON_WEIGHT = 'regular' as const
+const SQUARE = 48
 const SQUARE_SYMBOL = 30
-const ICON_WEIGHT = 'semibold' as const
-const CHROME_H = 4 + SQUARE + 12
+const SQUARE_WEIGHT = 'medium' as const
+const CHROME_INSET = 16
+const CHROME_TOP = 8
+const CHROME_H = CHROME_TOP + SQUARE + 12
 const TOOL = 52
 const AVATAR = 32
 const TOAST_MS = 2000
 /** The Make squares, in W1's order, before Recipe. Placeholders until B.8b. */
-const MAKES: { kind: Exclude<MakeKind, 'write' | 'none'>; label: string; icon: SFSymbol }[] = [
-  { kind: 'video', label: 'Make video', icon: 'video' },
-  { kind: 'still', label: 'Make stills', icon: 'photo.on.rectangle' },
-  { kind: 'cut', label: 'Make a cut', icon: 'scissors' },
+const MAKES: { kind: Exclude<MakeKind, 'write' | 'none'>; label: string; name: string; icon: SFSymbol }[] = [
+  { kind: 'video', label: 'Video', name: 'Make video', icon: 'video' },
+  { kind: 'still', label: 'Stills', name: 'Make stills', icon: 'photo.on.rectangle' },
+  { kind: 'cut', label: 'Cut', name: 'Make a cut', icon: 'scissors' },
 ]
 
 const styles = StyleSheet.create({
@@ -489,10 +507,10 @@ const styles = StyleSheet.create({
   grey: { color: GREY },
   picture: { height: PICTURE_H, overflow: 'hidden' },
   form: { height: PICTURE_H, borderRadius: 0, justifyContent: 'flex-end' },
-  chrome: { position: 'absolute', left: space.margin, right: space.margin, flexDirection: 'row', justifyContent: 'space-between' },
-  square: { width: SQUARE, height: SQUARE, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
+  chrome: { position: 'absolute', left: CHROME_INSET, right: CHROME_INSET, flexDirection: 'row', justifyContent: 'space-between' },
+  square: { width: SQUARE, height: SQUARE, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin, paddingTop: 16 },
-  icons: { flexDirection: 'row', alignItems: 'center', gap: 22 },
+  icons: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   icon: { width: ICON, height: ICON, alignItems: 'center', justifyContent: 'center' },
   save: { minWidth: 84, height: 44, borderRadius: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', maxWidth: 220 },
   unsaved: { backgroundColor: colour.Lime },
@@ -508,7 +526,8 @@ const styles = StyleSheet.create({
   viewIdea: { fontSize: 13, fontWeight: '600', color: colour.Ink, marginTop: 6 },
   stepTag: { fontSize: 13, color: GREY, marginTop: 10 },
   small: { fontSize: 13, color: GREY, marginTop: 8 },
-  rowLabel: { fontSize: 15, color: GREY, marginTop: 24, marginBottom: 10 },
+  // Pinterest's section header ("More to explore"): Semibold 20 ink, 28 above, 12 below.
+  header: { fontSize: 20, fontWeight: '600', color: colour.Ink, marginTop: 28, marginBottom: 12 },
   tools: { flexDirection: 'row', gap: 4, marginHorizontal: -9 },
   tool: { width: TOOL + 18, alignItems: 'center' },
   toolSquare: { width: TOOL, height: TOOL, borderRadius: 14, backgroundColor: SOFT, alignItems: 'center', justifyContent: 'center' },
@@ -517,7 +536,7 @@ const styles = StyleSheet.create({
   toolSub: { fontSize: 11, color: GREY, marginTop: 1 },
   badge: { position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colour.Ink, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 11, fontWeight: '700', color: colour.Surface },
-  exploreLabel: { paddingHorizontal: space.margin, marginTop: 32 },
+  exploreHeader: { paddingHorizontal: space.margin },
   grid: { flexDirection: 'row', gap: space.gutter, paddingHorizontal: space.margin },
   column: { flex: 1 },
   cell: { marginBottom: space.gutter },

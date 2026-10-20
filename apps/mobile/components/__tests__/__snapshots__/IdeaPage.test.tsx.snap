@@ -54,7 +54,7 @@ exports[`snapshots saved state 1`] = `
             {
               "alignItems": "center",
               "flexDirection": "row",
-              "gap": 22,
+              "gap": 20,
             }
           }
         >
@@ -94,9 +94,9 @@ exports[`snapshots saved state 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-like"
@@ -137,9 +137,9 @@ exports[`snapshots saved state 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-thread"
@@ -180,9 +180,9 @@ exports[`snapshots saved state 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-share"
@@ -471,12 +471,14 @@ exports[`snapshots saved state 1`] = `
           </Text>
         </View>
         <Text
+          accessibilityRole="header"
           style={
             {
-              "color": "#6E6E73",
-              "fontSize": 15,
-              "marginBottom": 10,
-              "marginTop": 24,
+              "color": "#1D1D1F",
+              "fontSize": 20,
+              "fontWeight": "600",
+              "marginBottom": 12,
+              "marginTop": 28,
             }
           }
         >
@@ -557,7 +559,7 @@ exports[`snapshots saved state 1`] = `
                 }
               }
             >
-              Make video
+              Video
             </Text>
             <Text
               style={
@@ -637,7 +639,7 @@ exports[`snapshots saved state 1`] = `
                 }
               }
             >
-              Make stills
+              Stills
             </Text>
             <Text
               style={
@@ -717,7 +719,7 @@ exports[`snapshots saved state 1`] = `
                 }
               }
             >
-              Make a cut
+              Cut
             </Text>
             <Text
               style={
@@ -811,12 +813,12 @@ exports[`snapshots saved state 1`] = `
         {
           "flexDirection": "row",
           "justifyContent": "space-between",
-          "left": 12,
+          "left": 16,
           "position": "absolute",
-          "right": 12,
+          "right": 16,
         },
         {
-          "top": 4,
+          "top": 8,
         },
       ]
     }
@@ -856,11 +858,11 @@ exports[`snapshots saved state 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.72)",
-          "borderRadius": 12,
-          "height": 44,
+          "backgroundColor": "rgba(255,255,255,0.85)",
+          "borderRadius": 14,
+          "height": 48,
           "justifyContent": "center",
-          "width": 44,
+          "width": 48,
         }
       }
       testID="idea-back"
@@ -900,11 +902,11 @@ exports[`snapshots saved state 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.72)",
-          "borderRadius": 12,
-          "height": 44,
+          "backgroundColor": "rgba(255,255,255,0.85)",
+          "borderRadius": 14,
+          "height": 48,
           "justifyContent": "center",
-          "width": 44,
+          "width": 48,
         }
       }
       testID="idea-more"
@@ -966,7 +968,7 @@ exports[`snapshots text idea 1`] = `
             {
               "alignItems": "center",
               "flexDirection": "row",
-              "gap": 22,
+              "gap": 20,
             }
           }
         >
@@ -1006,9 +1008,9 @@ exports[`snapshots text idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-like"
@@ -1049,9 +1051,9 @@ exports[`snapshots text idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-thread"
@@ -1092,9 +1094,9 @@ exports[`snapshots text idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-share"
@@ -1381,12 +1383,14 @@ exports[`snapshots text idea 1`] = `
           </Text>
         </View>
         <Text
+          accessibilityRole="header"
           style={
             {
-              "color": "#6E6E73",
-              "fontSize": 15,
-              "marginBottom": 10,
-              "marginTop": 24,
+              "color": "#1D1D1F",
+              "fontSize": 20,
+              "fontWeight": "600",
+              "marginBottom": 12,
+              "marginTop": 28,
             }
           }
         >
@@ -1467,7 +1471,7 @@ exports[`snapshots text idea 1`] = `
                 }
               }
             >
-              Make video
+              Video
             </Text>
             <Text
               style={
@@ -1547,7 +1551,7 @@ exports[`snapshots text idea 1`] = `
                 }
               }
             >
-              Make stills
+              Stills
             </Text>
             <Text
               style={
@@ -1627,7 +1631,7 @@ exports[`snapshots text idea 1`] = `
                 }
               }
             >
-              Make a cut
+              Cut
             </Text>
             <Text
               style={
@@ -1721,12 +1725,12 @@ exports[`snapshots text idea 1`] = `
         {
           "flexDirection": "row",
           "justifyContent": "space-between",
-          "left": 12,
+          "left": 16,
           "position": "absolute",
-          "right": 12,
+          "right": 16,
         },
         {
-          "top": 4,
+          "top": 8,
         },
       ]
     }
@@ -1766,11 +1770,11 @@ exports[`snapshots text idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.72)",
-          "borderRadius": 12,
-          "height": 44,
+          "backgroundColor": "rgba(255,255,255,0.85)",
+          "borderRadius": 14,
+          "height": 48,
           "justifyContent": "center",
-          "width": 44,
+          "width": 48,
         }
       }
       testID="idea-back"
@@ -1810,11 +1814,11 @@ exports[`snapshots text idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.72)",
-          "borderRadius": 12,
-          "height": 44,
+          "backgroundColor": "rgba(255,255,255,0.85)",
+          "borderRadius": 14,
+          "height": 48,
           "justifyContent": "center",
-          "width": 44,
+          "width": 48,
         }
       }
       testID="idea-more"
@@ -2276,7 +2280,7 @@ exports[`snapshots video idea 1`] = `
             {
               "alignItems": "center",
               "flexDirection": "row",
-              "gap": 22,
+              "gap": 20,
             }
           }
         >
@@ -2316,9 +2320,9 @@ exports[`snapshots video idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-like"
@@ -2359,9 +2363,9 @@ exports[`snapshots video idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-thread"
@@ -2402,9 +2406,9 @@ exports[`snapshots video idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 30,
+                "height": 28,
                 "justifyContent": "center",
-                "width": 30,
+                "width": 28,
               }
             }
             testID="idea-share"
@@ -2691,12 +2695,14 @@ exports[`snapshots video idea 1`] = `
           </Text>
         </View>
         <Text
+          accessibilityRole="header"
           style={
             {
-              "color": "#6E6E73",
-              "fontSize": 15,
-              "marginBottom": 10,
-              "marginTop": 24,
+              "color": "#1D1D1F",
+              "fontSize": 20,
+              "fontWeight": "600",
+              "marginBottom": 12,
+              "marginTop": 28,
             }
           }
         >
@@ -2777,7 +2783,7 @@ exports[`snapshots video idea 1`] = `
                 }
               }
             >
-              Make video
+              Video
             </Text>
             <Text
               style={
@@ -2857,7 +2863,7 @@ exports[`snapshots video idea 1`] = `
                 }
               }
             >
-              Make stills
+              Stills
             </Text>
             <Text
               style={
@@ -2937,7 +2943,7 @@ exports[`snapshots video idea 1`] = `
                 }
               }
             >
-              Make a cut
+              Cut
             </Text>
             <Text
               style={
@@ -3031,12 +3037,12 @@ exports[`snapshots video idea 1`] = `
         {
           "flexDirection": "row",
           "justifyContent": "space-between",
-          "left": 12,
+          "left": 16,
           "position": "absolute",
-          "right": 12,
+          "right": 16,
         },
         {
-          "top": 4,
+          "top": 8,
         },
       ]
     }
@@ -3076,11 +3082,11 @@ exports[`snapshots video idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.72)",
-          "borderRadius": 12,
-          "height": 44,
+          "backgroundColor": "rgba(255,255,255,0.85)",
+          "borderRadius": 14,
+          "height": 48,
           "justifyContent": "center",
-          "width": 44,
+          "width": 48,
         }
       }
       testID="idea-back"
@@ -3120,11 +3126,11 @@ exports[`snapshots video idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.72)",
-          "borderRadius": 12,
-          "height": 44,
+          "backgroundColor": "rgba(255,255,255,0.85)",
+          "borderRadius": 14,
+          "height": 48,
           "justifyContent": "center",
-          "width": 44,
+          "width": 48,
         }
       }
       testID="idea-more"
