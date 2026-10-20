@@ -5,7 +5,7 @@
 //                     recipe; fewer than 3 clean steps → Save as idea instead. The source text is never stored.
 //   applyRecipe       price first: credits are spent before the model runs; recipe_apply_v1 writes one card per step
 //                     for her idea; a failure after the charge refunds and leaves nothing behind.
-//   undoApplication   "Remove these n cards": deletes the cards the application made.
+//   undoApplication   "Remove these n cards": deletes the cards the application made; refunds in full within 10 s.
 //   inviteAuthor      records the invite (recipe_authors.invited_at). Sends nothing: Tim sends invites by hand.
 //
 // Writes here use the service role; the routes check who's asking first (apps/web/app/api/recipes). RLS on the recipe
@@ -30,6 +30,7 @@ import {
   type MappedCard,
   type RecipeStatus,
   type StepForApply,
+  undoRefund,
 } from '@ivywolf/schema'
 import { costCents } from '../suggest/cost'
 import { readSource } from './source'
@@ -319,7 +320,7 @@ export async function applyRecipe(input: ApplyInput, deps: ApplyDeps = liveApply
       .insert(result.cards.map((c, i) => ({ application_id: applicationId, step_id: c.step_id, card_id: ids[i], make_prompt: c.make_prompt })))
     if (lErr) throw new Error(`application cards: ${lErr.message}`)
 
-    await bumpUses(supabase, recipe.id)
+    await adjustUses(supabase, recipe.id, 1)
     // The author's share: only for a published recipe whose author accepted (priceOf already makes it 0 otherwise).
     if (price.author > 0 && recipe.status === 'published' && recipe.recipe_authors?.accepted_at) {
       const { error: eErr } = await supabase.from('recipe_author_earnings').insert({ author_id: recipe.recipe_authors.id, application_id: applicationId, credits: price.author })
@@ -353,36 +354,63 @@ export function cardRows(cards: MappedCard[], at: { creatorId: string; projectId
   }))
 }
 
-/** uses + 1 without a lost update: compare-and-set, retried (counters are never read-modify-write blind). */
-async function bumpUses(supabase: SupabaseClient, recipeId: string) {
+/** uses ± 1 without a lost update: compare-and-set, retried (counters are never read-modify-write blind). */
+async function adjustUses(supabase: SupabaseClient, recipeId: string, delta: 1 | -1) {
   for (let i = 0; i < 5; i++) {
     const { data } = await supabase.from('recipes').select('uses').eq('id', recipeId).single()
     const uses = (data?.uses as number) ?? 0
-    const { data: hit } = await supabase.from('recipes').update({ uses: uses + 1 }).eq('id', recipeId).eq('uses', uses).select('id')
+    const { data: hit } = await supabase.from('recipes').update({ uses: Math.max(0, uses + delta) }).eq('id', recipeId).eq('uses', uses).select('id')
     if (hit?.length) return
   }
-  console.error(`[recipes] uses for ${recipeId} not bumped after 5 tries`)
+  console.error(`[recipes] uses for ${recipeId} not adjusted after 5 tries`)
 }
 
 // ── Undo ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** "Remove these n cards": every card the application made, and nothing else. No refund (B.10 leaves that to Tim). */
-export async function undoApplication(input: { creatorId: string; applicationId: string }, supabase = admin()): Promise<{ removed: number }> {
+/**
+ * "Remove these n cards": every card the application made, and nothing else. Within the Undo pill's 10 s (undoRefund)
+ * the charge comes back in full — nothing has generated yet — and the application stops counting: its use comes off
+ * the recipe and any author share is taken back. After that, the cards still go but the charge stands.
+ * The undone_at stamp is claimed first, so two Undos for one application refund once.
+ */
+export async function undoApplication(
+  input: { creatorId: string; applicationId: string },
+  supabase = admin(),
+  now = Date.now()
+): Promise<{ removed: number; refunded: number }> {
   const { data: app } = await supabase
     .from('recipe_applications')
-    .select('id, undone_at, recipe_application_cards(card_id)')
+    .select('id, recipe_id, credits, created_at, undone_at, recipe_application_cards(card_id)')
     .eq('id', input.applicationId)
     .eq('user_id', input.creatorId)
     .maybeSingle()
   if (!app) throw new RecipeError('not_found', 'No such application')
-  if (app.undone_at) return { removed: 0 }
+  if (app.undone_at) return { removed: 0, refunded: 0 }
+  const { data: claimed } = await supabase
+    .from('recipe_applications')
+    .update({ undone_at: new Date(now).toISOString() })
+    .eq('id', app.id)
+    .is('undone_at', null)
+    .select('id')
+  if (!claimed?.length) return { removed: 0, refunded: 0 }
+
   const ids = ((app.recipe_application_cards as unknown as { card_id: string }[]) ?? []).map((c) => c.card_id)
   if (ids.length) {
     const { error } = await supabase.from('cards').delete().in('id', ids).eq('creator_id', input.creatorId)
-    if (error) throw new RecipeError('failed', `remove cards: ${error.message}`)
+    if (error) {
+      await supabase.from('recipe_applications').update({ undone_at: null }).eq('id', app.id)
+      throw new RecipeError('failed', `remove cards: ${error.message}`)
+    }
   }
-  await supabase.from('recipe_applications').update({ undone_at: new Date().toISOString() }).eq('id', app.id)
-  return { removed: ids.length }
+
+  const refunded = undoRefund({ credits: app.credits as number, created_at: app.created_at as string }, now)
+  if (refunded > 0) {
+    const { error } = await supabase.rpc('refund_credits', { p_creator: input.creatorId, p_amount: refunded, p_reason: 'refund', p_ref: app.id })
+    if (error) console.error(`[recipes] undo refund for ${app.id}: ${error.message}`)
+    await supabase.from('recipe_author_earnings').delete().eq('application_id', app.id)
+    await adjustUses(supabase, app.recipe_id as string, -1)
+  }
+  return { removed: ids.length, refunded }
 }
 
 // ── Invite ─────────────────────────────────────────────────────────────────────────────────────────────────────

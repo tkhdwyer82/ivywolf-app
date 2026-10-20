@@ -1,6 +1,8 @@
 // apps/web/app/api/recipes/applications/[id]/route.ts
 // Undo (Job B.10): DELETE → "Remove these n cards" — every card the application made, and nothing else. Her own
-// applications only. Not refunded (left for Tim to decide).
+// applications only. Within the Undo pill's 10 s (+ 5 s for a late tap) the charge is refunded in full, the use comes
+// off the recipe and any author share is taken back; after that the cards go and the charge stands.
+// → { removed, refunded }
 
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'

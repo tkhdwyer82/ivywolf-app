@@ -1,4 +1,5 @@
-// Job B.10: recipes — the extraction gate, the fallback, price first, N cards in order, Undo removes all N.
+// Job B.10: recipes — the extraction gate, the fallback, price first, N cards in order, Undo removes all N and refunds
+// in full within 10 s.
 //   npm test -w @ivywolf/pipeline
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -15,6 +16,9 @@ import {
   validateMapping,
   type RecipeExtractOutput,
   type StepForApply,
+  UNDO_GRACE_MS,
+  UNDO_MS,
+  undoRefund,
 } from '@ivywolf/schema'
 import { applyRecipe, cardRows, extractRecipe, undoApplication, RecipeError, type ApplyDeps, type ExtractDeps } from '../recipes'
 
@@ -266,17 +270,64 @@ test('validateMapping: a skipped step or an over-long body fails the whole appli
 
 // ── undo ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-test('undo removes all N cards the application made, and only those', async () => {
-  let deleted: unknown = null
-  const db = fake((table, ops) => {
-    if (table === 'recipe_applications' && ops[0] === 'select') return { data: { id: 'app1', undone_at: null, recipe_application_cards: [{ card_id: 'c1' }, { card_id: 'c2' }, { card_id: 'c3' }] } }
-    if (table === 'cards' && ops[0] === 'delete') deleted = ops
+const LANDED = Date.parse('2026-10-20T00:00:00Z')
+
+/** An application that landed at LANDED; `claimed` false = another Undo stamped it first. */
+function undoFixture(opts: { claimed?: boolean } = {}) {
+  const seen = { deleted: null as unknown, refund: null as unknown, earningsDeleted: false, uses: [] as number[] }
+  const db = fake((table, ops, payload) => {
+    if (table === 'recipe_applications' && ops[0] === 'select')
+      return { data: { id: 'app1', recipe_id: 'r1', credits: 5, created_at: new Date(LANDED).toISOString(), undone_at: null, recipe_application_cards: [{ card_id: 'c1' }, { card_id: 'c2' }, { card_id: 'c3' }] } }
+    if (table === 'recipe_applications' && ops[0] === 'update') return { data: opts.claimed === false ? [] : [{ id: 'app1' }] }
+    if (table === 'cards' && ops[0] === 'delete') seen.deleted = ops
+    if (table === 'rpc refund_credits') seen.refund = payload
+    if (table === 'recipe_author_earnings' && ops[0] === 'delete') seen.earningsDeleted = true
+    if (table === 'recipes' && ops[0] === 'select') return { data: { uses: 3 } }
+    if (table === 'recipes' && ops[0] === 'update') {
+      seen.uses.push((payload as { uses: number }).uses)
+      return { data: [{ id: 'r1' }] }
+    }
     return {}
   })
-  const r = await undoApplication({ creatorId: 'u1', applicationId: 'app1' }, db.client)
-  assert.deepEqual(r, { removed: 3 })
-  assert.deepEqual(deleted, ['delete', 'in(["c1","c2","c3"])', 'eq("u1")'])
-  assert.ok(db.log.some((l) => l.startsWith('recipe_applications: update')))
+  return { db, seen }
+}
+
+test('undo removes all N cards the application made, and only those', async () => {
+  const { db, seen } = undoFixture()
+  const r = await undoApplication({ creatorId: 'u1', applicationId: 'app1' }, db.client, LANDED + 4_000)
+  assert.equal(r.removed, 3)
+  assert.deepEqual(seen.deleted, ['delete', 'in(["c1","c2","c3"])', 'eq("u1")'])
+})
+
+test('undo within the 10 s refunds the charge in full, takes back the use and any author share', async () => {
+  const { db, seen } = undoFixture()
+  const r = await undoApplication({ creatorId: 'u1', applicationId: 'app1' }, db.client, LANDED + 9_000)
+  assert.deepEqual(r, { removed: 3, refunded: 5 })
+  assert.deepEqual(seen.refund, { p_creator: 'u1', p_amount: 5, p_reason: 'refund', p_ref: 'app1' })
+  assert.equal(seen.earningsDeleted, true)
+  assert.deepEqual(seen.uses, [2])
+})
+
+test('undo after the window removes the cards but the charge stands', async () => {
+  const { db, seen } = undoFixture()
+  const r = await undoApplication({ creatorId: 'u1', applicationId: 'app1' }, db.client, LANDED + UNDO_MS + UNDO_GRACE_MS + 1)
+  assert.deepEqual(r, { removed: 3, refunded: 0 })
+  assert.equal(seen.refund, null)
+  assert.equal(seen.earningsDeleted, false)
+})
+
+test('two Undos for one application refund once', async () => {
+  const { db, seen } = undoFixture({ claimed: false })
+  assert.deepEqual(await undoApplication({ creatorId: 'u1', applicationId: 'app1' }, db.client, LANDED + 1_000), { removed: 0, refunded: 0 })
+  assert.equal(seen.refund, null)
+  assert.equal(seen.deleted, null)
+})
+
+test('undoRefund: the whole charge inside the window (plus grace), nothing after', () => {
+  const app = { credits: 4, created_at: new Date(LANDED).toISOString() }
+  assert.equal(undoRefund(app, LANDED + UNDO_MS), 4)
+  assert.equal(undoRefund(app, LANDED + UNDO_MS + UNDO_GRACE_MS), 4)
+  assert.equal(undoRefund(app, LANDED + UNDO_MS + UNDO_GRACE_MS + 1), 0)
 })
 
 // ── price, publishing, fit, links ──────────────────────────────────────────────────────────────────────────────

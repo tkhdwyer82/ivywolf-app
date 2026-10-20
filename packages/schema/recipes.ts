@@ -176,6 +176,21 @@ export function recipePrice(r: { status: RecipeStatus; authorAccepted: boolean; 
   return { model, author: total - model, total }
 }
 
+// ── Undo ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** How long "Remove these n cards · Undo" stays after a recipe's cards land. */
+export const UNDO_MS = 10_000
+/** The server's allowance on top of UNDO_MS for a tap made in time that arrives late (network, a slow phone). */
+export const UNDO_GRACE_MS = 5_000
+
+/**
+ * What an Undo gives back: the whole charge while the Undo pill is up — nothing has generated yet, and the mapping
+ * cost is ours — and nothing after it.
+ */
+export function undoRefund(app: { credits: number; created_at: string }, now: number): number {
+  return now - Date.parse(app.created_at) <= UNDO_MS + UNDO_GRACE_MS ? app.credits : 0
+}
+
 /** Only an accepted author's recipe may be published (0042's trigger enforces the same). */
 export const canPublish = (author: { accepted_at: string | null } | null) => !!author?.accepted_at
 

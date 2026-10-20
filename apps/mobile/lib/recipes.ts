@@ -242,11 +242,11 @@ export async function apply(token: string, recipeId: string, ideaId: string, pro
   return { ok: false, code, error: r.error, price: (r.body.price as RecipePrice | null) ?? null }
 }
 
-/** "Remove these n cards". */
+/** "Remove these n cards" — within the pill's 10 s, the charge comes back in full. Returns the credits refunded. */
 export async function undo(token: string, applicationId: string): Promise<number> {
-  const r = await call<{ removed: number }>(token, `/api/recipes/applications/${applicationId}`, { method: 'DELETE' })
+  const r = await call<{ removed: number; refunded: number }>(token, `/api/recipes/applications/${applicationId}`, { method: 'DELETE' })
   if (!r.ok) throw new Error(r.error)
-  return r.data.removed
+  return r.data.refunded
 }
 
 /** "Invite @handle?" — recorded for Tim; nothing is sent from the app or the server. */
@@ -255,6 +255,6 @@ export async function invite(token: string, recipeId: string): Promise<void> {
   if (!r.ok) throw new Error(r.error)
 }
 
-/** How long "Remove these n cards" stays after they land. */
-export const UNDO_MS = 10_000
+/** How long "Remove these n cards" stays after they land (the refund window; packages/schema/recipes.ts). */
+export { UNDO_MS } from '@ivywolf/schema'
 export const removeLabel = (n: number) => (n === 1 ? 'Remove this card' : `Remove these ${n} cards`)
