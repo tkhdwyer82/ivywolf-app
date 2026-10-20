@@ -224,7 +224,13 @@ export interface ReelLink {
   url: string
 }
 
-/** An Instagram reel, a TikTok or a YouTube Short — the links "Turn into a recipe" takes. Anything else is null. */
+/**
+ * An Instagram reel or post, a TikTok or a YouTube Short — the links "Turn into a recipe" takes. Anything else is null.
+ * The query and fragment (?igsh=…, ?exln=…, #…) are dropped before matching, and the stored url never has them.
+ *   instagram.com/p/<id> · /reel/<id> · /reels/<id> · /<handle>/reel/<id> · /<handle>/p/<id>
+ *   tiktok.com/@<handle>/video/<id> · tiktok.com/t/<id> · vm.tiktok.com/<id> · vt.tiktok.com/<id>
+ *   youtube.com/shorts/<id> (www., m.) · youtu.be/<id>
+ */
 export function parseReelLink(raw: string): ReelLink | null {
   let u: URL
   try {
@@ -233,17 +239,24 @@ export function parseReelLink(raw: string): ReelLink | null {
     return null
   }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
-  const host = u.hostname.replace(/^(www|m)\./, '')
+  const host = u.hostname.toLowerCase().replace(/^(www|m)\./, '')
   const parts = u.pathname.split('/').filter(Boolean)
-  const url = `https://${u.hostname.replace(/^m\./, 'www.')}${u.pathname}`
-  if (host === 'instagram.com' && (parts[0] === 'reel' || parts[0] === 'reels' || parts[1] === 'reel') && parts.length >= 2) {
-    return { platform: 'instagram', handle: parts[1] === 'reel' ? parts[0] : null, url }
+  const path = parts.length ? `/${parts.join('/')}/` : '/'
+  const at = (h: string) => `https://${h}${path}`
+
+  if (host === 'instagram.com') {
+    const POST = ['p', 'reel', 'reels']
+    if (POST.includes(parts[0]) && parts[1]) return { platform: 'instagram', handle: null, url: at('www.instagram.com') }
+    if (parts.length >= 3 && POST.includes(parts[1]) && parts[2]) return { platform: 'instagram', handle: parts[0], url: at('www.instagram.com') }
+    return null
   }
-  if (host === 'tiktok.com' && parts[0]?.startsWith('@') && parts[1] === 'video' && parts[2]) {
-    return { platform: 'tiktok', handle: parts[0].slice(1), url }
+  if (host === 'tiktok.com') {
+    if (parts[0]?.startsWith('@') && parts[1] === 'video' && parts[2]) return { platform: 'tiktok', handle: parts[0].slice(1), url: at('www.tiktok.com').slice(0, -1) }
+    if (parts[0] === 't' && parts[1]) return { platform: 'tiktok', handle: null, url: at('www.tiktok.com') }
+    return null
   }
-  if (host === 'vm.tiktok.com' || host === 'vt.tiktok.com') return { platform: 'tiktok', handle: null, url: u.toString() }
-  if (host === 'youtube.com' && parts[0] === 'shorts' && parts[1]) return { platform: 'youtube', handle: null, url }
-  if (host === 'youtu.be' && parts[0]) return { platform: 'youtube', handle: null, url: u.toString() }
+  if ((host === 'vm.tiktok.com' || host === 'vt.tiktok.com') && parts[0]) return { platform: 'tiktok', handle: null, url: at(host) }
+  if (host === 'youtube.com' && parts[0] === 'shorts' && parts[1]) return { platform: 'youtube', handle: null, url: `https://www.youtube.com/shorts/${parts[1]}` }
+  if (host === 'youtu.be' && parts[0]) return { platform: 'youtube', handle: null, url: `https://youtu.be/${parts[0]}` }
   return null
 }

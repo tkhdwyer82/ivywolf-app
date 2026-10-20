@@ -218,11 +218,15 @@ async function call<T>(token: string, path: string, init: { method: string; body
   return { ok: true, data: body as T }
 }
 
-export type ExtractReply = { kind: 'recipe'; recipe_id: string } | { kind: 'idea'; card_id: string | null; message: string }
+export type ExtractReply =
+  | { kind: 'recipe'; recipe_id: string }
+  | { kind: 'idea'; card_id: string | null; message: string }
+  /** No one to credit: the link carries no handle (Instagram) and she didn't type one. Nothing ran. */
+  | { kind: 'need_handle'; message: string }
 
-/** "Turn into a recipe": a reel link (+ any text with it) → a private draft, or saved as an idea instead. */
-export async function extract(token: string, url: string, text?: string): Promise<ExtractReply> {
-  const r = await call<ExtractReply>(token, '/api/recipes/extract', { method: 'POST', body: { url, text: text?.trim() || undefined } })
+/** "Turn into a recipe": a reel link (+ any text with it, + their @handle) → a private draft, or saved as an idea. */
+export async function extract(token: string, url: string, text?: string, handle?: string): Promise<ExtractReply> {
+  const r = await call<ExtractReply>(token, '/api/recipes/extract', { method: 'POST', body: { url, text: text?.trim() || undefined, handle: handle?.trim() || undefined } })
   if (!r.ok) throw new Error(r.error)
   return r.data
 }

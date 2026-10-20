@@ -118,6 +118,8 @@ export type ExtractOutcome =
   /** Fewer than 3 clean steps: saved as an idea instead (cardId), or not saved (null) when the platform can't be. */
   | { kind: 'idea'; cardId: string | null; reason: string }
   | { kind: 'not_a_reel' }
+  /** We can't tell who made it (an Instagram link carries no handle): nothing ran; ask her for their @handle. */
+  | { kind: 'need_handle' }
 
 export interface ExtractDeps {
   readSource: typeof readSource
@@ -126,11 +128,17 @@ export interface ExtractDeps {
 }
 const liveExtract: ExtractDeps = { readSource, propose: proposeRecipe, db: admin }
 
-export async function extractRecipe(input: { creatorId: string; url: string; sharedText?: string | null }, deps: ExtractDeps = liveExtract): Promise<ExtractOutcome> {
+export async function extractRecipe(
+  input: { creatorId: string; url: string; sharedText?: string | null; handle?: string | null },
+  deps: ExtractDeps = liveExtract
+): Promise<ExtractOutcome> {
   const link = parseReelLink(input.url)
   if (!link) return { kind: 'not_a_reel' }
   const source = await deps.readSource(link, input.sharedText ?? null)
-  const handle = source.handle ?? link.handle
+  // The credit comes first: her @handle when she typed one, else the platform's, else the link's. With none, nothing
+  // runs — a recipe is never stored without someone to credit.
+  const handle = cleanHandle(input.handle) ?? source.handle ?? link.handle
+  if (!handle) return { kind: 'need_handle' }
 
   let result: ExtractResult = { ok: false, reason: 'too_few_steps', kept: 0 }
   if (source.text.trim()) {
@@ -141,8 +149,8 @@ export async function extractRecipe(input: { creatorId: string; url: string; sha
     }
   }
   const supabase = deps.db()
-  if (!result.ok || !handle) {
-    return { kind: 'idea', cardId: await saveAsIdea(supabase, input.creatorId, link.platform, link.url, source.title), reason: result.ok ? 'no_handle' : result.reason }
+  if (!result.ok) {
+    return { kind: 'idea', cardId: await saveAsIdea(supabase, input.creatorId, link.platform, link.url, source.title), reason: result.reason }
   }
 
   const { data: recipe, error } = await supabase
@@ -159,6 +167,12 @@ export async function extractRecipe(input: { creatorId: string; url: string; sha
     throw new Error(`recipe steps: ${sErr.message}`)
   }
   return { kind: 'recipe', recipeId: recipe.id as string }
+}
+
+/** "@maya.makes" → "maya.makes"; anything that isn't a handle → null. */
+export const cleanHandle = (h: string | null | undefined) => {
+  const t = h?.trim().replace(/^@/, '') ?? ''
+  return /^[\w.]{1,30}$/.test(t) ? t : null
 }
 
 /**

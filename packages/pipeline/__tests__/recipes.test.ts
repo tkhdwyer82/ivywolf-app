@@ -136,6 +136,31 @@ test('extract: 3–8 steps → a draft_private recipe with its steps in order', 
   assert.deepEqual((steps[1] as Record<string, unknown>[]).map((s) => s.ordinal), [1, 2, 3, 4])
 })
 
+test('extract: no handle anywhere → ask for it; nothing runs, nothing is saved', async () => {
+  const db = fake()
+  let proposed = false
+  const deps: ExtractDeps = {
+    readSource: async () => ({ text: 'how I film a product hook', handle: null, title: null }),
+    propose: async (text) => ((proposed = true), { result: validateExtraction(out(4), text), cents: 1 }),
+    db: () => db.client,
+  }
+  assert.deepEqual(await extractRecipe({ creatorId: 'u1', url: 'https://www.instagram.com/p/DPx1abc/?igsh=x' }, deps), { kind: 'need_handle' })
+  assert.equal(proposed, false)
+  assert.deepEqual(db.log, [])
+})
+
+test('extract: her @handle credits an Instagram link that carries none', async () => {
+  const inserts: Record<string, unknown>[] = []
+  const db = fake((table, ops, payload) => {
+    if (table === 'recipes' && ops[0] === 'insert') inserts.push(payload as Record<string, unknown>)
+    return table === 'recipes' ? { data: { id: 'r1' } } : {}
+  })
+  const deps: ExtractDeps = { ...extractDeps(db, 4), readSource: async () => ({ text: 'how I film a product hook', handle: null, title: null }) }
+  assert.deepEqual(await extractRecipe({ creatorId: 'u1', url: 'https://www.instagram.com/p/DPx1abc/', handle: '@maya.makes' }, deps), { kind: 'recipe', recipeId: 'r1' })
+  assert.equal(inserts[0].author_handle, 'maya.makes')
+  assert.equal(inserts[0].source_url, 'https://www.instagram.com/p/DPx1abc/')
+})
+
 test('extract: not a reel link', async () => {
   assert.deepEqual(await extractRecipe({ creatorId: 'u1', url: 'https://example.com/x' }, extractDeps(fake(), 4)), { kind: 'not_a_reel' })
 })

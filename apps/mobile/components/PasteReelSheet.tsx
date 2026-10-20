@@ -3,6 +3,8 @@
 // or a YouTube Short, plus — optional — its caption, the way the share sheet would hand it over. Turn into a recipe →
 // POST /api/recipes/extract with the lens's rainbow sweep while it runs; a draft lands on its recipe page, private to
 // her. Fewer than 3 steps → it says so and the link is saved as an idea instead. Free: nothing here spends credits.
+// An Instagram link carries no handle, so the sheet asks for "Their @handle" — the credit — before anything runs; for
+// any other link it asks only if the server couldn't find one (need_handle).
 
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
@@ -19,10 +21,14 @@ export function PasteReelSheet({ onClose }: { onClose: () => void }) {
   const { getToken } = useAuth()
   const [url, setUrl] = useState('')
   const [caption, setCaption] = useState('')
+  const [handle, setHandle] = useState('')
+  const [askHandle, setAskHandle] = useState(false)
   const [running, setRunning] = useState(false)
   const [note, setNote] = useState<{ text: string; cardId: string | null } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const valid = !!parseReelLink(url)
+  const link = parseReelLink(url)
+  const needsHandle = !!link && link.handle === null && (link.platform === 'instagram' || askHandle)
+  const valid = !!link && (!needsHandle || /^@?[\w.]{1,30}$/.test(handle.trim()))
 
   async function go() {
     if (!valid || running) return
@@ -31,9 +37,12 @@ export function PasteReelSheet({ onClose }: { onClose: () => void }) {
     try {
       const token = await getToken()
       if (!token) throw new Error('Sign in again to do that')
-      const r = await extract(token, url.trim(), caption)
+      const r = await extract(token, url.trim(), caption, needsHandle ? handle : undefined)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
-      if (r.kind === 'recipe') {
+      if (r.kind === 'need_handle') {
+        setAskHandle(true)
+        setError(r.message)
+      } else if (r.kind === 'recipe') {
         onClose()
         router.push({ pathname: '/recipe/[id]', params: { id: r.recipe_id } })
       } else setNote({ text: r.message, cardId: r.card_id })
@@ -86,6 +95,21 @@ export function PasteReelSheet({ onClose }: { onClose: () => void }) {
             accessibilityLabel="Reel link"
             testID="paste-reel-url"
           />
+          {needsHandle && (
+            <TextInput
+              value={handle}
+              onChangeText={setHandle}
+              placeholder="Their @handle"
+              placeholderTextColor={colour.Grey}
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!running}
+              style={styles.input}
+              accessibilityLabel="Their handle"
+              accessibilityHint="Who made this reel. The recipe is credited to them."
+              testID="paste-reel-handle"
+            />
+          )}
           <TextInput
             value={caption}
             onChangeText={setCaption}
@@ -98,7 +122,7 @@ export function PasteReelSheet({ onClose }: { onClose: () => void }) {
           />
         </View>
       </RainbowSweep>
-      {!!url.trim() && !valid && <Text style={styles.hint}>That isn’t a reel, TikTok or Short.</Text>}
+      {!!url.trim() && !link && <Text style={styles.hint}>That isn’t a reel, TikTok or Short.</Text>}
       {error && <Text style={styles.hint}>{error}</Text>}
       <Pressable
         onPress={go}
