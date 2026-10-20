@@ -3,22 +3,25 @@
 //   1. The picture, full-bleed in a 440 slot: a photo card's picture (her own, its Unsplash photo or its reference —
 //      lib/picture.ts — else its project's hue; a video idea's poster); a board's 3-up once its thread has three
 //      pictures; any other form drawn large on its hue (CardFace, as B.5). Over it only two translucent 40 squares:
-//      back, and ••• (where Change view, Move to project, Photo credit and the rest live). Under an Unsplash photo, and
-//      only then, its credit: one 11 grey line, "Photo by {name} on Unsplash", both names linked — the attribution
-//      Unsplash's terms expect. Her own photos and renders get no line.
-//   2. One action row: ♥ (like) · ◯ (View idea, I3) · ↑ (Share) left, 26 outline icons; Save right — lime 84 × 44
-//      r12, or ink "Saved · {project}" once it's filed in one of her projects. Save opens Save to (I2).
+//      back, and ••• (where Change view, Move to project, Photo credit and the rest live). An Unsplash photo's
+//      attribution is ••• → Photo credit for now; a visible line under the picture is deferred (B.8a, 21 Oct).
+//   2. One action row: ♥ (like) · ◯ (View idea, I3 — a bottom sheet over the page) · ↑ (Share) left, 30pt icons in
+//      the Home hold menu's set and weight; Save right — lime 84 × 44 r12, or ink "Saved · {project}" once it's filed
+//      in one of her projects. Save opens Save to (I2).
 //   3. Who: her avatar 32, her name, "{duration} · {project}" grey.
 //   4. The snippet: her words in quotes, two lines, 15 — tap to hear them — then "View idea" (I3).
-//   5. Make with: ✦ Recipe (the B.10 recipe sheet, her private drafts as its badge). On a card a recipe made, its step's
-//      Make square too (TODO(B.8b): the Make page) and the step's tag. Make video / stills / cut join in B.8b.
+//   5. Make with: Make video · Make stills · Make a cut · ✦ Recipe. The three Make squares are placeholders until B.8b
+//      ("Soon"; a tap says it's coming, nothing runs or spends). Recipe is live: the B.10 recipe sheet, her private
+//      drafts as its badge. On a card a recipe made, the step's square is lime and opens its prompt (TODO(B.8b): the
+//      Make page), and the step's tag shows under the snippet.
 //   6. More to explore: a 2-column masonry of her ideas most like this one (GET /api/cards/{id}/related). Each tile opens
 //      its own idea page; nothing links.
 // Gone since B.5: More in this thread (in I3 now), the thread pill, the source badge and the bottom Talk bar — the mic
 // lives in the nav.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ActionSheetIOS, ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import type { MakeKind } from '@ivywolf/schema'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView, type SFSymbol } from 'expo-symbols'
@@ -42,6 +45,7 @@ import { Tile } from '@/components/Tile'
 import type { Picture } from '@/lib/picture'
 import { trashCard, TRASH_IDEA_LINE } from '@/lib/trash'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
+import { Pill } from '@/components/UndoPill'
 import { colour, hueOf, space, type } from '@ivywolf/ui'
 
 const GREY = '#6E6E73'
@@ -62,7 +66,14 @@ export default function IdeaPage() {
   const [step, setStep] = useState<StepCard | null>(null)
   const [drafts, setDrafts] = useState(0)
   const [related, setRelated] = useState<CardItem[] | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const player = useAudioPlayer(null)
+
+  // Clerk hands out a new getToken every render, so nothing below depends on it directly: a callback keyed on it was
+  // new each render, and useFocusEffect re-ran it every render — the idea page reloaded itself in a loop (B.8a build
+  // 26: More to explore flickered and never filled, and the flood of requests starved Save to's). Read it from a ref.
+  const tokenRef = useRef(getToken)
+  tokenRef.current = getToken
 
   const load = useCallback(() => {
     loadIdea(supabase, id)
@@ -72,12 +83,22 @@ export default function IdeaPage() {
       .then(setStep)
       .catch(() => setStep(null))
     if (userId) draftCount(supabase, userId).then(setDrafts).catch(() => setDrafts(0))
-    getToken()
-      .then((token) => (token ? loadRelated(supabase, token, id) : []))
-      .then(setRelated)
-      .catch(() => setRelated([]))
-  }, [supabase, id, userId, getToken])
+  }, [supabase, id, userId])
   useFocusEffect(load)
+
+  // More to explore: one fetch per idea, never per render or per focus. A reply for an idea she's left is dropped.
+  useEffect(() => {
+    let live = true
+    setRelated(null)
+    tokenRef
+      .current()
+      .then((token) => (token ? loadRelated(supabase, token, id) : []))
+      .then((r) => live && setRelated(r))
+      .catch(() => live && setRelated([]))
+    return () => {
+      live = false
+    }
+  }, [supabase, id])
 
   async function play() {
     if (!idea?.storagePath) return
@@ -186,6 +207,12 @@ export default function IdeaPage() {
     Alert.alert(MAKE_LABEL[step.makeKind as keyof typeof MAKE_LABEL] ?? 'Make', `${step.makePrompt}\n\nThis opens the Make page once it’s built. Nothing was spent.`)
   }
 
+  /** A Make square before B.8b: says it's coming, for 2 s. Nothing runs, nothing is spent. */
+  function soon(label: string) {
+    setToast(`${label} is coming in the next build`)
+    setTimeout(() => setToast((t) => (t?.startsWith(label) ? null : t)), TOAST_MS)
+  }
+
   function trash() {
     if (!idea) return
     Alert.alert('Move to trash?', TRASH_IDEA_LINE, [
@@ -227,6 +254,8 @@ export default function IdeaPage() {
   const name = user?.fullName ?? user?.firstName ?? 'You'
   const showRecipe = idea.source !== 'recipe'
   const stepMake = step?.makePrompt && step.makeKind !== 'none' ? step : null
+  // A step that writes has no B.8b square of its own, so it keeps a lime Make words square at the front.
+  const stepWrites = stepMake?.makeKind === 'write'
   const [left, right] = masonry(related ?? [])
 
   return (
@@ -259,20 +288,6 @@ export default function IdeaPage() {
                 <Image source={{ uri: picture.uri }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
               ))}
           </View>
-        )}
-
-        {/* Unsplash's attribution: only under an Unsplash photo in the slot. */}
-        {!drawnForm && grid.length < 3 && picture.source === 'unsplash' && idea.card.credit && (
-          <Text style={styles.credit} numberOfLines={1} testID="idea-credit">
-            Photo by{' '}
-            <Text style={styles.creditLink} onPress={() => Linking.openURL(idea.card.credit!.photographerUrl)} accessibilityRole="link">
-              {idea.card.credit.photographer}
-            </Text>{' '}
-            on{' '}
-            <Text style={styles.creditLink} onPress={() => Linking.openURL(idea.card.credit!.photoUrl)} accessibilityRole="link">
-              Unsplash
-            </Text>
-          </Text>
         )}
 
         {/* 2. The action row */}
@@ -331,15 +346,18 @@ export default function IdeaPage() {
           {error && <Text style={styles.small}>{error}</Text>}
 
           {/* 5. Make with */}
-          {(showRecipe || stepMake) && (
-            <>
-              <Text style={styles.rowLabel}>Make with</Text>
-              <View style={styles.tools}>
-                {stepMake && <ToolSquare icon="sparkles" label={MAKE_LABEL[stepMake.makeKind as keyof typeof MAKE_LABEL]} onPress={make} lime testID="step-make" />}
-                {showRecipe && <ToolSquare icon="sparkles" label="Recipe" badge={drafts} onPress={() => setSheet('recipe')} testID="make-recipe" />}
-              </View>
-            </>
-          )}
+          <Text style={styles.rowLabel}>Make with</Text>
+          <View style={styles.tools}>
+            {stepWrites && <ToolSquare icon="text.quote" label={MAKE_LABEL.write} onPress={make} lime testID="step-make" />}
+            {MAKES.map((m) =>
+              stepMake?.makeKind === m.kind ? (
+                <ToolSquare key={m.kind} icon={m.icon} label={m.label} onPress={make} lime testID="step-make" />
+              ) : (
+                <ToolSquare key={m.kind} icon={m.icon} label={m.label} sub="Soon" onPress={() => soon(m.label)} testID={`make-${m.kind}`} />
+              )
+            )}
+            {showRecipe && <ToolSquare icon="sparkles" label="Recipe" badge={drafts} onPress={() => setSheet('recipe')} testID="make-recipe" />}
+          </View>
         </View>
 
         {/* 6. More to explore */}
@@ -364,10 +382,10 @@ export default function IdeaPage() {
       {/* Over the picture: back and •••, nothing else. */}
       <View style={[styles.chrome, { top: insets.top + 4 }]} pointerEvents="box-none">
         <Pressable onPress={() => router.back()} style={styles.square} accessibilityRole="button" accessibilityLabel="Back" testID="idea-back">
-          <SymbolView name="chevron.left" tintColor={colour.Ink} size={17} weight="semibold" />
+          <SymbolView name="chevron.left" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={ICON_WEIGHT} />
         </Pressable>
         <Pressable onPress={() => setMenu(true)} style={styles.square} accessibilityRole="button" accessibilityLabel="More" testID="idea-more">
-          <SymbolView name="ellipsis" tintColor={colour.Ink} size={17} weight="semibold" />
+          <SymbolView name="ellipsis" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={ICON_WEIGHT} />
         </Pressable>
       </View>
 
@@ -390,6 +408,7 @@ export default function IdeaPage() {
           ]}
         />
       )}
+      {toast && <Pill label={toast} tone="grey" testID="make-toast" />}
       {sheet === 'share' && <ShareSheet card={idea.card} onClose={() => setSheet(null)} onShared={load} />}
       {sheet === 'context' && <AddContextSheet card={idea.card} onClose={() => setSheet(null)} />}
       {sheet === 'recipe' && (
@@ -419,15 +438,15 @@ function Poster({ uri }: { uri: string }) {
 function Icon({ name, label, onPress, testID }: { name: SFSymbol; label: string; onPress: () => void; testID?: string }) {
   return (
     <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label} testID={testID} style={styles.icon}>
-      <SymbolView name={name} tintColor={colour.Ink} size={ICON} weight="regular" />
+      <SymbolView name={name} tintColor={colour.Ink} size={ICON_SYMBOL} weight={ICON_WEIGHT} />
     </Pressable>
   )
 }
 
 /** W1's tool square: 52, r14, its label under it; a count badge top-right when there's one. */
-function ToolSquare({ icon, label, onPress, badge = 0, lime, testID }: { icon: SFSymbol; label: string; onPress: () => void; badge?: number; lime?: boolean; testID?: string }) {
+function ToolSquare({ icon, label, onPress, badge = 0, lime, sub, testID }: { icon: SFSymbol; label: string; onPress: () => void; badge?: number; lime?: boolean; sub?: string; testID?: string }) {
   return (
-    <Pressable onPress={onPress} style={styles.tool} accessibilityRole="button" accessibilityLabel={badge ? `${label}, ${badge} yours` : label} testID={testID}>
+    <Pressable onPress={onPress} style={styles.tool} accessibilityRole="button" accessibilityLabel={[label, sub, badge ? `${badge} yours` : null].filter(Boolean).join(', ')} testID={testID}>
       <View style={[styles.toolSquare, lime && styles.toolLime]}>
         <SymbolView name={icon} tintColor={colour.Ink} size={22} weight="semibold" />
         {badge > 0 && (
@@ -436,22 +455,36 @@ function ToolSquare({ icon, label, onPress, badge = 0, lime, testID }: { icon: S
           </View>
         )}
       </View>
-      <Text style={styles.toolLabel} numberOfLines={1}>
+      <Text style={styles.toolLabel} numberOfLines={2}>
         {label}
       </Text>
+      {sub && <Text style={styles.toolSub}>{sub}</Text>}
     </Pressable>
   )
 }
 
-// Figma v5.0 I1 (2151:5) — measured: picture 393 × 440 full-bleed; back and ••• translucent white squares 40, r12, 16
-// in; the action row 16 under the picture, 26 icons 22 apart, Save 84 × 44 r12; who 32 avatar, name Semibold 15, meta
-// Regular 13 grey; snippet Regular 15/21 two lines, "View idea" Semibold 13; "Make with" Regular 13 grey, squares 52
-// r14 14 apart with Regular 11 labels; More to explore the Home masonry.
+// Figma v5.0 I1 (2151:5), with the build-26 phone fixes: picture 393 × 440 full-bleed; back and ••• translucent white
+// squares 44, r12, 24 pt icons; the action row 16 under the picture, 30 pt icons 22 apart, Save 84 × 44 r12; who 32
+// avatar, name Semibold 15, meta Regular 13 grey; snippet Regular 15/21 two lines, "View idea" Semibold 13; "Make with"
+// Regular 15 grey, squares 52 r14 14 apart with Regular 13 ink labels ("Soon" 11 grey under); More to explore the Home
+// masonry.
 const PICTURE_H = 440
-const CHROME_H = 4 + 40 + 12
-const ICON = 26
-const SQUARE = 40
+// Icons: the Home hold menu's set and weight (SF Symbols, semibold — HoldArc's ICON). An SF Symbol draws at about 0.8
+// of its size (size 30 is HoldArc's 24 pt glyph), so a 30 pt glyph is size 38 and a 24 pt one size 30.
+const ICON = 30
+const ICON_SYMBOL = 38
+const SQUARE = 44
+const SQUARE_SYMBOL = 30
+const ICON_WEIGHT = 'semibold' as const
+const CHROME_H = 4 + SQUARE + 12
 const TOOL = 52
+const TOAST_MS = 2000
+/** The Make squares, in W1's order, before Recipe. Placeholders until B.8b. */
+const MAKES: { kind: Exclude<MakeKind, 'write' | 'none'>; label: string; icon: SFSymbol }[] = [
+  { kind: 'video', label: 'Make video', icon: 'video' },
+  { kind: 'still', label: 'Make stills', icon: 'photo.on.rectangle' },
+  { kind: 'cut', label: 'Make a cut', icon: 'scissors' },
+]
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colour.Surface },
@@ -461,8 +494,6 @@ const styles = StyleSheet.create({
   form: { height: PICTURE_H, borderRadius: 0, justifyContent: 'flex-end' },
   chrome: { position: 'absolute', left: space.margin, right: space.margin, flexDirection: 'row', justifyContent: 'space-between' },
   square: { width: SQUARE, height: SQUARE, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.72)', alignItems: 'center', justifyContent: 'center' },
-  credit: { fontSize: 11, color: GREY, paddingHorizontal: space.margin, paddingTop: 6 },
-  creditLink: { textDecorationLine: 'underline' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin, paddingTop: 16 },
   icons: { flexDirection: 'row', alignItems: 'center', gap: 22 },
   icon: { width: ICON, height: ICON, alignItems: 'center', justifyContent: 'center' },
@@ -483,12 +514,13 @@ const styles = StyleSheet.create({
   viewIdea: { fontSize: 13, fontWeight: '600', color: colour.Ink, marginTop: 6 },
   stepTag: { fontSize: 13, color: GREY, marginTop: 10 },
   small: { fontSize: 13, color: GREY, marginTop: 8 },
-  rowLabel: { fontSize: 13, color: GREY, marginTop: 24, marginBottom: 10 },
-  tools: { flexDirection: 'row', gap: 14 },
-  tool: { width: TOOL, alignItems: 'center' },
+  rowLabel: { fontSize: 15, color: GREY, marginTop: 24, marginBottom: 10 },
+  tools: { flexDirection: 'row', gap: 4, marginHorizontal: -9 },
+  tool: { width: TOOL + 18, alignItems: 'center' },
   toolSquare: { width: TOOL, height: TOOL, borderRadius: 14, backgroundColor: SOFT, alignItems: 'center', justifyContent: 'center' },
   toolLime: { backgroundColor: colour.Lime },
-  toolLabel: { fontSize: 11, color: colour.Ink, marginTop: 6 },
+  toolLabel: { fontSize: 13, color: colour.Ink, marginTop: 6, textAlign: 'center' },
+  toolSub: { fontSize: 11, color: GREY, marginTop: 1 },
   badge: { position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colour.Ink, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 11, fontWeight: '700', color: colour.Surface },
   exploreLabel: { paddingHorizontal: space.margin, marginTop: 32 },

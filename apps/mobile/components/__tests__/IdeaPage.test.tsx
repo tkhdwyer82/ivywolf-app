@@ -18,10 +18,15 @@ jest.mock('expo-router', () => {
   }
 })
 jest.mock('@clerk/clerk-expo', () => ({
+  // A new getToken every render, as Clerk's — the page must not reload because of it.
   useAuth: () => ({ getToken: async () => 'tok', userId: 'u1' }),
   useUser: () => ({ user: { fullName: 'Tim Dwyer', firstName: 'Tim', imageUrl: null } }),
 }))
-jest.mock('@/lib/supabase', () => ({ useSupabase: () => ({}) }))
+// One client for every render, as the real hook gives (lib/supabase.ts).
+jest.mock('@/lib/supabase', () => {
+  const client = {}
+  return { useSupabase: () => client }
+})
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }))
 jest.mock('expo-audio', () => ({ useAudioPlayer: () => ({ pause: jest.fn(), play: jest.fn(), replace: jest.fn(), seekTo: jest.fn() }) }))
 jest.mock('expo-image', () => ({ Image: () => null }))
@@ -125,7 +130,8 @@ const TEXT = idea({ card: card({ shape: 'text' }) })
 const SAVED = idea({ project: { id: 'p-launch', name: 'Launch video', kind: 'user' } })
 
 async function open(i: Idea) {
-  loadIdea.mockResolvedValue(i)
+  // A fresh object per load, as the real loader returns — a page that reloads on every render never settles.
+  loadIdea.mockImplementation(async () => ({ ...i }))
   const r = await render(<IdeaPage />)
   await screen.findByTestId('idea-save')
   // Let the related ideas and the draft count land too.
@@ -186,10 +192,30 @@ describe('Idea page (B.8a)', () => {
     expect(router.push).toHaveBeenCalledWith('/idea/view/c1')
   })
 
+  it('Make with: the full row — Make video · Make stills · Make a cut · Recipe, labels 15 grey and 13 ink', async () => {
+    await open(base as unknown as Idea)
+    expect(screen.getByText('Make with')).toHaveStyle({ fontSize: 15, color: '#6E6E73' })
+    expect(['make-video', 'make-still', 'make-cut', 'make-recipe'].map((t) => !!screen.getByTestId(t))).toEqual([true, true, true, true])
+    expect(screen.getByText('Make video')).toHaveStyle({ fontSize: 13, color: '#1D1D1F' })
+    expect(screen.getAllByText('Soon')).toHaveLength(3)
+  })
+
+  it('a Make placeholder only says it is coming, for 2 s — nothing else', async () => {
+    jest.useFakeTimers()
+    await open(base as unknown as Idea)
+    await fireEvent.press(screen.getByTestId('make-video'))
+    expect(await screen.findByText('Make video is coming in the next build')).toBeTruthy()
+    expect(router.push).not.toHaveBeenCalled()
+    await act(async () => {
+      jest.advanceTimersByTime(2000)
+    })
+    expect(screen.queryByTestId('make-toast')).toBeNull()
+    jest.useRealTimers()
+  })
+
   it('Make with: ✦ Recipe with her drafts as its badge, opening the recipe sheet', async () => {
     draftCount.mockResolvedValue(2)
     await open(base as unknown as Idea)
-    expect(screen.getByText('Make with')).toBeTruthy()
     expect(screen.getByTestId('make-recipe-badge')).toHaveTextContent('2')
     await fireEvent.press(screen.getByTestId('make-recipe'))
     expect(await screen.findByText('RECIPE SHEET')).toBeTruthy()
@@ -214,23 +240,45 @@ describe('Idea page (B.8a)', () => {
     expect(screen.getByTestId('poster')).toBeTruthy()
   })
 
-  it('an Unsplash photo: one 11pt grey credit line under the picture, and ••• → Photo credit', async () => {
+  it('an Unsplash photo: no line under the picture (deferred); ••• → Photo credit keeps the attribution', async () => {
     const credit = { photographer: 'Ana Lee', photographerUrl: 'https://unsplash.com/@ana', photoUrl: 'https://unsplash.com/photos/x' }
     await open(
       idea({ card: card({ credit, picture: { source: 'unsplash', uri: 'https://images/x.jpg', kind: 'image', credit: null, linkUrl: null, trackUrl: null } }) })
     )
-    const line = screen.getByTestId('idea-credit')
-    expect(line).toHaveTextContent('Photo by Ana Lee on Unsplash')
-    expect(line).toHaveStyle({ fontSize: 11, color: '#6E6E73' })
+    expect(screen.queryByText(/Photo by/)).toBeNull()
     await fireEvent.press(screen.getByTestId('idea-more'))
     expect(await screen.findByText('Photo credit')).toBeTruthy()
   })
+})
 
-  it('her own photo or a render: no credit line', async () => {
-    await open(idea({ card: card({ picture: { source: 'own', uri: 'https://x/mine.jpg', kind: 'image', credit: null, linkUrl: null, trackUrl: null } }) }))
-    expect(screen.queryByTestId('idea-credit')).toBeNull()
-    await open(idea({ card: card({ picture: { source: 'created', uri: 'https://x/render.png', kind: 'image', credit: null, linkUrl: null, trackUrl: null } }) }))
-    expect(screen.queryByTestId('idea-credit')).toBeNull()
+describe('More to explore loads once (build 26: it re-fetched on every render)', () => {
+  it('one related fetch per idea, and the page settles — no reload loop', async () => {
+    loadRelated.mockResolvedValue([card({ id: 'c7', title: 'Stairwell burst' })])
+    await open(base as unknown as Idea)
+    await screen.findByTestId('tile-c7')
+    for (let i = 0; i < 10; i++) await act(async () => {})
+    expect(loadRelated).toHaveBeenCalledTimes(1)
+    expect(loadIdea).toHaveBeenCalledTimes(1)
+  })
+
+  it('a new idea id fetches again, once', async () => {
+    loadRelated.mockResolvedValue([])
+    const params = jest.requireMock('expo-router') as { useLocalSearchParams: () => { id: string } }
+    const r = await open(base as unknown as Idea)
+    expect(loadRelated).toHaveBeenCalledTimes(1)
+    const spy = jest.spyOn(params, 'useLocalSearchParams').mockReturnValue({ id: 'c9' })
+    await r.rerender(<IdeaPage />)
+    for (let i = 0; i < 5; i++) await act(async () => {})
+    expect(loadRelated).toHaveBeenCalledTimes(2)
+    expect(loadRelated.mock.calls[1][2]).toBe('c9')
+    spy.mockRestore()
+  })
+
+  it('nothing related → no section, no grey tiles', async () => {
+    loadRelated.mockResolvedValue([])
+    await open(base as unknown as Idea)
+    expect(screen.queryByTestId('more-to-explore')).toBeNull()
+    expect(screen.queryByText('More to explore')).toBeNull()
   })
 })
 

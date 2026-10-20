@@ -24,7 +24,18 @@ function Routes() {
         <Stack.Screen name="idea/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="idea/transcript/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: '#FAFAF7' } }} />
         <Stack.Screen name="idea/save/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: hero.room } }} />
-        <Stack.Screen name="idea/view/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
+        {/* View idea (B.8a I3): a bottom sheet over the idea page, like Pinterest's comments — 85 %, drag down to close. */}
+        <Stack.Screen
+          name="idea/view/[id]"
+          options={{
+            headerShown: false,
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.85],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 28,
+            contentStyle: { backgroundColor: hero.room },
+          }}
+        />
         <Stack.Screen name="idea/edit/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="mini" options={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="search" options={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: hero.room } }} />

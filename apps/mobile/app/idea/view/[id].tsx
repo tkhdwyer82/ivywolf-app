@@ -2,7 +2,8 @@
 // View idea (B.8a, Figma v5.0 I3 2151:106): one scrolling page — her full words, chaptered as the transcript is
 // (lib/transcript.ts: a chapter per turn, coloured by what Ivy did with each span), then the Ivy thread below it: the
 // other ideas in her thread, the directions that cite this idea, and Ivy's notes on its recording. From the idea
-// page's ◯ and its "View idea". Reads only; nothing new on the backend.
+// page's ◯ and its "View idea", as a bottom sheet (85 %, drag down to close — app/_layout.tsx) with the picture behind
+// it. Reads only; nothing new on the backend.
 
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -17,6 +18,8 @@ import { loadTranscript, type SpanKind, type Turn } from '@/lib/transcript'
 import { loadIvyThread, threadEmpty, type IvyThread } from '@/lib/viewIdea'
 
 const GREY = '#6E6E73'
+/** Under the sheet's grabber. */
+const SHEET_TOP = 28
 const SOFT = '#F2F2F7'
 // As the transcript (Figma 83:317): idea spans bold ink, loose ends olive, my things rust, wake word and filler grey.
 const TONE: Record<SpanKind, object> = {
@@ -64,7 +67,7 @@ export default function ViewIdea() {
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 60, paddingBottom: insets.bottom + 40, paddingHorizontal: space.margin }}>
+      <ScrollView contentContainerStyle={{ paddingTop: SHEET_TOP, paddingBottom: insets.bottom + 40, paddingHorizontal: space.margin }}>
         <Text style={styles.title} accessibilityRole="header">
           {idea.title}
         </Text>
@@ -118,11 +121,6 @@ export default function ViewIdea() {
         )}
       </ScrollView>
 
-      <View style={[styles.chrome, { top: insets.top + 4 }]}>
-        <Pressable onPress={() => router.back()} style={styles.square} accessibilityRole="button" accessibilityLabel="Back">
-          <SymbolView name="chevron.left" tintColor={colour.Ink} size={17} weight="semibold" />
-        </Pressable>
-      </View>
     </View>
   )
 }
@@ -146,6 +144,4 @@ const styles = StyleSheet.create({
   cardBody: { fontSize: 14, lineHeight: 20, color: GREY, marginTop: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E6E6E6' },
   rowTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: colour.Ink },
-  chrome: { position: 'absolute', left: space.margin },
-  square: { width: 40, height: 40, borderRadius: 12, backgroundColor: SOFT, alignItems: 'center', justifyContent: 'center' },
 })
