@@ -204,6 +204,11 @@ describe('Idea page (B.8a)', () => {
   it('back and ••• are frosted: a blur under each', async () => {
     await open(base as unknown as Idea)
     expect(screen.getAllByTestId('frost')).toHaveLength(2)
+    // Readable on a white photo: a #F2F2F7 0.85 fill and a 6 % ink hairline, on both.
+    for (const id of ['idea-back', 'idea-more']) {
+      expect(screen.getByTestId(id)).toHaveStyle({ borderWidth: 1, borderColor: 'rgba(29,29,31,0.06)' })
+    }
+    expect(JSON.stringify(screen.toJSON()).match(/rgba\(242,242,247,0.85\)/g)).toHaveLength(2)
   })
 
   it('who: her name and "{day} {time} · {project}" — no duration', async () => {

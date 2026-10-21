@@ -32,7 +32,6 @@ import { SymbolView, type SFSymbol } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
 import { Image } from 'expo-image'
 import { useVideoPlayer, VideoView } from 'expo-video'
-import { BlurView } from 'expo-blur'
 import { useAuth, useUser } from '@clerk/clerk-expo'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
@@ -54,6 +53,7 @@ import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { Pill } from '@/components/UndoPill'
 import { AvatarInitials } from '@/components/AvatarInitials'
 import { Marquee } from '@/components/Marquee'
+import { FROST_SQUARE, FrostSquare } from '@/components/FrostSquare'
 import { colour, hueOf, space, type } from '@ivywolf/ui'
 
 const GREY = '#6E6E73'
@@ -430,14 +430,8 @@ export default function IdeaPage() {
 
       {/* Over the picture: back and •••, nothing else. */}
       <View style={[styles.chrome, { top: insets.top + CARD_TOP + CHROME_INSET }]} pointerEvents="box-none">
-        <Pressable onPress={() => router.back()} style={styles.square} accessibilityRole="button" accessibilityLabel="Back" testID="idea-back">
-          <Frost />
-          <SymbolView name="chevron.left" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={SQUARE_WEIGHT} />
-        </Pressable>
-        <Pressable onPress={() => setMenu(true)} style={styles.square} accessibilityRole="button" accessibilityLabel="More" testID="idea-more">
-          <Frost />
-          <SymbolView name="ellipsis" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={SQUARE_WEIGHT} />
-        </Pressable>
+        <FrostSquare icon="chevron.left" label="Back" onPress={() => router.back()} testID="idea-back" />
+        <FrostSquare icon="ellipsis" label="More" onPress={() => setMenu(true)} testID="idea-more" />
       </View>
 
       {menu && (
@@ -485,16 +479,6 @@ async function countComments(supabase: ReturnType<typeof useSupabase>, cardId: s
   } catch {
     return 0
   }
-}
-
-/** Behind back and •••: the photo, blurred, under white at 0.78 — Pinterest's and Instagram's frosted squares. */
-function Frost() {
-  return (
-    <>
-      <BlurView intensity={BLUR} tint="light" style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, styles.frost]} />
-    </>
-  )
 }
 
 /** A video idea's poster: its first frame, muted and paused (as Home's TakeStill, without the ▶ chip). Reports its
@@ -561,7 +545,7 @@ function ToolSquare({ icon, label, spoken, onPress, badge = 0, lime, sub, testID
 }
 
 // Figma v5.0 I1 (2151:5), matched to Pinterest's idea page: the picture a card 8 from the sides and the status bar, r32,
-// at its own ratio; back and ••• each a 48 frosted square (blur 40 under white 0.78), r14, 16 inside the card's top
+// at its own ratio; back and ••• each a 48 FrostSquare (blur 40 under #F2F2F7 0.85, a 6 % ink hairline), r14, 16 inside the card's top
 // corners, 24 pt icons at stroke 2; the action row 16 under the picture, 28 pt outline icons at stroke 1.8, 20 apart,
 // counts Regular 14 ink 6 after their icon, Save 84 × 44 r12 (saved: name up to 180 | ˅ 44, a 1 pt divider); who 32 avatar, name Semibold 15, meta Regular 13 grey; snippet
 // Regular 15/21 two lines, "View idea" Semibold 13; "Make with" and "More to explore" Semibold 20 ink, 28 above and 12
@@ -573,7 +557,6 @@ const CARD_RADIUS = 32
 const RATIO = 1.25
 const PICTURE_MIN = 300
 const PICTURE_MAX = 0.75
-const BLUR = 40
 /** The saved pill: the name's part at most 180 (padding included), ˅'s 44. */
 const SPLIT_NAME = 180
 const SPLIT_PAD = 14
@@ -584,12 +567,9 @@ const SPLIT_CHEVRON = 44
 const ICON = 28
 const ICON_SYMBOL = 35
 const ICON_WEIGHT = 'regular' as const
-const SQUARE = 48
-const SQUARE_SYMBOL = 30
-const SQUARE_WEIGHT = 'medium' as const
 const CHROME_INSET = 16
 // A drawn form starts under the squares.
-const CHROME_H = CHROME_INSET + SQUARE + 12
+const CHROME_H = CHROME_INSET + FROST_SQUARE + 12
 const TOOL = 52
 const AVATAR = 32
 const TOAST_MS = 2000
@@ -609,8 +589,6 @@ const styles = StyleSheet.create({
   form: { borderRadius: 0, justifyContent: 'flex-end', paddingTop: CHROME_H },
   statusBand: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colour.Surface },
   chrome: { position: 'absolute', left: CARD_INSET + CHROME_INSET, right: CARD_INSET + CHROME_INSET, flexDirection: 'row', justifyContent: 'space-between' },
-  square: { width: SQUARE, height: SQUARE, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  frost: { backgroundColor: 'rgba(255,255,255,0.78)' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin, paddingTop: 16 },
   icons: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   iconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

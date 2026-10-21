@@ -1033,7 +1033,9 @@ exports[`snapshots saved state 1`] = `
       style={
         {
           "alignItems": "center",
+          "borderColor": "rgba(29,29,31,0.06)",
           "borderRadius": 14,
+          "borderWidth": 1,
           "height": 48,
           "justifyContent": "center",
           "overflow": "hidden",
@@ -1067,7 +1069,7 @@ exports[`snapshots saved state 1`] = `
               "top": 0,
             },
             {
-              "backgroundColor": "rgba(255,255,255,0.78)",
+              "backgroundColor": "rgba(242,242,247,0.85)",
             },
           ]
         }
@@ -1108,7 +1110,9 @@ exports[`snapshots saved state 1`] = `
       style={
         {
           "alignItems": "center",
+          "borderColor": "rgba(29,29,31,0.06)",
           "borderRadius": 14,
+          "borderWidth": 1,
           "height": 48,
           "justifyContent": "center",
           "overflow": "hidden",
@@ -1142,7 +1146,7 @@ exports[`snapshots saved state 1`] = `
               "top": 0,
             },
             {
-              "backgroundColor": "rgba(255,255,255,0.78)",
+              "backgroundColor": "rgba(242,242,247,0.85)",
             },
           ]
         }
@@ -2057,7 +2061,9 @@ exports[`snapshots text idea 1`] = `
       style={
         {
           "alignItems": "center",
+          "borderColor": "rgba(29,29,31,0.06)",
           "borderRadius": 14,
+          "borderWidth": 1,
           "height": 48,
           "justifyContent": "center",
           "overflow": "hidden",
@@ -2091,7 +2097,7 @@ exports[`snapshots text idea 1`] = `
               "top": 0,
             },
             {
-              "backgroundColor": "rgba(255,255,255,0.78)",
+              "backgroundColor": "rgba(242,242,247,0.85)",
             },
           ]
         }
@@ -2132,7 +2138,9 @@ exports[`snapshots text idea 1`] = `
       style={
         {
           "alignItems": "center",
+          "borderColor": "rgba(29,29,31,0.06)",
           "borderRadius": 14,
+          "borderWidth": 1,
           "height": 48,
           "justifyContent": "center",
           "overflow": "hidden",
@@ -2166,7 +2174,7 @@ exports[`snapshots text idea 1`] = `
               "top": 0,
             },
             {
-              "backgroundColor": "rgba(255,255,255,0.78)",
+              "backgroundColor": "rgba(242,242,247,0.85)",
             },
           ]
         }
@@ -3477,7 +3485,9 @@ exports[`snapshots video idea 1`] = `
       style={
         {
           "alignItems": "center",
+          "borderColor": "rgba(29,29,31,0.06)",
           "borderRadius": 14,
+          "borderWidth": 1,
           "height": 48,
           "justifyContent": "center",
           "overflow": "hidden",
@@ -3511,7 +3521,7 @@ exports[`snapshots video idea 1`] = `
               "top": 0,
             },
             {
-              "backgroundColor": "rgba(255,255,255,0.78)",
+              "backgroundColor": "rgba(242,242,247,0.85)",
             },
           ]
         }
@@ -3552,7 +3562,9 @@ exports[`snapshots video idea 1`] = `
       style={
         {
           "alignItems": "center",
+          "borderColor": "rgba(29,29,31,0.06)",
           "borderRadius": 14,
+          "borderWidth": 1,
           "height": 48,
           "justifyContent": "center",
           "overflow": "hidden",
@@ -3586,7 +3598,7 @@ exports[`snapshots video idea 1`] = `
               "top": 0,
             },
             {
-              "backgroundColor": "rgba(255,255,255,0.78)",
+              "backgroundColor": "rgba(242,242,247,0.85)",
             },
           ]
         }
