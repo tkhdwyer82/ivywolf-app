@@ -10,6 +10,7 @@ import { useUser } from '@clerk/clerk-expo'
 import { useSupabase } from '@/lib/supabase'
 import { loadTranscript, type SpanKind, type Turn } from '@/lib/transcript'
 import { hero } from '@/lib/theme'
+import { AvatarInitials } from '@/components/AvatarInitials'
 
 // Figma 83:317: body #4D4D52; idea bold ink; loose end #7A8A29; my things #C2400D; wake word #6E6E73.
 const TONE: Record<SpanKind, object> = {
@@ -63,9 +64,7 @@ export default function TranscriptSheet() {
         <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
           {data.turns.map((t, i) => (
             <View key={i} style={styles.turn}>
-              <View style={[styles.avatar, speakers.indexOf(t.speaker) > 0 && { backgroundColor: hero.fill }]}>
-                <Text style={styles.initial}>{nameOf(t.speaker).charAt(0)}</Text>
-              </View>
+              <AvatarInitials name={nameOf(t.speaker)} uri={speakers.indexOf(t.speaker) === 0 && user?.hasImage ? user.imageUrl : null} size={40} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{nameOf(t.speaker)}</Text>
                 <Text style={styles.words}>
@@ -118,8 +117,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   turn: { flexDirection: 'row', gap: 16, marginBottom: 20 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: hero.lime, alignItems: 'center', justifyContent: 'center' },
-  initial: { fontSize: 16, fontWeight: '600', color: hero.ink },
   name: { fontSize: 17, fontWeight: '600', color: hero.ink, marginBottom: 4 },
   words: { fontSize: 16, lineHeight: 25, color: '#4D4D52' },
   legend: { flexDirection: 'row', gap: 14, marginLeft: 56 },

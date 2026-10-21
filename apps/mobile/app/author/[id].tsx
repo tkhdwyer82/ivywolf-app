@@ -12,6 +12,7 @@ import { useAuth } from '@clerk/clerk-expo'
 import { colour, space } from '@ivywolf/ui'
 import { useSupabase } from '@/lib/supabase'
 import { creditsLabel, loadAuthor, type AuthorPage } from '@/lib/recipes'
+import { AvatarInitials } from '@/components/AvatarInitials'
 
 export default function Author() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -40,9 +41,7 @@ export default function Author() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top + 64, paddingBottom: insets.bottom + 40, paddingHorizontal: space.margin }}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{(author.name ?? author.handle).slice(0, 1).toUpperCase()}</Text>
-        </View>
+        <AvatarInitials name={author.name ?? author.handle} size={AVATAR} testID="author-avatar" />
         <Text style={styles.title} accessibilityRole="header">
           {author.name ?? `@${author.handle}`}
         </Text>
@@ -83,8 +82,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colour.Surface },
   centered: { alignItems: 'center', justifyContent: 'center' },
   grey: { fontSize: 14, color: colour.Grey },
-  avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: colour.Lime, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 28, fontWeight: '700', color: colour.Ink },
   title: { fontSize: 28, fontWeight: '700', color: colour.Ink, marginTop: 14 },
   stats: { fontSize: 15, color: colour.Ink, marginTop: 10 },
   list: { marginTop: 24, gap: 6 },

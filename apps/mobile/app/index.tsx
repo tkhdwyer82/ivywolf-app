@@ -27,7 +27,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { SymbolView } from 'expo-symbols'
-import { useAuth } from '@clerk/clerk-expo'
+import { useAuth, useUser } from '@clerk/clerk-expo'
 import { useAudioPlayer } from 'expo-audio'
 import { useSupabase } from '@/lib/supabase'
 import { requestProcessing } from '@/lib/record'
@@ -65,6 +65,7 @@ import { useCardActions } from '@/components/CardActions'
 import { LinkBanner, LinkLines, type LinkLinesHandle } from '@/components/LinkMode'
 import { PinnedRow, pinnedOf } from '@/components/PinnedRow'
 import { MyThingsIcon } from '@/components/MyThingsIcon'
+import { AvatarInitials } from '@/components/AvatarInitials'
 import { HomeDirectionTile } from '@/components/HomeDirectionTile'
 import { useOpenCredit } from '@/components/useOpenCredit'
 import { dismissForToday, directionOfDay, directionPicture, type HomeDirection } from '@/lib/directionOfDay'
@@ -437,8 +438,13 @@ function Wordmark() {
   )
 }
 
-/** The logo row's right: My things (Ivy, B.6 — her own 44 pt tap), search and the avatar (Voice notes). No + — adding lives on the ⊕'s long-press. */
+/**
+ * The logo row's right: My things (Ivy, B.6 — her own 44 pt tap), search and the avatar (Voice notes). No + — adding
+ * lives on the ⊕'s long-press. The avatar is her photo, else her initials (AvatarInitials); the generic profile glyph
+ * shows only until Clerk has loaded her.
+ */
 function HeaderActions() {
+  const { user } = useUser()
   return (
     <>
       <MyThingsIcon />
@@ -446,8 +452,14 @@ function HeaderActions() {
         <SymbolView name="magnifyingglass" tintColor={colour.Ink} size={size.icon} />
       </Pressable>
       <Pressable onPress={() => router.push('/notes')} hitSlop={TAP_SLOP} style={styles.avatar} accessibilityRole="button" accessibilityLabel="Voice notes">
-        <Image source={require('@/assets/figma/l1-profile.svg')} style={StyleSheet.absoluteFill} />
-        <Image source={require('@/assets/figma/l1-profile-glyph.svg')} style={styles.avatarGlyph} />
+        {user ? (
+          <AvatarInitials name={user.fullName ?? user.firstName ?? user.primaryEmailAddress?.emailAddress} uri={user.hasImage ? user.imageUrl : null} size={size.icon} testID="home-avatar" />
+        ) : (
+          <>
+            <Image source={require('@/assets/figma/l1-profile.svg')} style={StyleSheet.absoluteFill} />
+            <Image source={require('@/assets/figma/l1-profile-glyph.svg')} style={styles.avatarGlyph} />
+          </>
+        )}
       </Pressable>
     </>
   )

@@ -79,6 +79,14 @@ export async function moveCard(supabase: SupabaseClient, cardId: string, project
   if (!data?.length) throw new Error('This idea has gone.')
 }
 
+/** Remove it from its project (the idea page's ••• → Remove from …): back to My things, where unsaved ideas live. */
+export async function removeFromProject(supabase: SupabaseClient, cardId: string) {
+  const { data, error } = await supabase.from('projects').select('id').eq('kind', 'things').maybeSingle()
+  if (error) throw new Error(`remove: ${error.message}`)
+  if (!data) throw new Error('remove: no My things project')
+  await moveCard(supabase, cardId, data.id)
+}
+
 /** Make a project, or return the one she already has by that name (names are unique per creator, ignoring case). */
 export async function createProject(supabase: SupabaseClient, creatorId: string, name: string): Promise<string> {
   const clean = name.trim().replace(/\s+/g, ' ')
@@ -89,12 +97,6 @@ export async function createProject(supabase: SupabaseClient, creatorId: string,
   const existing = mine.find((p) => p.name.trim().toLowerCase() === clean.toLowerCase())
   if (!existing) throw new Error(`create: ${error.message}`)
   return existing.id
-}
-
-/** "4 ideas · saved here", "to-dos, loose ends, life", "1 idea". */
-export function subtitle(p: PickerProject, savedHere: boolean): string {
-  const count = p.kind === 'things' ? 'to-dos, loose ends, life' : `${p.ideas} ${p.ideas === 1 ? 'idea' : 'ideas'}`
-  return savedHere ? `${count} · saved here` : count
 }
 
 /** A project's swatch without a frame: its hue (0039). */
