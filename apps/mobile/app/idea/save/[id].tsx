@@ -5,6 +5,8 @@
 // Only the card moves — its thread and the rest of the thread stay where they are.
 // B.8a (I2 2151:82): from the idea page's Save button too, with a squarer "New project" at the top (44, soft fill); the
 // lime button at the foot is only there while she names it ("Create and save here").
+// From the saved pill's ˅: a sheet (app/_layout.tsx), where it lives first under Top choices, the rest under Your
+// projects, and "Remove from {project}" — back to My things, unsaved.
 
 import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Image, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
@@ -38,6 +40,10 @@ export default function SaveTo() {
   const match = useCallback((p: PickerProject) => p.name.toLowerCase().includes(query.trim().toLowerCase()), [query])
   const top = useMemo(() => (picker ? picker.top.filter(match) : []), [picker, match])
   const yours = useMemo(() => (picker ? picker.yours.filter(match) : []), [picker, match])
+
+  const things = picker ? [...picker.top, ...picker.yours].find((p) => p.kind === 'things') ?? null : null
+  // Only a project of hers can be left; My things and Ivy Mini are where unsaved ideas live.
+  const removable = picker?.current?.kind === 'user' && things ? picker.current : null
 
   async function saveTo(target: string) {
     if (busy) return
@@ -153,6 +159,18 @@ export default function SaveTo() {
               <Text style={styles.psstText}>Psst! This idea already lives in {picker.current.name}</Text>
             </View>
           )}
+          {removable && things && !naming && (
+            <Pressable
+              onPress={() => saveTo(things.id)}
+              disabled={busy}
+              style={({ pressed }) => [styles.remove, pressed && { opacity: 0.5 }]}
+              accessibilityRole="button"
+              testID="save-remove"
+            >
+              <SymbolView name="minus.circle" tintColor={hero.ink} size={18} />
+              <Text style={styles.removeText}>Remove from {removable.name}</Text>
+            </Pressable>
+          )}
           {!naming && top.length > 0 && (
             <>
               <Text style={styles.section}>Top choices</Text>
@@ -216,6 +234,8 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: '600', color: hero.ink, lineHeight: 22 },
   sub: { fontSize: 12, color: hero.secondary, marginTop: 1 },
   none: { marginTop: 20 },
+  remove: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14 },
+  removeText: { fontSize: 15, fontWeight: '600', color: hero.ink },
   // B.8a I2: New project, squarer — 44 tall, r12, soft #F2F2F7.
   newProject: { height: 44, borderRadius: 12, backgroundColor: '#F2F2F7', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4, marginBottom: 12 },
   newProjectText: { fontSize: 15, fontWeight: '600', color: hero.ink },

@@ -3,9 +3,10 @@
 import { render, screen } from '@testing-library/react-native'
 import SaveTo from '@/app/idea/save/[id]'
 
+let mockParams: Record<string, string> = { id: 'c1', projectId: 'p-things' }
 jest.mock('expo-router', () => {
   const React = require('react')
-  return { router: { back: jest.fn() }, useLocalSearchParams: () => ({ id: 'c1', projectId: 'p-things' }), useFocusEffect: (f: () => void) => React.useEffect(f, [f]) }
+  return { router: { back: jest.fn() }, useLocalSearchParams: () => mockParams, useFocusEffect: (f: () => void) => React.useEffect(f, [f]) }
 })
 jest.mock('@clerk/clerk-expo', () => ({ useAuth: () => ({ userId: 'u1', getToken: async () => 'tok' }) }))
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }))
@@ -41,4 +42,20 @@ it('lists her projects straight away, with New project at the top', async () => 
   // New project comes before the list.
   const tree = JSON.stringify(screen.toJSON())
   expect(tree.indexOf('New project')).toBeLessThan(tree.indexOf('Launch video'))
+})
+
+it('from the saved pill: where it lives first under Top choices, and Remove from it', async () => {
+  mockParams = { id: 'c1', projectId: 'p-launch' }
+  await render(<SaveTo />)
+  expect(await screen.findByTestId('save-remove')).toHaveTextContent('Remove from Launch video')
+  const tree = JSON.stringify(screen.toJSON())
+  expect(tree.indexOf('Top choices')).toBeLessThan(tree.indexOf('saved here'))
+  expect(tree.indexOf('saved here')).toBeLessThan(tree.indexOf('Your projects'))
+  mockParams = { id: 'c1', projectId: 'p-things' }
+})
+
+it('no Remove when it lives in My things', async () => {
+  await render(<SaveTo />)
+  await screen.findByText('Launch video')
+  expect(screen.queryByTestId('save-remove')).toBeNull()
 })

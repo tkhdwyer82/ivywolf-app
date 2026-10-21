@@ -13,6 +13,7 @@ exports[`snapshots saved state 1`] = `
     contentContainerStyle={
       {
         "paddingBottom": 28,
+        "paddingTop": 8,
       }
     }
     contentInsetAdjustmentBehavior="never"
@@ -28,11 +29,13 @@ exports[`snapshots saved state 1`] = `
         style={
           [
             {
-              "height": 440,
+              "borderRadius": 32,
+              "marginHorizontal": 8,
               "overflow": "hidden",
             },
             {
               "backgroundColor": "#F2CFC2",
+              "height": 918,
             },
           ]
         }
@@ -94,13 +97,23 @@ exports[`snapshots saved state 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-like"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
           <View
             accessibilityLabel="View idea"
             accessibilityRole="button"
@@ -137,13 +150,23 @@ exports[`snapshots saved state 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-thread"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
           <View
             accessibilityLabel="Share"
             accessibilityRole="button"
@@ -180,46 +203,25 @@ exports[`snapshots saved state 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-share"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
         </View>
         <View
-          accessibilityLabel="Saved to Launch video. Change"
-          accessibilityRole="button"
-          accessibilityState={
-            {
-              "busy": undefined,
-              "checked": undefined,
-              "disabled": undefined,
-              "expanded": undefined,
-              "selected": undefined,
-            }
-          }
-          accessibilityValue={
-            {
-              "max": undefined,
-              "min": undefined,
-              "now": undefined,
-              "text": undefined,
-            }
-          }
-          accessible={true}
-          collapsable={false}
-          focusable={true}
-          onBlur={[Function]}
-          onClick={[Function]}
-          onFocus={[Function]}
-          onResponderGrant={[Function]}
-          onResponderMove={[Function]}
-          onResponderRelease={[Function]}
-          onResponderTerminate={[Function]}
-          onResponderTerminationRequest={[Function]}
-          onStartShouldSetResponder={[Function]}
           style={
             [
               {
@@ -233,28 +235,148 @@ exports[`snapshots saved state 1`] = `
               },
               {
                 "backgroundColor": "#1D1D1F",
+                "flexDirection": "row",
+                "overflow": "hidden",
+                "paddingHorizontal": 0,
               },
             ]
           }
           testID="idea-save"
         >
-          <Text
-            numberOfLines={1}
+          <View
+            accessibilityLabel="Saved to Launch video. Open it"
+            accessibilityRole="button"
+            accessibilityState={
+              {
+                "busy": undefined,
+                "checked": undefined,
+                "disabled": undefined,
+                "expanded": undefined,
+                "selected": undefined,
+              }
+            }
+            accessibilityValue={
+              {
+                "max": undefined,
+                "min": undefined,
+                "now": undefined,
+                "text": undefined,
+              }
+            }
+            accessible={true}
+            collapsable={false}
+            focusable={true}
+            onBlur={[Function]}
+            onClick={[Function]}
+            onFocus={[Function]}
+            onResponderGrant={[Function]}
+            onResponderMove={[Function]}
+            onResponderRelease={[Function]}
+            onResponderTerminate={[Function]}
+            onResponderTerminationRequest={[Function]}
+            onStartShouldSetResponder={[Function]}
             style={
               [
                 {
-                  "color": "#1D1D1F",
-                  "fontSize": 15,
-                  "fontWeight": "600",
+                  "alignItems": "center",
+                  "flexDirection": "row",
+                  "flexShrink": 1,
+                  "gap": 8,
+                  "height": 44,
+                  "paddingLeft": 14,
+                  "paddingRight": 12,
                 },
-                {
-                  "color": "#FFFFFF",
-                },
+                false,
               ]
             }
+            testID="idea-saved-project"
           >
-            Saved · Launch video
-          </Text>
+            <View
+              style={
+                [
+                  {
+                    "borderRadius": 5,
+                    "height": 10,
+                    "width": 10,
+                  },
+                  {
+                    "backgroundColor": "#F2CFC2",
+                  },
+                ]
+              }
+            />
+            <Text
+              numberOfLines={1}
+              style={
+                [
+                  {
+                    "color": "#1D1D1F",
+                    "fontSize": 15,
+                    "fontWeight": "600",
+                  },
+                  {
+                    "color": "#FFFFFF",
+                  },
+                ]
+              }
+            >
+              Launch video
+            </Text>
+          </View>
+          <View
+            style={
+              {
+                "backgroundColor": "rgba(255,255,255,0.3)",
+                "height": 24,
+                "width": 1,
+              }
+            }
+          />
+          <View
+            accessibilityLabel="Move or remove"
+            accessibilityRole="button"
+            accessibilityState={
+              {
+                "busy": undefined,
+                "checked": undefined,
+                "disabled": undefined,
+                "expanded": undefined,
+                "selected": undefined,
+              }
+            }
+            accessibilityValue={
+              {
+                "max": undefined,
+                "min": undefined,
+                "now": undefined,
+                "text": undefined,
+              }
+            }
+            accessible={true}
+            collapsable={false}
+            focusable={true}
+            onBlur={[Function]}
+            onClick={[Function]}
+            onFocus={[Function]}
+            onResponderGrant={[Function]}
+            onResponderMove={[Function]}
+            onResponderRelease={[Function]}
+            onResponderTerminate={[Function]}
+            onResponderTerminationRequest={[Function]}
+            onStartShouldSetResponder={[Function]}
+            style={
+              [
+                {
+                  "alignItems": "center",
+                  "height": 44,
+                  "justifyContent": "center",
+                  "width": 40,
+                },
+                false,
+              ]
+            }
+            testID="idea-save-change"
+          />
         </View>
       </View>
       <View
@@ -807,18 +929,35 @@ exports[`snapshots saved state 1`] = `
     </View>
   </RCTScrollView>
   <View
+    pointerEvents="none"
+    style={
+      [
+        {
+          "backgroundColor": "#FFFFFF",
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+          "top": 0,
+        },
+        {
+          "height": 0,
+        },
+      ]
+    }
+  />
+  <View
     pointerEvents="box-none"
     style={
       [
         {
           "flexDirection": "row",
           "justifyContent": "space-between",
-          "left": 16,
+          "left": 24,
           "position": "absolute",
-          "right": 16,
+          "right": 24,
         },
         {
-          "top": 8,
+          "top": 24,
         },
       ]
     }
@@ -858,15 +997,46 @@ exports[`snapshots saved state 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.85)",
           "borderRadius": 14,
           "height": 48,
           "justifyContent": "center",
+          "overflow": "hidden",
           "width": 48,
         }
       }
       testID="idea-back"
-    />
+    >
+      <View
+        intensity={40}
+        style={
+          {
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          }
+        }
+        testID="frost"
+        tint="light"
+      />
+      <View
+        style={
+          [
+            {
+              "bottom": 0,
+              "left": 0,
+              "position": "absolute",
+              "right": 0,
+              "top": 0,
+            },
+            {
+              "backgroundColor": "rgba(255,255,255,0.78)",
+            },
+          ]
+        }
+      />
+    </View>
     <View
       accessibilityLabel="More"
       accessibilityRole="button"
@@ -902,15 +1072,46 @@ exports[`snapshots saved state 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.85)",
           "borderRadius": 14,
           "height": 48,
           "justifyContent": "center",
+          "overflow": "hidden",
           "width": 48,
         }
       }
       testID="idea-more"
-    />
+    >
+      <View
+        intensity={40}
+        style={
+          {
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          }
+        }
+        testID="frost"
+        tint="light"
+      />
+      <View
+        style={
+          [
+            {
+              "bottom": 0,
+              "left": 0,
+              "position": "absolute",
+              "right": 0,
+              "top": 0,
+            },
+            {
+              "backgroundColor": "rgba(255,255,255,0.78)",
+            },
+          ]
+        }
+      />
+    </View>
   </View>
 </View>
 `;
@@ -928,6 +1129,7 @@ exports[`snapshots text idea 1`] = `
     contentContainerStyle={
       {
         "paddingBottom": 28,
+        "paddingTop": 8,
       }
     }
     contentInsetAdjustmentBehavior="never"
@@ -941,10 +1143,16 @@ exports[`snapshots text idea 1`] = `
     <View>
       <View
         style={
-          {
-            "height": 440,
-            "overflow": "hidden",
-          }
+          [
+            {
+              "borderRadius": 32,
+              "marginHorizontal": 8,
+              "overflow": "hidden",
+            },
+            {
+              "height": 918,
+            },
+          ]
         }
         testID="idea-form"
       >
@@ -1008,13 +1216,23 @@ exports[`snapshots text idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-like"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
           <View
             accessibilityLabel="View idea"
             accessibilityRole="button"
@@ -1051,13 +1269,23 @@ exports[`snapshots text idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-thread"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
           <View
             accessibilityLabel="Share"
             accessibilityRole="button"
@@ -1094,13 +1322,23 @@ exports[`snapshots text idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-share"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
         </View>
         <View
           accessibilityLabel="Save to a project"
@@ -1153,16 +1391,12 @@ exports[`snapshots text idea 1`] = `
           testID="idea-save"
         >
           <Text
-            numberOfLines={1}
             style={
-              [
-                {
-                  "color": "#1D1D1F",
-                  "fontSize": 15,
-                  "fontWeight": "600",
-                },
-                null,
-              ]
+              {
+                "color": "#1D1D1F",
+                "fontSize": 15,
+                "fontWeight": "600",
+              }
             }
           >
             Save
@@ -1719,18 +1953,35 @@ exports[`snapshots text idea 1`] = `
     </View>
   </RCTScrollView>
   <View
+    pointerEvents="none"
+    style={
+      [
+        {
+          "backgroundColor": "#FFFFFF",
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+          "top": 0,
+        },
+        {
+          "height": 0,
+        },
+      ]
+    }
+  />
+  <View
     pointerEvents="box-none"
     style={
       [
         {
           "flexDirection": "row",
           "justifyContent": "space-between",
-          "left": 16,
+          "left": 24,
           "position": "absolute",
-          "right": 16,
+          "right": 24,
         },
         {
-          "top": 8,
+          "top": 24,
         },
       ]
     }
@@ -1770,15 +2021,46 @@ exports[`snapshots text idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.85)",
           "borderRadius": 14,
           "height": 48,
           "justifyContent": "center",
+          "overflow": "hidden",
           "width": 48,
         }
       }
       testID="idea-back"
-    />
+    >
+      <View
+        intensity={40}
+        style={
+          {
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          }
+        }
+        testID="frost"
+        tint="light"
+      />
+      <View
+        style={
+          [
+            {
+              "bottom": 0,
+              "left": 0,
+              "position": "absolute",
+              "right": 0,
+              "top": 0,
+            },
+            {
+              "backgroundColor": "rgba(255,255,255,0.78)",
+            },
+          ]
+        }
+      />
+    </View>
     <View
       accessibilityLabel="More"
       accessibilityRole="button"
@@ -1814,15 +2096,46 @@ exports[`snapshots text idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.85)",
           "borderRadius": 14,
           "height": 48,
           "justifyContent": "center",
+          "overflow": "hidden",
           "width": 48,
         }
       }
       testID="idea-more"
-    />
+    >
+      <View
+        intensity={40}
+        style={
+          {
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          }
+        }
+        testID="frost"
+        tint="light"
+      />
+      <View
+        style={
+          [
+            {
+              "bottom": 0,
+              "left": 0,
+              "position": "absolute",
+              "right": 0,
+              "top": 0,
+            },
+            {
+              "backgroundColor": "rgba(255,255,255,0.78)",
+            },
+          ]
+        }
+      />
+    </View>
   </View>
 </View>
 `;
@@ -2235,6 +2548,7 @@ exports[`snapshots video idea 1`] = `
     contentContainerStyle={
       {
         "paddingBottom": 28,
+        "paddingTop": 8,
       }
     }
     contentInsetAdjustmentBehavior="never"
@@ -2250,11 +2564,13 @@ exports[`snapshots video idea 1`] = `
         style={
           [
             {
-              "height": 440,
+              "borderRadius": 32,
+              "marginHorizontal": 8,
               "overflow": "hidden",
             },
             {
               "backgroundColor": "#F2CFC2",
+              "height": 918,
             },
           ]
         }
@@ -2320,13 +2636,23 @@ exports[`snapshots video idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-like"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
           <View
             accessibilityLabel="View idea"
             accessibilityRole="button"
@@ -2363,13 +2689,23 @@ exports[`snapshots video idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-thread"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
           <View
             accessibilityLabel="Share"
             accessibilityRole="button"
@@ -2406,13 +2742,23 @@ exports[`snapshots video idea 1`] = `
             style={
               {
                 "alignItems": "center",
-                "height": 28,
-                "justifyContent": "center",
-                "width": 28,
+                "flexDirection": "row",
+                "gap": 4,
               }
             }
             testID="idea-share"
-          />
+          >
+            <View
+              style={
+                {
+                  "alignItems": "center",
+                  "height": 28,
+                  "justifyContent": "center",
+                  "width": 28,
+                }
+              }
+            />
+          </View>
         </View>
         <View
           accessibilityLabel="Save to a project"
@@ -2465,16 +2811,12 @@ exports[`snapshots video idea 1`] = `
           testID="idea-save"
         >
           <Text
-            numberOfLines={1}
             style={
-              [
-                {
-                  "color": "#1D1D1F",
-                  "fontSize": 15,
-                  "fontWeight": "600",
-                },
-                null,
-              ]
+              {
+                "color": "#1D1D1F",
+                "fontSize": 15,
+                "fontWeight": "600",
+              }
             }
           >
             Save
@@ -3031,18 +3373,35 @@ exports[`snapshots video idea 1`] = `
     </View>
   </RCTScrollView>
   <View
+    pointerEvents="none"
+    style={
+      [
+        {
+          "backgroundColor": "#FFFFFF",
+          "left": 0,
+          "position": "absolute",
+          "right": 0,
+          "top": 0,
+        },
+        {
+          "height": 0,
+        },
+      ]
+    }
+  />
+  <View
     pointerEvents="box-none"
     style={
       [
         {
           "flexDirection": "row",
           "justifyContent": "space-between",
-          "left": 16,
+          "left": 24,
           "position": "absolute",
-          "right": 16,
+          "right": 24,
         },
         {
-          "top": 8,
+          "top": 24,
         },
       ]
     }
@@ -3082,15 +3441,46 @@ exports[`snapshots video idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.85)",
           "borderRadius": 14,
           "height": 48,
           "justifyContent": "center",
+          "overflow": "hidden",
           "width": 48,
         }
       }
       testID="idea-back"
-    />
+    >
+      <View
+        intensity={40}
+        style={
+          {
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          }
+        }
+        testID="frost"
+        tint="light"
+      />
+      <View
+        style={
+          [
+            {
+              "bottom": 0,
+              "left": 0,
+              "position": "absolute",
+              "right": 0,
+              "top": 0,
+            },
+            {
+              "backgroundColor": "rgba(255,255,255,0.78)",
+            },
+          ]
+        }
+      />
+    </View>
     <View
       accessibilityLabel="More"
       accessibilityRole="button"
@@ -3126,15 +3516,46 @@ exports[`snapshots video idea 1`] = `
       style={
         {
           "alignItems": "center",
-          "backgroundColor": "rgba(255,255,255,0.85)",
           "borderRadius": 14,
           "height": 48,
           "justifyContent": "center",
+          "overflow": "hidden",
           "width": 48,
         }
       }
       testID="idea-more"
-    />
+    >
+      <View
+        intensity={40}
+        style={
+          {
+            "bottom": 0,
+            "left": 0,
+            "position": "absolute",
+            "right": 0,
+            "top": 0,
+          }
+        }
+        testID="frost"
+        tint="light"
+      />
+      <View
+        style={
+          [
+            {
+              "bottom": 0,
+              "left": 0,
+              "position": "absolute",
+              "right": 0,
+              "top": 0,
+            },
+            {
+              "backgroundColor": "rgba(255,255,255,0.78)",
+            },
+          ]
+        }
+      />
+    </View>
   </View>
 </View>
 `;

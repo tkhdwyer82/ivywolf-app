@@ -77,12 +77,18 @@ jest.mock('@/lib/recipes', () => ({
 }))
 jest.mock('@/lib/todo', () => ({ ...jest.requireActual('@/lib/todo'), loadTodo: jest.fn() }))
 jest.mock('@/components/Nav', () => ({ Nav: () => null }))
+jest.mock('expo-blur', () => {
+  const { View } = require('react-native')
+  return { BlurView: (p: object) => <View testID="frost" {...p} /> }
+})
+jest.mock('@/lib/viewIdea', () => ({ loadIvyThread: jest.fn() }))
 
 const { router } = jest.requireMock('expo-router') as { router: { push: jest.Mock } }
 const { loadIdea } = jest.requireMock('@/lib/idea') as { loadIdea: jest.Mock }
 const { loadRelated } = jest.requireMock('@/lib/related') as { loadRelated: jest.Mock }
 const { draftCount, loadStepCard } = jest.requireMock('@/lib/recipes') as { draftCount: jest.Mock; loadStepCard: jest.Mock }
 const { loadTodo } = jest.requireMock('@/lib/todo') as { loadTodo: jest.Mock }
+const { loadIvyThread } = jest.requireMock('@/lib/viewIdea') as { loadIvyThread: jest.Mock }
 
 const card = (over: Record<string, unknown> = {}) => ({
   kind: 'card',
@@ -145,6 +151,7 @@ beforeEach(() => {
   loadRelated.mockResolvedValue([])
   draftCount.mockResolvedValue(0)
   loadStepCard.mockResolvedValue(null)
+  loadIvyThread.mockResolvedValue({ title: null, ideas: [], directions: [], notes: [] })
 })
 
 describe('Idea page (B.8a)', () => {
@@ -173,9 +180,28 @@ describe('Idea page (B.8a)', () => {
     expect(router.push).toHaveBeenCalledWith('/idea/view/c1')
   })
 
-  it('saved: ink "Saved · {project}"', async () => {
+  it("saved: Pinterest's split pill — the name opens the project, ˅ opens Save to", async () => {
     await open(SAVED)
-    expect(screen.getByTestId('idea-save')).toHaveTextContent('Saved · Launch video')
+    expect(screen.getByTestId('idea-save')).toHaveTextContent('Launch video')
+    await fireEvent.press(screen.getByTestId('idea-saved-project'))
+    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/project/[id]', params: { id: 'p-launch' } })
+    await fireEvent.press(screen.getByTestId('idea-save-change'))
+    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/idea/save/[id]', params: { id: 'c1', projectId: 'p-launch' } })
+  })
+
+  it('counts after ♥ and ◯ only when there are some', async () => {
+    await open(base as unknown as Idea)
+    expect(screen.queryByTestId('idea-like-count')).toBeNull()
+    expect(screen.queryByTestId('idea-thread-count')).toBeNull()
+    loadIvyThread.mockResolvedValue({ title: 'Rooftop', ideas: [{ id: 'c2', title: 'Second take' }], directions: [], notes: [{ id: 'n1', text: 'x', at: '' }] })
+    await open(idea({ heartedAt: '2026-10-20T00:00:00Z' }))
+    expect(screen.getByTestId('idea-like-count')).toHaveTextContent('1')
+    expect(screen.getByTestId('idea-thread-count')).toHaveTextContent('2')
+  })
+
+  it('back and ••• are frosted: a blur under each', async () => {
+    await open(base as unknown as Idea)
+    expect(screen.getAllByTestId('frost')).toHaveLength(2)
   })
 
   it('who: her name and "{duration} · {project}"', async () => {

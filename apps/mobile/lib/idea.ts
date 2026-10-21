@@ -46,7 +46,7 @@ export interface Idea {
   recordedAt: string | null
   /** The recording's length (B.8a's "0:31 · Launch video"); null for a card with no recording. */
   durationMs: number | null
-  project: { id: string; name: string; kind: string } | null
+  project: { id: string; name: string; kind: string; hue?: HueName | null } | null
   thread: { id: string; title: string; returnCount: number } | null
   siblings: Sibling[]
   /** What CardFace draws (Figma 227:5): the shape and its payloads, credit, where it was said, the thread's stage. */

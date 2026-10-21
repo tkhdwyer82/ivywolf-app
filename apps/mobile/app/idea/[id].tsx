@@ -1,13 +1,16 @@
 // apps/mobile/app/idea/[id].tsx
 // Idea (B.8a, Figma v5.0 I1 2151:5, scrolled I1b 2151:42), Pinterest-clean. Top to bottom, and nothing else:
-//   1. The picture, full-bleed in a 440 slot: a photo card's picture (her own, its Unsplash photo or its reference —
-//      lib/picture.ts — else its project's hue; a video idea's poster); a board's 3-up once its thread has three
-//      pictures; any other form drawn large on its hue (CardFace, as B.5). Over it only two translucent 40 squares:
-//      back, and ••• (where Change view, Move to project, Photo credit and the rest live). An Unsplash photo's
-//      attribution is ••• → Photo credit for now; a visible line under the picture is deferred (B.8a, 21 Oct).
+//   1. The picture, as a card: below the status bar (which sits on the page, never on the photo), 8 in from each side,
+//      r32, at the image's own aspect ratio (capped at 75 % of the screen, at least 300). A photo card's picture (her
+//      own, its Unsplash photo or its reference — lib/picture.ts — else its project's hue; a video idea's poster); a
+//      board's 3-up once its thread has three pictures; any other form drawn large on its hue (CardFace, as B.5). Over
+//      it only two frosted 48 squares: back, and ••• (where Change view, Move to project, Photo credit and the rest
+//      live). An Unsplash photo's attribution is ••• → Photo credit for now; a visible line under the picture is
+//      deferred (B.8a, 21 Oct).
 //   2. One action row, as Pinterest's: ♥ (outline; filled only once liked) · ◯ (a plain round speech bubble — View
-//      idea, I3, a bottom sheet over the page) · ↑ (Share) left, 28 pt outline icons, regular weight, 20 apart; Save
-//      right — lime 84 × 44 r12, or ink "Saved · {project}" once it's filed in one of her projects (Save to, I2).
+//      idea, I3, a bottom sheet over the page) · ↑ (Share) left, 28 pt outline icons, regular weight, 20 apart, with a
+//      small grey count after ♥ and ◯ when there's one; Save right — lime 84 × 44 r12, or, once it's filed in one of
+//      her projects, Pinterest's split ink pill: the project's name (opens it) | ˅ (Save to, I2, to move or remove it).
 //   3. Who: her avatar 32, her name, "{duration} · {project}" grey.
 //   4. The snippet: her words in quotes, two lines, 15 — tap to hear them — then "View idea" (I3).
 //   5. Make with: Video · Stills · Cut · ✦ Recipe (the header says "Make", so the squares don't). The first three are
@@ -20,7 +23,7 @@
 // lives in the nav.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActionSheetIOS, ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native'
+import { ActionSheetIOS, ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import type { MakeKind } from '@ivywolf/schema'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -28,6 +31,7 @@ import { SymbolView, type SFSymbol } from 'expo-symbols'
 import { useAudioPlayer } from 'expo-audio'
 import { Image } from 'expo-image'
 import { useVideoPlayer, VideoView } from 'expo-video'
+import { BlurView } from 'expo-blur'
 import { useAuth, useUser } from '@clerk/clerk-expo'
 import { LOW_CONFIDENCE } from '@ivywolf/schema'
 import { useSupabase } from '@/lib/supabase'
@@ -35,6 +39,7 @@ import { loadIdea, savedTo, setHeart, setPinned, setShape, snippet, viewsFor, wh
 import { setShared } from '@/lib/share'
 import { masonry, type CardItem } from '@/lib/home'
 import { loadRelated } from '@/lib/related'
+import { loadIvyThread } from '@/lib/viewIdea'
 import { draftCount, loadStepCard, MAKE_LABEL, type StepCard } from '@/lib/recipes'
 import { ShareSheet } from '@/components/ShareSheet'
 import { AddContextSheet } from '@/components/AddContextSheet'
@@ -58,6 +63,7 @@ export default function IdeaPage() {
   const { getToken, userId } = useAuth()
   const { user } = useUser()
   const insets = useSafeAreaInsets()
+  const screenSize = useWindowDimensions()
   const [idea, setIdea] = useState<Idea | null | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
@@ -68,6 +74,10 @@ export default function IdeaPage() {
   const [drafts, setDrafts] = useState(0)
   const [related, setRelated] = useState<CardItem[] | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  // The picture's own height ÷ width, once it has loaded (a drawn form has none: RATIO).
+  const [ratio, setRatio] = useState<number | null>(null)
+  // ◯'s count: what View idea's Ivy thread lists (its other ideas, directions, Ivy's notes).
+  const [comments, setComments] = useState(0)
   const player = useAudioPlayer(null)
 
   // Clerk hands out a new getToken every render, so nothing below depends on it directly: a callback keyed on it was
@@ -78,7 +88,10 @@ export default function IdeaPage() {
 
   const load = useCallback(() => {
     loadIdea(supabase, id)
-      .then(setIdea)
+      .then((i) => {
+        setIdea(i)
+        if (i) countComments(supabase, i.id, i.recordingId).then(setComments)
+      })
       .catch((e) => setError(e instanceof Error ? e.message : 'Could not load'))
     loadStepCard(supabase, id)
       .then(setStep)
@@ -258,35 +271,48 @@ export default function IdeaPage() {
   // A step that writes has no B.8b square of its own, so it keeps a lime Make words square at the front.
   const stepWrites = stepMake?.makeKind === 'write'
   const [left, right] = masonry(related ?? [])
+  const cardW = screenSize.width - 2 * CARD_INSET
+  const pictureH = Math.round(Math.min(Math.max(cardW * (ratio ?? RATIO), PICTURE_MIN), screenSize.height * PICTURE_MAX))
+  const openSaveTo = () => router.push({ pathname: '/idea/save/[id]', params: { id: idea.id, projectId: idea.project?.id } })
 
   return (
     <View style={styles.screen}>
-      <ScrollView style={styles.screen} contentInsetAdjustmentBehavior="never" contentContainerStyle={{ paddingBottom: insets.bottom + space.section }}>
+      <ScrollView
+        style={styles.screen}
+        contentInsetAdjustmentBehavior="never"
+        contentContainerStyle={{ paddingTop: insets.top + CARD_TOP, paddingBottom: insets.bottom + space.section }}
+      >
         {/* 1. The picture */}
         {grid.length >= 3 ? (
-          <View style={styles.picture} testID="idea-grid">
+          <View style={[styles.picture, { height: pictureH }]} testID="idea-grid">
             <ThreeUp pictures={grid.slice(0, 3)} recyclingKey={idea.id} />
           </View>
         ) : drawnForm ? (
-          <View style={styles.picture} testID="idea-form">
+          <View style={[styles.picture, { height: pictureH }]} testID="idea-form">
             <CardFace
               card={idea.card}
               size="page"
-              photoHeight={PICTURE_H}
+              photoHeight={pictureH}
               playing={playing}
               onPlay={idea.storagePath ? play : undefined}
               footer={false}
-              style={[styles.form, { paddingTop: insets.top + CHROME_H }]}
+              style={[styles.form, { height: pictureH }]}
             />
           </View>
         ) : (
-          <View style={[styles.picture, { backgroundColor: hueOf(idea.card.hue) }]} testID={picture.kind === 'video' ? 'idea-video' : 'idea-picture'}>
+          <View style={[styles.picture, { height: pictureH, backgroundColor: hueOf(idea.card.hue) }]} testID={picture.kind === 'video' ? 'idea-video' : 'idea-picture'}>
             {/* A video idea shows its poster — the take's first frame, paused; it never plays here. */}
             {picture.uri &&
               (picture.kind === 'video' ? (
-                <Poster uri={picture.uri} />
+                <Poster uri={picture.uri} onRatio={setRatio} />
               ) : (
-                <Image source={{ uri: picture.uri }} style={StyleSheet.absoluteFill} contentFit="cover" accessibilityIgnoresInvertColors />
+                <Image
+                  source={{ uri: picture.uri }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  onLoad={(e) => e.source.width > 0 && setRatio(e.source.height / e.source.width)}
+                  accessibilityIgnoresInvertColors
+                />
               ))}
           </View>
         )}
@@ -294,21 +320,42 @@ export default function IdeaPage() {
         {/* 2. The action row */}
         <View style={styles.actions}>
           <View style={styles.icons}>
-            <Icon name={idea.heartedAt ? 'heart.fill' : 'heart'} label={idea.heartedAt ? 'Unlike' : 'Like'} onPress={heart} testID="idea-like" />
-            <Icon name="message" label="View idea" onPress={() => router.push(`/idea/view/${idea.id}`)} testID="idea-thread" />
+            {/* One creator, so ♥'s count is hers: 1 once she's liked it. */}
+            <Icon name={idea.heartedAt ? 'heart.fill' : 'heart'} label={idea.heartedAt ? 'Unlike' : 'Like'} count={idea.heartedAt ? 1 : 0} onPress={heart} testID="idea-like" />
+            <Icon name="message" label="View idea" count={comments} onPress={() => router.push(`/idea/view/${idea.id}`)} testID="idea-thread" />
             <Icon name="square.and.arrow.up" label="Share" onPress={() => setSheet('share')} testID="idea-share" />
           </View>
-          <Pressable
-            onPress={() => router.push({ pathname: '/idea/save/[id]', params: { id: idea.id, projectId: idea.project?.id } })}
-            style={[styles.save, saved ? styles.saved : styles.unsaved]}
-            accessibilityRole="button"
-            accessibilityLabel={saved ? `Saved to ${saved}. Change` : 'Save to a project'}
-            testID="idea-save"
-          >
-            <Text style={[styles.saveText, saved && styles.savedText]} numberOfLines={1}>
-              {saved ? `Saved · ${saved}` : 'Save'}
-            </Text>
-          </Pressable>
+          {saved && idea.project ? (
+            // Pinterest's split pill: the project's name opens it; ˅ opens Save to, to move or remove it.
+            <View style={[styles.save, styles.saved]} testID="idea-save">
+              <Pressable
+                onPress={() => router.push({ pathname: '/project/[id]', params: { id: idea.project!.id } })}
+                style={({ pressed }) => [styles.splitName, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Saved to ${saved}. Open it`}
+                testID="idea-saved-project"
+              >
+                <View style={[styles.dot, { backgroundColor: hueOf(idea.project.hue ?? idea.card.hue) }]} />
+                <Text style={[styles.saveText, styles.savedText]} numberOfLines={1}>
+                  {saved}
+                </Text>
+              </Pressable>
+              <View style={styles.divider} />
+              <Pressable
+                onPress={openSaveTo}
+                style={({ pressed }) => [styles.splitChevron, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Move or remove"
+                testID="idea-save-change"
+              >
+                <SymbolView name="chevron.down" tintColor={colour.Surface} size={14} weight="semibold" />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable onPress={openSaveTo} style={[styles.save, styles.unsaved]} accessibilityRole="button" accessibilityLabel="Save to a project" testID="idea-save">
+              <Text style={styles.saveText}>Save</Text>
+            </Pressable>
+          )}
         </View>
 
         <View style={styles.body}>
@@ -379,12 +426,17 @@ export default function IdeaPage() {
         )}
       </ScrollView>
 
+      {/* The status bar sits on the page: the picture scrolls under this band, never under the clock. */}
+      <View style={[styles.statusBand, { height: insets.top }]} pointerEvents="none" />
+
       {/* Over the picture: back and •••, nothing else. */}
-      <View style={[styles.chrome, { top: insets.top + CHROME_TOP }]} pointerEvents="box-none">
+      <View style={[styles.chrome, { top: insets.top + CARD_TOP + CHROME_INSET }]} pointerEvents="box-none">
         <Pressable onPress={() => router.back()} style={styles.square} accessibilityRole="button" accessibilityLabel="Back" testID="idea-back">
+          <Frost />
           <SymbolView name="chevron.left" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={SQUARE_WEIGHT} />
         </Pressable>
         <Pressable onPress={() => setMenu(true)} style={styles.square} accessibilityRole="button" accessibilityLabel="More" testID="idea-more">
+          <Frost />
           <SymbolView name="ellipsis" tintColor={colour.Ink} size={SQUARE_SYMBOL} weight={SQUARE_WEIGHT} />
         </Pressable>
       </View>
@@ -426,19 +478,55 @@ export default function IdeaPage() {
   )
 }
 
-/** A video idea's poster: its first frame, muted and paused (as Home's TakeStill, without the ▶ chip). */
-function Poster({ uri }: { uri: string }) {
+/** ◯'s count, or 0 when the thread can't be read — a count never stops the page. */
+async function countComments(supabase: ReturnType<typeof useSupabase>, cardId: string, recordingId: string | null): Promise<number> {
+  try {
+    const t = await loadIvyThread(supabase, cardId, recordingId)
+    return t.ideas.length + t.directions.length + t.notes.length
+  } catch {
+    return 0
+  }
+}
+
+/** Behind back and •••: the photo, blurred, under white at 0.78 — Pinterest's and Instagram's frosted squares. */
+function Frost() {
+  return (
+    <>
+      <BlurView intensity={BLUR} tint="light" style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, styles.frost]} />
+    </>
+  )
+}
+
+/** A video idea's poster: its first frame, muted and paused (as Home's TakeStill, without the ▶ chip). Reports its
+ *  height ÷ width once the take loads, so the card keeps the take's shape. */
+function Poster({ uri, onRatio }: { uri: string; onRatio: (r: number) => void }) {
   const player = useVideoPlayer(uri, (p) => {
     p.muted = true
     p.loop = false
   })
+  useEffect(() => {
+    const sub = player.addListener?.('sourceLoad', ({ availableVideoTracks }) => {
+      const size = availableVideoTracks[0]?.size
+      if (size?.width) onRatio(size.height / size.width)
+    })
+    return () => sub?.remove()
+  }, [player, onRatio])
   return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} pointerEvents="none" />
 }
 
-function Icon({ name, label, onPress, testID }: { name: SFSymbol; label: string; onPress: () => void; testID?: string }) {
+/** An action-row icon, with its count after it in small grey when there's one. */
+function Icon({ name, label, count = 0, onPress, testID }: { name: SFSymbol; label: string; count?: number; onPress: () => void; testID?: string }) {
   return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={label} testID={testID} style={styles.icon}>
-      <SymbolView name={name} tintColor={colour.Ink} size={ICON_SYMBOL} weight={ICON_WEIGHT} />
+    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" accessibilityLabel={count > 0 ? `${label}, ${count}` : label} testID={testID} style={styles.iconRow}>
+      <View style={styles.icon}>
+        <SymbolView name={name} tintColor={colour.Ink} size={ICON_SYMBOL} weight={ICON_WEIGHT} />
+      </View>
+      {count > 0 && (
+        <Text style={styles.count} testID={testID ? `${testID}-count` : undefined}>
+          {count}
+        </Text>
+      )}
     </Pressable>
   )
 }
@@ -473,12 +561,20 @@ function ToolSquare({ icon, label, spoken, onPress, badge = 0, lime, sub, testID
   )
 }
 
-// Figma v5.0 I1 (2151:5), matched to Pinterest's idea page: picture 393 × 440 full-bleed; back and ••• each a 48 white
-// square at 0.85, r14, 16 from the edges, 24 pt icons at stroke 2; the action row 16 under the picture, 28 pt outline
-// icons at stroke 1.8, 20 apart, Save 84 × 44 r12; who 32 avatar, name Semibold 15, meta Regular 13 grey; snippet
+// Figma v5.0 I1 (2151:5), matched to Pinterest's idea page: the picture a card 8 from the sides and the status bar, r32,
+// at its own ratio; back and ••• each a 48 frosted square (blur 40 under white 0.78), r14, 16 inside the card's top
+// corners, 24 pt icons at stroke 2; the action row 16 under the picture, 28 pt outline icons at stroke 1.8, 20 apart,
+// counts Regular 12 grey, Save 84 × 44 r12 (saved: name | ˅, a 1 pt divider); who 32 avatar, name Semibold 15, meta Regular 13 grey; snippet
 // Regular 15/21 two lines, "View idea" Semibold 13; "Make with" and "More to explore" Semibold 20 ink, 28 above and 12
 // below; squares 52 r14 with Regular 13 ink labels ("Soon" 11 grey under); More to explore the Home masonry.
-const PICTURE_H = 440
+const CARD_INSET = 8
+const CARD_TOP = 8
+const CARD_RADIUS = 32
+/** Height ÷ width when the picture has no ratio of its own (a drawn form, a grid, or before it loads): 4:5. */
+const RATIO = 1.25
+const PICTURE_MIN = 300
+const PICTURE_MAX = 0.75
+const BLUR = 40
 // Icons are SF Symbols (the Home hold menu's set). A symbol's glyph draws at about 0.8 of its size (HoldArc: size 30
 // is a 24 pt glyph), so a 28 pt glyph is size 35 and a 24 pt one size 30. Stroke is the symbol's weight: regular is
 // about 1.8, medium about 2.
@@ -489,8 +585,8 @@ const SQUARE = 48
 const SQUARE_SYMBOL = 30
 const SQUARE_WEIGHT = 'medium' as const
 const CHROME_INSET = 16
-const CHROME_TOP = 8
-const CHROME_H = CHROME_TOP + SQUARE + 12
+// A drawn form starts under the squares.
+const CHROME_H = CHROME_INSET + SQUARE + 12
 const TOOL = 52
 const AVATAR = 32
 const TOAST_MS = 2000
@@ -505,16 +601,25 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colour.Surface },
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.margin },
   grey: { color: GREY },
-  picture: { height: PICTURE_H, overflow: 'hidden' },
-  form: { height: PICTURE_H, borderRadius: 0, justifyContent: 'flex-end' },
-  chrome: { position: 'absolute', left: CHROME_INSET, right: CHROME_INSET, flexDirection: 'row', justifyContent: 'space-between' },
-  square: { width: SQUARE, height: SQUARE, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.85)', alignItems: 'center', justifyContent: 'center' },
+  picture: { marginHorizontal: CARD_INSET, borderRadius: CARD_RADIUS, overflow: 'hidden' },
+  form: { borderRadius: 0, justifyContent: 'flex-end', paddingTop: CHROME_H },
+  statusBand: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colour.Surface },
+  chrome: { position: 'absolute', left: CARD_INSET + CHROME_INSET, right: CARD_INSET + CHROME_INSET, flexDirection: 'row', justifyContent: 'space-between' },
+  square: { width: SQUARE, height: SQUARE, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  frost: { backgroundColor: 'rgba(255,255,255,0.78)' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin, paddingTop: 16 },
   icons: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  iconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   icon: { width: ICON, height: ICON, alignItems: 'center', justifyContent: 'center' },
+  count: { fontSize: 12, color: GREY },
   save: { minWidth: 84, height: 44, borderRadius: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', maxWidth: 220 },
   unsaved: { backgroundColor: colour.Lime },
-  saved: { backgroundColor: colour.Ink },
+  saved: { backgroundColor: colour.Ink, flexDirection: 'row', paddingHorizontal: 0, overflow: 'hidden' },
+  splitName: { flexShrink: 1, height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 14, paddingRight: 12 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  divider: { width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.3)' },
+  splitChevron: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
+  pressed: { opacity: 0.6 },
   saveText: { fontSize: 15, fontWeight: '600', color: colour.Ink },
   savedText: { color: colour.Surface },
   body: { paddingHorizontal: space.margin, paddingTop: 18 },
