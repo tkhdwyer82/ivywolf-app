@@ -70,14 +70,21 @@ it('from the saved pill: where it lives first under Top choices with a ✓, My t
   mockParams = { id: 'c1', projectId: 'p-things' }
 })
 
-it('Psst! points at Top choices for 4 s, then goes', async () => {
+it('Psst! sits under the search field, points at Top choices for 4 s, then goes', async () => {
   jest.useFakeTimers()
   mockParams = { id: 'c1', projectId: 'p-launch' }
   await render(<SaveTo />)
   await screen.findByText('Launch video')
   expect(screen.getByTestId('save-psst')).toHaveTextContent('Psst! This idea already lives in Launch video')
+  // Under the search field, never over it: in the list's flow, 12 below the field, before Top choices.
+  const tree = JSON.stringify(screen.toJSON())
+  expect(tree.indexOf('Search projects')).toBeLessThan(tree.indexOf('Psst!'))
+  expect(tree.indexOf('Psst!')).toBeLessThan(tree.indexOf('Top choices'))
+  expect(screen.getByTestId('save-psst').parent?.parent).not.toHaveStyle({ position: 'absolute' })
+  expect(screen.getByText('Top choices')).toHaveStyle({ marginTop: 12 })
   await act(async () => jest.advanceTimersByTime(PSST_MS + 500))
   expect(screen.queryByTestId('save-psst')).toBeNull()
+  expect(screen.getByText('Top choices')).toHaveStyle({ marginTop: 28 })
   jest.useRealTimers()
   mockParams = { id: 'c1', projectId: 'p-things' }
 })

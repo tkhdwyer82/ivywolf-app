@@ -2,13 +2,14 @@
 // Save to (P10, B.8a I2 2151:82), Pinterest's board picker: a full-height sheet (app/_layout.tsx) from the idea page's
 // Save and its saved pill's ˅. A 56 header (× left, "Save to" centred), search, Top choices — where it lives now first
 // with a ✓, then My things — and Your projects: rows of a thumbnail and a name, nothing under it. While it lives in a
-// project, Pinterest's dark "Psst!" bubble points at Top choices for 4 s. "+ New project" is the lime button at the
+// project, Pinterest's dark "Psst!" bubble sits 12 under the search field — never over it — its tail down at Top
+// choices, for 4 s; then it folds away and Top choices moves up. "+ New project" is the lime button at the
 // foot, where Pinterest's Create new board is: it turns the search field into the name field (what she'd typed carries
 // over), then reads "Create and save here", makes it, and moves the idea. Remove from a project is on the idea page's
 // •••, not here. Only the card moves — its thread and the rest of the thread stay where they are.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Animated, Image, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Animated, Image, KeyboardAvoidingView, LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SymbolView } from 'expo-symbols'
@@ -30,6 +31,7 @@ export default function SaveTo() {
   const [naming, setNaming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [psstGone, setPsstGone] = useState(false)
 
   useFocusEffect(
     useCallback(() => {
@@ -42,6 +44,8 @@ export default function SaveTo() {
   const match = useCallback((p: PickerProject) => p.name.toLowerCase().includes(query.trim().toLowerCase()), [query])
   const top = useMemo(() => (picker ? picker.top.filter(match) : []), [picker, match])
   const yours = useMemo(() => (picker ? picker.yours.filter(match) : []), [picker, match])
+  // Where it lives now, said once over Top choices.
+  const psst = !!picker?.current && !naming && top.length > 0 && !psstGone
 
   async function saveTo(target: string) {
     if (busy) return
@@ -142,9 +146,18 @@ export default function SaveTo() {
           <View style={styles.centered}>{error ? <Text style={styles.note}>{error}</Text> : <ActivityIndicator color={hero.ink} />}</View>
         ) : (
           <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+            {psst && (
+              <Psst
+                name={picker.current!.name}
+                onGone={() => {
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+                  setPsstGone(true)
+                }}
+              />
+            )}
             {!naming && top.length > 0 && (
               <>
-                <Text style={styles.section}>Top choices</Text>
+                <Text style={[styles.section, psst && styles.underPsst]}>Top choices</Text>
                 {top.map(row)}
               </>
             )}
@@ -158,8 +171,6 @@ export default function SaveTo() {
             {error && <Text style={styles.note}>{error}</Text>}
           </ScrollView>
         )}
-        {/* Over the list, its tail on Top choices: where it lives now. */}
-        {picker?.current && !naming && top.length > 0 && <Psst name={picker.current.name} />}
       </View>
 
       <Pressable
@@ -176,15 +187,16 @@ export default function SaveTo() {
   )
 }
 
-/** Pinterest's dark tooltip: 14 white, two lines at most, a tail down to Top choices; fades after PSST_MS. */
-function Psst({ name }: { name: string }) {
+/** Pinterest's dark tooltip, in the list's flow under the search field: 14 white, two lines at most, a tail down to
+ *  Top choices. Fades after PSST_MS, then tells the list to close the gap. */
+function Psst({ name, onGone }: { name: string; onGone: () => void }) {
   const opacity = useRef(new Animated.Value(1)).current
-  const [gone, setGone] = useState(false)
+  const gone = useRef(onGone)
+  gone.current = onGone
   useEffect(() => {
-    const t = setTimeout(() => Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setGone(true)), PSST_MS)
+    const t = setTimeout(() => Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => gone.current()), PSST_MS)
     return () => clearTimeout(t)
   }, [opacity])
-  if (gone) return null
   return (
     <View style={styles.psstAnchor} pointerEvents="none">
       <Animated.View style={[styles.psst, { opacity }]} testID="save-psst" accessibilityLiveRegion="polite">
@@ -228,8 +240,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', height: 50, gap: 20, paddingHorizontal: SIDE },
   thumb: { width: 42, height: 42, borderRadius: 8, backgroundColor: hero.fill },
   name: { flex: 1, fontSize: 18, fontWeight: '600', color: hero.ink },
-  // The bubble's foot sits just above Top choices (SECTION_TOP into the list); it rises over the gap and the search.
-  psstAnchor: { position: 'absolute', top: 0, left: SIDE, right: SIDE, height: SECTION_TOP - 4, justifyContent: 'flex-end' },
+  // 12 under the search field, in the flow — it never covers the field; Top choices sits 12 under it, the tail between.
+  psstAnchor: { marginTop: 12, marginHorizontal: SIDE },
+  underPsst: { marginTop: 12 },
   psst: { alignSelf: 'flex-start', maxWidth: 260, backgroundColor: '#1D1D1F', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 },
   psstText: { fontSize: 14, lineHeight: 19, color: '#FFFFFF' },
   tail: { position: 'absolute', bottom: -5, left: 22, width: 12, height: 12, backgroundColor: '#1D1D1F', transform: [{ rotate: '45deg' }] },
