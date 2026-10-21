@@ -1,7 +1,7 @@
 /// <reference types="jest" />
 // B.8a I2 (build 26: the sheet span forever): Save to lists her projects as soon as they load, New project at the top.
-import { render, screen } from '@testing-library/react-native'
-import SaveTo from '@/app/idea/save/[id]'
+import { act, render, screen, within } from '@testing-library/react-native'
+import SaveTo, { PSST_MS } from '@/app/idea/save/[id]'
 
 let mockParams: Record<string, string> = { id: 'c1', projectId: 'p-things' }
 jest.mock('expo-router', () => {
@@ -33,29 +33,51 @@ jest.mock('@/lib/supabase', () => {
   return { useSupabase: () => client }
 })
 
-it('lists her projects straight away, with New project at the top', async () => {
+it('lists her projects straight away, with New project at the foot', async () => {
   await render(<SaveTo />)
   expect(await screen.findByText('Launch video')).toBeTruthy()
   expect(screen.getByText('Restock')).toBeTruthy()
   expect(screen.getAllByText('My things').length).toBeGreaterThan(0)
   expect(screen.getByTestId('save-new-project')).toHaveTextContent('New project')
-  // New project comes before the list.
+  // Pinterest's Create new board: after the list, never above it.
   const tree = JSON.stringify(screen.toJSON())
-  expect(tree.indexOf('New project')).toBeLessThan(tree.indexOf('Launch video'))
+  expect(tree.indexOf('New project')).toBeGreaterThan(tree.indexOf('Restock'))
 })
 
-it('from the saved pill: where it lives first under Top choices, and Remove from it', async () => {
+it('rows are a thumbnail and a name — no subtitle lines', async () => {
+  await render(<SaveTo />)
+  await screen.findByText('Launch video')
+  for (const id of ['p-things', 'p-launch', 'p-jars']) {
+    const r = screen.getByTestId(`save-row-${id}`)
+    expect(r).toHaveStyle({ height: 50 })
+    expect(within(r).getAllByText(/./)).toHaveLength(1)
+  }
+  for (const gone of [/saved here/, /\d+ ideas?/, /to-dos, loose ends, life/]) expect(screen.queryByText(gone)).toBeNull()
+})
+
+it('from the saved pill: where it lives first under Top choices with a ✓, My things second; no Remove row', async () => {
   mockParams = { id: 'c1', projectId: 'p-launch' }
   await render(<SaveTo />)
-  expect(await screen.findByTestId('save-remove')).toHaveTextContent('Remove from Launch video')
+  await screen.findByText('Launch video')
   const tree = JSON.stringify(screen.toJSON())
-  expect(tree.indexOf('Top choices')).toBeLessThan(tree.indexOf('saved here'))
-  expect(tree.indexOf('saved here')).toBeLessThan(tree.indexOf('Your projects'))
+  const at = (s: string) => tree.indexOf(s)
+  expect(at('Top choices')).toBeLessThan(at('save-row-p-launch'))
+  expect(at('save-row-p-launch')).toBeLessThan(at('save-row-p-things'))
+  expect(at('save-row-p-things')).toBeLessThan(at('Your projects'))
+  expect(within(screen.getByTestId('save-row-p-launch')).getByTestId('save-here')).toBeTruthy()
+  expect(within(screen.getByTestId('save-row-p-jars')).queryByTestId('save-here')).toBeNull()
+  expect(screen.queryByText(/Remove from/)).toBeNull()
   mockParams = { id: 'c1', projectId: 'p-things' }
 })
 
-it('no Remove when it lives in My things', async () => {
+it('Psst! points at Top choices for 4 s, then goes', async () => {
+  jest.useFakeTimers()
+  mockParams = { id: 'c1', projectId: 'p-launch' }
   await render(<SaveTo />)
   await screen.findByText('Launch video')
-  expect(screen.queryByTestId('save-remove')).toBeNull()
+  expect(screen.getByTestId('save-psst')).toHaveTextContent('Psst! This idea already lives in Launch video')
+  await act(async () => jest.advanceTimersByTime(PSST_MS + 500))
+  expect(screen.queryByTestId('save-psst')).toBeNull()
+  jest.useRealTimers()
+  mockParams = { id: 'c1', projectId: 'p-things' }
 })

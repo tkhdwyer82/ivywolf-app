@@ -82,6 +82,7 @@ jest.mock('expo-blur', () => {
   return { BlurView: (p: object) => <View testID="frost" {...p} /> }
 })
 jest.mock('@/lib/viewIdea', () => ({ loadIvyThread: jest.fn() }))
+jest.mock('@/lib/saveTo', () => ({ removeFromProject: jest.fn(async () => {}) }))
 
 const { router } = jest.requireMock('expo-router') as { router: { push: jest.Mock } }
 const { loadIdea } = jest.requireMock('@/lib/idea') as { loadIdea: jest.Mock }
@@ -191,11 +192,40 @@ describe('Idea page (B.8a)', () => {
     expect(router.push).toHaveBeenLastCalledWith({ pathname: '/idea/save/[id]', params: { id: 'c1', projectId: 'p-launch' } })
   })
 
+  it("Pinterest's spacing under the card: row 24 under it, who 20 under the row, words 12, View idea 8, sides 20", async () => {
+    await open(base as unknown as Idea)
+    expect(screen.getByTestId('idea-actions')).toHaveStyle({ marginTop: 24, minHeight: 44, paddingHorizontal: 20 })
+    expect(screen.getByTestId('idea-body')).toHaveStyle({ paddingTop: 20, paddingHorizontal: 20 })
+    expect(screen.getByTestId('idea-snippet')).toHaveStyle({ marginTop: 12 })
+    expect(screen.getByText('View idea')).toHaveStyle({ marginTop: 8 })
+  })
+
+  it('saved pill: 48 high, a full-height 1 pt divider at 25 % white, ˅ in 44', async () => {
+    await open(SAVED)
+    expect(screen.getByTestId('idea-save')).toHaveStyle({ height: 48 })
+    expect(screen.getByTestId('idea-saved-divider')).toHaveStyle({ width: 1, alignSelf: 'stretch', backgroundColor: 'rgba(255,255,255,0.25)' })
+    expect(screen.getByTestId('idea-save-change')).toHaveStyle({ width: 44 })
+  })
+
+  it('••• → Remove from {project} when saved, back to My things', async () => {
+    const { removeFromProject } = jest.requireMock('@/lib/saveTo') as { removeFromProject: jest.Mock }
+    await open(SAVED)
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    await fireEvent.press(screen.getByText('Remove from Launch video'))
+    expect(removeFromProject).toHaveBeenCalledWith(expect.anything(), 'c1')
+  })
+
+  it('••• has no Remove while it lives in My things', async () => {
+    await open(base as unknown as Idea)
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    expect(screen.queryByText(/Remove from/)).toBeNull()
+  })
+
   it('a count after ◯ only when there is one; none after ♥, even liked', async () => {
     await open(base as unknown as Idea)
     expect(screen.queryByTestId('idea-like-count')).toBeNull()
     expect(screen.queryByTestId('idea-thread-count')).toBeNull()
-    loadIvyThread.mockResolvedValue({ title: 'Rooftop', ideas: [{ id: 'c2', title: 'Second take' }], directions: [], notes: [{ id: 'n1', text: 'x', at: '' }] })
+    loadIvyThread.mockResolvedValue({ title: 'Rooftop', ideas: [{ id: 'c2', title: 'Second take', thumbUrl: null }], directions: [], notes: [{ id: 'n1', text: 'x', at: '' }] })
     await open(idea({ heartedAt: '2026-10-20T00:00:00Z' }))
     expect(screen.queryByTestId('idea-like-count')).toBeNull()
     expect(screen.getByTestId('idea-thread-count')).toHaveTextContent('2')
@@ -243,10 +273,10 @@ describe('Idea page (B.8a)', () => {
     expect(soon[0]).toHaveStyle({ fontSize: 11, color: '#6E6E73' })
   })
 
-  it('section headers as Pinterest\'s: Semibold 20 ink, 28 above and 12 below', async () => {
+  it('section headers as Pinterest\'s: Semibold 20 ink, 36 above and 12 below', async () => {
     loadRelated.mockResolvedValue([card({ id: 'c7', title: 'Stairwell burst' })])
     await open(base as unknown as Idea)
-    const header = { fontSize: 20, fontWeight: '600', color: '#1D1D1F', marginTop: 28, marginBottom: 12 }
+    const header = { fontSize: 20, fontWeight: '600', color: '#1D1D1F', marginTop: 36, marginBottom: 12 }
     expect(screen.getByText('Make with')).toHaveStyle(header)
     expect(await screen.findByText('More to explore')).toHaveStyle(header)
   })

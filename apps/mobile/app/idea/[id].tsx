@@ -40,6 +40,7 @@ import { setShared } from '@/lib/share'
 import { masonry, type CardItem } from '@/lib/home'
 import { loadRelated } from '@/lib/related'
 import { loadIvyThread } from '@/lib/viewIdea'
+import { removeFromProject } from '@/lib/saveTo'
 import { draftCount, loadStepCard, MAKE_LABEL, type StepCard } from '@/lib/recipes'
 import { ShareSheet } from '@/components/ShareSheet'
 import { AddContextSheet } from '@/components/AddContextSheet'
@@ -203,6 +204,17 @@ export default function IdeaPage() {
     else router.navigate({ pathname: '/', params: { linkFrom: idea.id } })
   }
 
+  /** ••• → Remove from {project}: back to My things, unsaved. */
+  async function unsave() {
+    if (!idea) return
+    try {
+      await removeFromProject(supabase, idea.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That didn’t change')
+    }
+    load()
+  }
+
   /** ••• → Photo credit: the Unsplash credit that used to sit under the picture. */
   function photoCredit() {
     const c = idea?.card.credit
@@ -320,7 +332,7 @@ export default function IdeaPage() {
         )}
 
         {/* 2. The action row */}
-        <View style={styles.actions}>
+        <View style={styles.actions} testID="idea-actions">
           <View style={styles.icons}>
             {/* ♥ has no count until other people can like an idea: hers alone would always read 1. */}
             <Icon name={idea.heartedAt ? 'heart.fill' : 'heart'} label={idea.heartedAt ? 'Unlike' : 'Like'} onPress={heart} testID="idea-like" />
@@ -337,9 +349,9 @@ export default function IdeaPage() {
                 accessibilityLabel={`Saved to ${saved}. Open it`}
                 testID="idea-saved-project"
               >
-                <Marquee text={saved} maxWidth={SPLIT_NAME - 2 * SPLIT_PAD} style={[styles.saveText, styles.savedText]} testID="idea-saved-name" />
+                <Marquee text={saved} maxWidth={SPLIT_NAME - SPLIT_LEFT - SPLIT_RIGHT} style={[styles.saveText, styles.savedText]} testID="idea-saved-name" />
               </Pressable>
-              <View style={styles.divider} />
+              <View style={styles.divider} testID="idea-saved-divider" />
               <Pressable
                 onPress={openSaveTo}
                 style={({ pressed }) => [styles.splitChevron, pressed && styles.pressed]}
@@ -357,7 +369,7 @@ export default function IdeaPage() {
           )}
         </View>
 
-        <View style={styles.body}>
+        <View style={styles.body} testID="idea-body">
           {/* 3. Who */}
           <View style={styles.who}>
             {/* Her photo only if she has one (Clerk's imageUrl is a generated purple placeholder otherwise). */}
@@ -448,7 +460,8 @@ export default function IdeaPage() {
             { icon: 'rectangle.3.group', label: 'Change view', onPress: changeView },
             { icon: 'square.on.square', label: 'Copy', onPress: copy },
             ...(idea.card.credit && picture.source === 'unsplash' ? [{ icon: 'camera' as const, label: 'Photo credit', onPress: photoCredit }] : []),
-            { icon: 'folder', label: 'Move to project', onPress: () => router.push({ pathname: '/idea/save/[id]', params: { id: idea.id, projectId: idea.project?.id } }) },
+            { icon: 'folder', label: 'Move to project', onPress: openSaveTo },
+            ...(saved ? [{ icon: 'minus.circle' as const, label: `Remove from ${saved}`, onPress: unsave }] : []),
             { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
           ]}
         />
@@ -545,11 +558,14 @@ function ToolSquare({ icon, label, spoken, onPress, badge = 0, lime, sub, testID
 }
 
 // Figma v5.0 I1 (2151:5), matched to Pinterest's idea page: the picture a card 8 from the sides and the status bar, r32,
-// at its own ratio; back and ••• each a 48 FrostSquare (blur 40 under #F2F2F7 0.85, a 6 % ink hairline), r14, 16 inside the card's top
-// corners, 24 pt icons at stroke 2; the action row 16 under the picture, 28 pt outline icons at stroke 1.8, 20 apart,
-// counts Regular 14 ink 6 after their icon, Save 84 × 44 r12 (saved: name up to 180 | ˅ 44, a 1 pt divider); who 32 avatar, name Semibold 15, meta Regular 13 grey; snippet
-// Regular 15/21 two lines, "View idea" Semibold 13; "Make with" and "More to explore" Semibold 20 ink, 28 above and 12
-// below; squares 52 r14 with Regular 13 ink labels ("Soon" 11 grey under); More to explore the Home masonry.
+// at its own ratio; back and ••• each a 48 FrostSquare (blur 40 under #F2F2F7 0.85, a 6 % ink hairline), r14, 16
+// inside the card's top corners, 24 pt icons at stroke 2. Below the card, Pinterest's measurements, 20 from the sides:
+// the action row 24 under it, 44 high — 28 pt outline icons at stroke 1.8, 20 apart, counts Regular 14 ink 6 after
+// their icon; Save 84 × 44 r12, or the saved pill, 48 high: the name (20 left, 16 right, the part at most 180) | a
+// full-height 1 pt divider, white 25 % | ˅ in 44. Who 20 under the row: 32 avatar, name Semibold 15, meta Regular 13
+// grey; her words 12 under that, Regular 15/21, two lines; "View idea" Semibold 13, 8 under them. "Make with" 36
+// under View idea and "More to explore" 36 under the squares — Semibold 20 ink, 12 above what they head; squares 52
+// r14 with Regular 13 ink labels ("Soon" 11 grey under); More to explore the Home masonry.
 const CARD_INSET = 8
 const CARD_TOP = 8
 const CARD_RADIUS = 32
@@ -559,7 +575,11 @@ const PICTURE_MIN = 300
 const PICTURE_MAX = 0.75
 /** The saved pill: the name's part at most 180 (padding included), ˅'s 44. */
 const SPLIT_NAME = 180
-const SPLIT_PAD = 14
+const SPLIT_LEFT = 20
+const SPLIT_RIGHT = 16
+const SPLIT_H = 48
+/** Side padding under the card. */
+const PAD = 20
 const SPLIT_CHEVRON = 44
 // Icons are SF Symbols (the Home hold menu's set). A symbol's glyph draws at about 0.8 of its size (HoldArc: size 30
 // is a 24 pt glyph), so a 28 pt glyph is size 35 and a 24 pt one size 30. Stroke is the symbol's weight: regular is
@@ -589,31 +609,31 @@ const styles = StyleSheet.create({
   form: { borderRadius: 0, justifyContent: 'flex-end', paddingTop: CHROME_H },
   statusBand: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colour.Surface },
   chrome: { position: 'absolute', left: CARD_INSET + CHROME_INSET, right: CARD_INSET + CHROME_INSET, flexDirection: 'row', justifyContent: 'space-between' },
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin, paddingTop: 16 },
+  actions: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: PAD, marginTop: 24 },
   icons: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   iconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   icon: { width: ICON, height: ICON, alignItems: 'center', justifyContent: 'center' },
   count: { fontSize: 14, color: colour.Ink },
   save: { minWidth: 84, height: 44, borderRadius: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   unsaved: { backgroundColor: colour.Lime },
-  saved: { backgroundColor: colour.Ink, flexDirection: 'row', paddingHorizontal: 0, overflow: 'hidden' },
-  splitName: { maxWidth: SPLIT_NAME, height: 44, justifyContent: 'center', paddingHorizontal: SPLIT_PAD },
-  divider: { width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.3)' },
-  splitChevron: { width: SPLIT_CHEVRON, height: 44, alignItems: 'center', justifyContent: 'center' },
+  saved: { height: SPLIT_H, backgroundColor: colour.Ink, flexDirection: 'row', paddingHorizontal: 0, overflow: 'hidden' },
+  splitName: { maxWidth: SPLIT_NAME, height: SPLIT_H, justifyContent: 'center', paddingLeft: SPLIT_LEFT, paddingRight: SPLIT_RIGHT },
+  divider: { width: 1, alignSelf: 'stretch', backgroundColor: 'rgba(255,255,255,0.25)' },
+  splitChevron: { width: SPLIT_CHEVRON, height: SPLIT_H, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.6 },
   saveText: { fontSize: 15, fontWeight: '600', color: colour.Ink },
   savedText: { color: colour.Surface },
-  body: { paddingHorizontal: space.margin, paddingTop: 18 },
+  body: { paddingHorizontal: PAD, paddingTop: 20 },
   who: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   whoText: { flex: 1 },
   name: { fontSize: 15, fontWeight: '600', color: colour.Ink },
   meta: { fontSize: 13, color: GREY, marginTop: 1 },
-  snippet: { fontSize: 15, lineHeight: 21, color: colour.Ink, marginTop: 14 },
-  viewIdea: { fontSize: 13, fontWeight: '600', color: colour.Ink, marginTop: 6 },
+  snippet: { fontSize: 15, lineHeight: 21, color: colour.Ink, marginTop: 12 },
+  viewIdea: { fontSize: 13, fontWeight: '600', color: colour.Ink, marginTop: 8 },
   stepTag: { fontSize: 13, color: GREY, marginTop: 10 },
   small: { fontSize: 13, color: GREY, marginTop: 8 },
-  // Pinterest's section header ("More to explore"): Semibold 20 ink, 28 above, 12 below.
-  header: { fontSize: 20, fontWeight: '600', color: colour.Ink, marginTop: 28, marginBottom: 12 },
+  // Pinterest's section header ("More to explore"): Semibold 20 ink, 36 above, 12 below.
+  header: { fontSize: 20, fontWeight: '600', color: colour.Ink, marginTop: 36, marginBottom: 12 },
   tools: { flexDirection: 'row', gap: 4, marginHorizontal: -9 },
   tool: { width: TOOL + 18, alignItems: 'center' },
   toolSquare: { width: TOOL, height: TOOL, borderRadius: 14, backgroundColor: SOFT, alignItems: 'center', justifyContent: 'center' },
@@ -622,8 +642,8 @@ const styles = StyleSheet.create({
   toolSub: { fontSize: 11, color: GREY, marginTop: 1 },
   badge: { position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colour.Ink, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 11, fontWeight: '700', color: colour.Surface },
-  exploreHeader: { paddingHorizontal: space.margin },
-  grid: { flexDirection: 'row', gap: space.gutter, paddingHorizontal: space.margin },
+  exploreHeader: { paddingHorizontal: PAD },
+  grid: { flexDirection: 'row', gap: space.gutter, paddingHorizontal: PAD },
   column: { flex: 1 },
   cell: { marginBottom: space.gutter },
 })

@@ -41,6 +41,6 @@ describe('More to explore', () => {
 describe('View idea', () => {
   it('no thread section when there is nothing in it', () => {
     expect(threadEmpty({ title: null, ideas: [], directions: [], notes: [] })).toBe(true)
-    expect(threadEmpty({ title: 'Rooftop', ideas: [{ id: 'c2', title: 'Second take' }], directions: [], notes: [] })).toBe(false)
+    expect(threadEmpty({ title: 'Rooftop', ideas: [{ id: 'c2', title: 'Second take', thumbUrl: null }], directions: [], notes: [] })).toBe(false)
   })
 })

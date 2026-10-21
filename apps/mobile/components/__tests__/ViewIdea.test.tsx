@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 // B.8a I3: View idea — her full words, chaptered as the transcript is, then the Ivy thread, on one scroll.
-import { render, screen } from '@testing-library/react-native'
+import { render, screen, within } from '@testing-library/react-native'
 import ViewIdea from '@/app/idea/view/[id]'
 
 jest.mock('expo-router', () => {
@@ -29,7 +29,7 @@ jest.mock('@/lib/viewIdea', () => ({
   ...jest.requireActual('@/lib/viewIdea'),
   loadIvyThread: jest.fn(async () => ({
     title: 'Rooftop',
-    ideas: [{ id: 'c2', title: 'Second take' }],
+    ideas: [{ id: 'c2', title: 'Second take', thumbUrl: 'https://x/frame.jpg' }],
     directions: [{ id: 's1', title: 'Open on the stairwell', gist: 'Burst out of the door.', why: null }],
     notes: [{ id: 'n1', text: 'You came back to the roof three times.', at: '2026-10-14T09:00:00Z' }],
   })),
@@ -41,8 +41,32 @@ it('her words, a chapter per turn, then the Ivy thread', async () => {
   expect(screen.getAllByTestId('chapter')).toHaveLength(2)
   expect(screen.getByText('Tim')).toBeTruthy()
   expect(await screen.findByTestId('ivy-thread')).toBeTruthy()
-  expect(screen.getByText('Ivy · Rooftop')).toBeTruthy()
+  expect(screen.getByText('Ivy')).toBeTruthy()
   expect(screen.getByText('Open on the stairwell')).toBeTruthy()
   expect(screen.getByText('Second take')).toBeTruthy()
   expect(screen.getByText('You came back to the roof three times.')).toBeTruthy()
+})
+
+it("Pinterest's comments sheet: × · Her words · ↑ header, the title, then the Ivy rows", async () => {
+  await render(<ViewIdea />)
+  await screen.findByTestId('ivy-thread')
+  expect(screen.getByText('Her words')).toBeTruthy()
+  expect(screen.getByTestId('view-close')).toBeTruthy()
+  expect(screen.getByTestId('view-share')).toBeTruthy()
+  expect(screen.getByText('Rooftop chase, night')).toHaveStyle({ fontSize: 22, fontWeight: '700' })
+})
+
+it('each Ivy row is a thumbnail and one title — no subtitle, no gist', async () => {
+  await render(<ViewIdea />)
+  await screen.findByTestId('ivy-thread')
+  const rows = screen.getAllByTestId('ivy-row')
+  expect(rows).toHaveLength(3)
+  for (const r of rows) {
+    expect(r).toHaveStyle({ height: 56 })
+    expect(within(r).getAllByTestId('ivy-row-thumb')).toHaveLength(1)
+    // One line of text per row: its title.
+    expect(within(r).getAllByText(/./)).toHaveLength(1)
+  }
+  expect(screen.queryByText('Burst out of the door.')).toBeNull()
+  expect(screen.queryByText('DIRECTION')).toBeNull()
 })

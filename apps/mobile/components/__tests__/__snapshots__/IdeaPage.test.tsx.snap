@@ -48,10 +48,12 @@ exports[`snapshots saved state 1`] = `
             "alignItems": "center",
             "flexDirection": "row",
             "justifyContent": "space-between",
-            "paddingHorizontal": 12,
-            "paddingTop": 16,
+            "marginTop": 24,
+            "minHeight": 44,
+            "paddingHorizontal": 20,
           }
         }
+        testID="idea-actions"
       >
         <View
           style={
@@ -236,6 +238,7 @@ exports[`snapshots saved state 1`] = `
               {
                 "backgroundColor": "#1D1D1F",
                 "flexDirection": "row",
+                "height": 48,
                 "overflow": "hidden",
                 "paddingHorizontal": 0,
               },
@@ -278,10 +281,11 @@ exports[`snapshots saved state 1`] = `
             style={
               [
                 {
-                  "height": 44,
+                  "height": 48,
                   "justifyContent": "center",
                   "maxWidth": 180,
-                  "paddingHorizontal": 14,
+                  "paddingLeft": 20,
+                  "paddingRight": 16,
                 },
                 false,
               ]
@@ -295,7 +299,7 @@ exports[`snapshots saved state 1`] = `
                     "overflow": "hidden",
                   },
                   {
-                    "maxWidth": 152,
+                    "maxWidth": 144,
                   },
                   false,
                 ]
@@ -362,11 +366,12 @@ exports[`snapshots saved state 1`] = `
           <View
             style={
               {
-                "backgroundColor": "rgba(255,255,255,0.3)",
-                "height": 24,
+                "alignSelf": "stretch",
+                "backgroundColor": "rgba(255,255,255,0.25)",
                 "width": 1,
               }
             }
+            testID="idea-saved-divider"
           />
           <View
             accessibilityLabel="Move or remove"
@@ -404,7 +409,7 @@ exports[`snapshots saved state 1`] = `
               [
                 {
                   "alignItems": "center",
-                  "height": 44,
+                  "height": 48,
                   "justifyContent": "center",
                   "width": 44,
                 },
@@ -418,10 +423,11 @@ exports[`snapshots saved state 1`] = `
       <View
         style={
           {
-            "paddingHorizontal": 12,
-            "paddingTop": 18,
+            "paddingHorizontal": 20,
+            "paddingTop": 20,
           }
         }
+        testID="idea-body"
       >
         <View
           style={
@@ -573,7 +579,7 @@ exports[`snapshots saved state 1`] = `
                 "color": "#1D1D1F",
                 "fontSize": 15,
                 "lineHeight": 21,
-                "marginTop": 14,
+                "marginTop": 12,
               }
             }
             testID="idea-snippet"
@@ -621,7 +627,7 @@ exports[`snapshots saved state 1`] = `
                 "color": "#1D1D1F",
                 "fontSize": 13,
                 "fontWeight": "600",
-                "marginTop": 6,
+                "marginTop": 8,
               }
             }
           >
@@ -636,7 +642,7 @@ exports[`snapshots saved state 1`] = `
               "fontSize": 20,
               "fontWeight": "600",
               "marginBottom": 12,
-              "marginTop": 28,
+              "marginTop": 36,
             }
           }
         >
@@ -1207,10 +1213,12 @@ exports[`snapshots text idea 1`] = `
             "alignItems": "center",
             "flexDirection": "row",
             "justifyContent": "space-between",
-            "paddingHorizontal": 12,
-            "paddingTop": 16,
+            "marginTop": 24,
+            "minHeight": 44,
+            "paddingHorizontal": 20,
           }
         }
+        testID="idea-actions"
       >
         <View
           style={
@@ -1446,10 +1454,11 @@ exports[`snapshots text idea 1`] = `
       <View
         style={
           {
-            "paddingHorizontal": 12,
-            "paddingTop": 18,
+            "paddingHorizontal": 20,
+            "paddingTop": 20,
           }
         }
+        testID="idea-body"
       >
         <View
           style={
@@ -1601,7 +1610,7 @@ exports[`snapshots text idea 1`] = `
                 "color": "#1D1D1F",
                 "fontSize": 15,
                 "lineHeight": 21,
-                "marginTop": 14,
+                "marginTop": 12,
               }
             }
             testID="idea-snippet"
@@ -1649,7 +1658,7 @@ exports[`snapshots text idea 1`] = `
                 "color": "#1D1D1F",
                 "fontSize": 13,
                 "fontWeight": "600",
-                "marginTop": 6,
+                "marginTop": 8,
               }
             }
           >
@@ -1664,7 +1673,7 @@ exports[`snapshots text idea 1`] = `
               "fontSize": 20,
               "fontWeight": "600",
               "marginBottom": 12,
-              "marginTop": 28,
+              "marginTop": 36,
             }
           }
         >
@@ -2631,10 +2640,12 @@ exports[`snapshots video idea 1`] = `
             "alignItems": "center",
             "flexDirection": "row",
             "justifyContent": "space-between",
-            "paddingHorizontal": 12,
-            "paddingTop": 16,
+            "marginTop": 24,
+            "minHeight": 44,
+            "paddingHorizontal": 20,
           }
         }
+        testID="idea-actions"
       >
         <View
           style={
@@ -2870,10 +2881,11 @@ exports[`snapshots video idea 1`] = `
       <View
         style={
           {
-            "paddingHorizontal": 12,
-            "paddingTop": 18,
+            "paddingHorizontal": 20,
+            "paddingTop": 20,
           }
         }
+        testID="idea-body"
       >
         <View
           style={
@@ -3025,7 +3037,7 @@ exports[`snapshots video idea 1`] = `
                 "color": "#1D1D1F",
                 "fontSize": 15,
                 "lineHeight": 21,
-                "marginTop": 14,
+                "marginTop": 12,
               }
             }
             testID="idea-snippet"
@@ -3073,7 +3085,7 @@ exports[`snapshots video idea 1`] = `
                 "color": "#1D1D1F",
                 "fontSize": 13,
                 "fontWeight": "600",
-                "marginTop": 6,
+                "marginTop": 8,
               }
             }
           >
@@ -3088,7 +3100,7 @@ exports[`snapshots video idea 1`] = `
               "fontSize": 20,
               "fontWeight": "600",
               "marginBottom": 12,
-              "marginTop": 28,
+              "marginTop": 36,
             }
           }
         >

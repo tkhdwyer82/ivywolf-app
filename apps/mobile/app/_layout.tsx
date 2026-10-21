@@ -23,13 +23,13 @@ function Routes() {
         <Stack.Screen name="index" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="idea/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="idea/transcript/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: '#FAFAF7' } }} />
-        {/* Save to (I2): always a sheet sliding up over the idea page, never a push. */}
+        {/* Save to (I2): always a sheet sliding up over the idea page, never a push — full height, to the top safe area. */}
         <Stack.Screen
           name="idea/save/[id]"
           options={{
             headerShown: false,
             presentation: 'formSheet',
-            sheetAllowedDetents: [0.9],
+            sheetAllowedDetents: [1],
             sheetGrabberVisible: true,
             sheetCornerRadius: 28,
             contentStyle: { backgroundColor: hero.room },

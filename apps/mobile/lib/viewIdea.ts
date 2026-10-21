@@ -8,6 +8,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export interface ThreadIdea {
   id: string
   title: string
+  /** Its frame, for the row's thumbnail; null → a soft square. */
+  thumbUrl: string | null
 }
 export interface DirectionNote {
   id: string
@@ -27,12 +29,14 @@ export interface IvyThread {
   notes: IvyNote[]
 }
 
+type ThreadCardRow = { id: string; title: string; trashed_at: string | null; frame_url: string | null }
+
 export async function loadIvyThread(supabase: SupabaseClient, cardId: string, recordingId: string | null): Promise<IvyThread> {
   const { data: tc } = await supabase.from('thread_cards').select('threads(id, title)').eq('card_id', cardId).maybeSingle()
   const thread = (tc?.threads as unknown as { id: string; title: string } | null) ?? null
   const [ideas, directions, notes] = await Promise.all([
     thread
-      ? supabase.from('thread_cards').select('cards(id, title, trashed_at)').eq('thread_id', thread.id)
+      ? supabase.from('thread_cards').select('cards(id, title, trashed_at, frame_url)').eq('thread_id', thread.id)
       : Promise.resolve({ data: [] as unknown[], error: null }),
     supabase.from('suggestions').select('id, title, gist, why, status').eq('kind', 'direction').contains('cite_card_ids', [cardId]).neq('status', 'dismissed').order('generated_at', { ascending: false }).limit(5),
     recordingId
@@ -41,10 +45,10 @@ export async function loadIvyThread(supabase: SupabaseClient, cardId: string, re
   ])
   return {
     title: thread?.title ?? null,
-    ideas: ((ideas.data ?? []) as { cards: { id: string; title: string; trashed_at: string | null } | null }[])
+    ideas: ((ideas.data ?? []) as { cards: ThreadCardRow | null }[])
       .map((r) => r.cards)
-      .filter((c): c is { id: string; title: string; trashed_at: string | null } => !!c && c.id !== cardId && !c.trashed_at)
-      .map((c) => ({ id: c.id, title: c.title })),
+      .filter((c): c is ThreadCardRow => !!c && c.id !== cardId && !c.trashed_at)
+      .map((c) => ({ id: c.id, title: c.title, thumbUrl: c.frame_url ?? null })),
     directions: ((directions.data ?? []) as { id: string; title: string; gist: string | null; why: string | null }[]).map((d) => ({ id: d.id, title: d.title, gist: d.gist, why: d.why })),
     notes: ((notes.data ?? []) as { id: string; text: string; created_at: string }[]).map((n) => ({ id: n.id, text: n.text, at: n.created_at })),
   }
