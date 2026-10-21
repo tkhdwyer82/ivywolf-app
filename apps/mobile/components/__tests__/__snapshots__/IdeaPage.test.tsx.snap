@@ -29,13 +29,14 @@ exports[`snapshots saved state 1`] = `
         style={
           [
             {
+              "alignSelf": "center",
               "borderRadius": 32,
-              "marginHorizontal": 8,
               "overflow": "hidden",
             },
             {
               "backgroundColor": "#F2CFC2",
               "height": 918,
+              "width": 734,
             },
           ]
         }
@@ -98,7 +99,7 @@ exports[`snapshots saved state 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-like"
@@ -151,7 +152,7 @@ exports[`snapshots saved state 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-thread"
@@ -204,7 +205,7 @@ exports[`snapshots saved state 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-share"
@@ -229,7 +230,6 @@ exports[`snapshots saved state 1`] = `
                 "borderRadius": 12,
                 "height": 44,
                 "justifyContent": "center",
-                "maxWidth": 220,
                 "minWidth": 84,
                 "paddingHorizontal": 16,
               },
@@ -278,13 +278,10 @@ exports[`snapshots saved state 1`] = `
             style={
               [
                 {
-                  "alignItems": "center",
-                  "flexDirection": "row",
-                  "flexShrink": 1,
-                  "gap": 8,
                   "height": 44,
-                  "paddingLeft": 14,
-                  "paddingRight": 12,
+                  "justifyContent": "center",
+                  "maxWidth": 180,
+                  "paddingHorizontal": 14,
                 },
                 false,
               ]
@@ -295,33 +292,72 @@ exports[`snapshots saved state 1`] = `
               style={
                 [
                   {
-                    "borderRadius": 5,
-                    "height": 10,
-                    "width": 10,
+                    "overflow": "hidden",
                   },
                   {
-                    "backgroundColor": "#F2CFC2",
+                    "maxWidth": 152,
                   },
+                  false,
                 ]
               }
-            />
-            <Text
-              numberOfLines={1}
-              style={
-                [
-                  {
-                    "color": "#1D1D1F",
-                    "fontSize": 15,
-                    "fontWeight": "600",
-                  },
-                  {
-                    "color": "#FFFFFF",
-                  },
-                ]
-              }
+              testID="idea-saved-name"
             >
-              Launch video
-            </Text>
+              <View
+                accessibilityElementsHidden={true}
+                importantForAccessibility="no-hide-descendants"
+                pointerEvents="none"
+                style={
+                  {
+                    "left": 0,
+                    "opacity": 0,
+                    "position": "absolute",
+                    "top": 0,
+                    "width": 9999,
+                  }
+                }
+              >
+                <Text
+                  numberOfLines={1}
+                  onLayout={[Function]}
+                  style={
+                    [
+                      [
+                        {
+                          "color": "#1D1D1F",
+                          "fontSize": 15,
+                          "fontWeight": "600",
+                        },
+                        {
+                          "color": "#FFFFFF",
+                        },
+                      ],
+                      {
+                        "alignSelf": "flex-start",
+                      },
+                    ]
+                  }
+                >
+                  Launch video
+                </Text>
+              </View>
+              <Text
+                numberOfLines={1}
+                style={
+                  [
+                    {
+                      "color": "#1D1D1F",
+                      "fontSize": 15,
+                      "fontWeight": "600",
+                    },
+                    {
+                      "color": "#FFFFFF",
+                    },
+                  ]
+                }
+              >
+                Launch video
+              </Text>
+            </View>
           </View>
           <View
             style={
@@ -370,7 +406,7 @@ exports[`snapshots saved state 1`] = `
                   "alignItems": "center",
                   "height": 44,
                   "justifyContent": "center",
-                  "width": 40,
+                  "width": 44,
                 },
                 false,
               ]
@@ -493,7 +529,7 @@ exports[`snapshots saved state 1`] = `
               }
               testID="idea-who"
             >
-              0:31 · Launch video
+              Wed 8:00 · Launch video
             </Text>
           </View>
         </View>
@@ -1145,12 +1181,13 @@ exports[`snapshots text idea 1`] = `
         style={
           [
             {
+              "alignSelf": "center",
               "borderRadius": 32,
-              "marginHorizontal": 8,
               "overflow": "hidden",
             },
             {
               "height": 918,
+              "width": 734,
             },
           ]
         }
@@ -1217,7 +1254,7 @@ exports[`snapshots text idea 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-like"
@@ -1270,7 +1307,7 @@ exports[`snapshots text idea 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-thread"
@@ -1323,7 +1360,7 @@ exports[`snapshots text idea 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-share"
@@ -1379,7 +1416,6 @@ exports[`snapshots text idea 1`] = `
                 "borderRadius": 12,
                 "height": 44,
                 "justifyContent": "center",
-                "maxWidth": 220,
                 "minWidth": 84,
                 "paddingHorizontal": 16,
               },
@@ -1517,7 +1553,7 @@ exports[`snapshots text idea 1`] = `
               }
               testID="idea-who"
             >
-              0:31 · My things
+              Wed 8:00 · My things
             </Text>
           </View>
         </View>
@@ -2564,13 +2600,14 @@ exports[`snapshots video idea 1`] = `
         style={
           [
             {
+              "alignSelf": "center",
               "borderRadius": 32,
-              "marginHorizontal": 8,
               "overflow": "hidden",
             },
             {
               "backgroundColor": "#F2CFC2",
               "height": 918,
+              "width": 734,
             },
           ]
         }
@@ -2637,7 +2674,7 @@ exports[`snapshots video idea 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-like"
@@ -2690,7 +2727,7 @@ exports[`snapshots video idea 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-thread"
@@ -2743,7 +2780,7 @@ exports[`snapshots video idea 1`] = `
               {
                 "alignItems": "center",
                 "flexDirection": "row",
-                "gap": 4,
+                "gap": 6,
               }
             }
             testID="idea-share"
@@ -2799,7 +2836,6 @@ exports[`snapshots video idea 1`] = `
                 "borderRadius": 12,
                 "height": 44,
                 "justifyContent": "center",
-                "maxWidth": 220,
                 "minWidth": 84,
                 "paddingHorizontal": 16,
               },
@@ -2937,7 +2973,7 @@ exports[`snapshots video idea 1`] = `
               }
               testID="idea-who"
             >
-              0:31 · My things
+              Wed 8:00 · My things
             </Text>
           </View>
         </View>

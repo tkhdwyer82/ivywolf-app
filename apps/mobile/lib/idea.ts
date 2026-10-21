@@ -46,7 +46,7 @@ export interface Idea {
   recordedAt: string | null
   /** The recording's length (B.8a's "0:31 · Launch video"); null for a card with no recording. */
   durationMs: number | null
-  project: { id: string; name: string; kind: string; hue?: HueName | null } | null
+  project: { id: string; name: string; kind: string } | null
   thread: { id: string; title: string; returnCount: number } | null
   siblings: Sibling[]
   /** What CardFace draws (Figma 227:5): the shape and its payloads, credit, where it was said, the thread's stage. */
@@ -224,15 +224,18 @@ export async function setPinned(supabase: SupabaseClient, id: string, on: boolea
 /** Saved = filed in one of her own projects. My things and Ivy Mini are where unfiled ideas live, so not "saved". */
 export const savedTo = (idea: Pick<Idea, 'project'>): string | null => (idea.project?.kind === 'user' ? idea.project.name : null)
 
-/** "0:31" — a recording's length, m:ss. */
-export function duration(ms: number | null): string | null {
-  if (ms == null || ms < 0) return null
-  const s = Math.round(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+/** "Mon 7:40" — the day and the time on her phone's clock, 12-hour without am/pm, as Pinterest's. */
+export function when(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return `${DAYS[d.getDay()]} ${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-/** Who's line: "0:31 · Launch video" (no recording → just the project; My things when unfiled). */
-export const whoLine = (idea: Pick<Idea, 'durationMs' | 'project'>) => [duration(idea.durationMs), idea.project?.name ?? 'My things'].filter(Boolean).join(' · ')
+/** Who's line: "Mon 7:40 · Launch video" — when she said it (when it was made, with no recording), then its project
+ *  (My things when unfiled). No duration on the idea page. */
+export const whoLine = (idea: Pick<Idea, 'recordedAt' | 'createdAt' | 'project'>) =>
+  [when(idea.recordedAt ?? idea.createdAt), idea.project?.name ?? 'My things'].filter(Boolean).join(' · ')
 
 /** The snippet: her words (the span she said), else the gist. Quoted; the page clips it to two lines. */
 export function snippet(idea: Pick<Idea, 'said' | 'gist'>): string | null {

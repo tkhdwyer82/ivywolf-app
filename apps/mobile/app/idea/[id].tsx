@@ -9,9 +9,10 @@
 //      deferred (B.8a, 21 Oct).
 //   2. One action row, as Pinterest's: ♥ (outline; filled only once liked) · ◯ (a plain round speech bubble — View
 //      idea, I3, a bottom sheet over the page) · ↑ (Share) left, 28 pt outline icons, regular weight, 20 apart, with a
-//      small grey count after ◯ when there's one (♥ gets one once other people can like an idea); Save right — lime 84 × 44 r12, or, once it's filed in one of
-//      her projects, Pinterest's split ink pill: the project's name (opens it) | ˅ (Save to, I2, to move or remove it).
-//   3. Who: her avatar 32, her name, "{duration} · {project}" grey.
+//      count 6 after ◯ when there's one (♥ gets one once other people can like an idea); Save right — lime 84 × 44
+//      r12, or, once it's filed in one of her projects, Pinterest's split ink pill: the project's name, up to 180 and
+//      scrolling when longer (opens it) | ˅ in 44 (Save to, I2, to move or remove it).
+//   3. Who: her avatar 32, her name, "{day} {time} · {project}" grey ("Mon 7:40 · Lisa"); no duration on this page.
 //   4. The snippet: her words in quotes, two lines, 15 — tap to hear them — then "View idea" (I3).
 //   5. Make with: Video · Stills · Cut · ✦ Recipe (the header says "Make", so the squares don't). The first three are
 //      placeholders until B.8b ("Soon"; a tap says it's coming, nothing runs or spends). Recipe is live: the B.10 recipe sheet, her private
@@ -52,6 +53,7 @@ import { trashCard, TRASH_IDEA_LINE } from '@/lib/trash'
 import { Menu, MENU_OFFSET } from '@/components/PinChrome'
 import { Pill } from '@/components/UndoPill'
 import { AvatarInitials } from '@/components/AvatarInitials'
+import { Marquee } from '@/components/Marquee'
 import { colour, hueOf, space, type } from '@ivywolf/ui'
 
 const GREY = '#6E6E73'
@@ -284,11 +286,11 @@ export default function IdeaPage() {
       >
         {/* 1. The picture */}
         {grid.length >= 3 ? (
-          <View style={[styles.picture, { height: pictureH }]} testID="idea-grid">
+          <View style={[styles.picture, { width: cardW, height: pictureH }]} testID="idea-grid">
             <ThreeUp pictures={grid.slice(0, 3)} recyclingKey={idea.id} />
           </View>
         ) : drawnForm ? (
-          <View style={[styles.picture, { height: pictureH }]} testID="idea-form">
+          <View style={[styles.picture, { width: cardW, height: pictureH }]} testID="idea-form">
             <CardFace
               card={idea.card}
               size="page"
@@ -300,7 +302,7 @@ export default function IdeaPage() {
             />
           </View>
         ) : (
-          <View style={[styles.picture, { height: pictureH, backgroundColor: hueOf(idea.card.hue) }]} testID={picture.kind === 'video' ? 'idea-video' : 'idea-picture'}>
+          <View style={[styles.picture, { width: cardW, height: pictureH, backgroundColor: hueOf(idea.card.hue) }]} testID={picture.kind === 'video' ? 'idea-video' : 'idea-picture'}>
             {/* A video idea shows its poster — the take's first frame, paused; it never plays here. */}
             {picture.uri &&
               (picture.kind === 'video' ? (
@@ -335,10 +337,7 @@ export default function IdeaPage() {
                 accessibilityLabel={`Saved to ${saved}. Open it`}
                 testID="idea-saved-project"
               >
-                <View style={[styles.dot, { backgroundColor: hueOf(idea.project.hue ?? idea.card.hue) }]} />
-                <Text style={[styles.saveText, styles.savedText]} numberOfLines={1}>
-                  {saved}
-                </Text>
+                <Marquee text={saved} maxWidth={SPLIT_NAME - 2 * SPLIT_PAD} style={[styles.saveText, styles.savedText]} testID="idea-saved-name" />
               </Pressable>
               <View style={styles.divider} />
               <Pressable
@@ -523,7 +522,7 @@ function Icon({ name, label, count = 0, onPress, testID }: { name: SFSymbol; lab
         <SymbolView name={name} tintColor={colour.Ink} size={ICON_SYMBOL} weight={ICON_WEIGHT} />
       </View>
       {count > 0 && (
-        <Text style={styles.count} testID={testID ? `${testID}-count` : undefined}>
+        <Text style={styles.count} testID={testID ? `${testID}-count` : undefined} allowFontScaling={false}>
           {count}
         </Text>
       )}
@@ -564,7 +563,7 @@ function ToolSquare({ icon, label, spoken, onPress, badge = 0, lime, sub, testID
 // Figma v5.0 I1 (2151:5), matched to Pinterest's idea page: the picture a card 8 from the sides and the status bar, r32,
 // at its own ratio; back and ••• each a 48 frosted square (blur 40 under white 0.78), r14, 16 inside the card's top
 // corners, 24 pt icons at stroke 2; the action row 16 under the picture, 28 pt outline icons at stroke 1.8, 20 apart,
-// counts Regular 12 grey, Save 84 × 44 r12 (saved: name | ˅, a 1 pt divider); who 32 avatar, name Semibold 15, meta Regular 13 grey; snippet
+// counts Regular 14 ink 6 after their icon, Save 84 × 44 r12 (saved: name up to 180 | ˅ 44, a 1 pt divider); who 32 avatar, name Semibold 15, meta Regular 13 grey; snippet
 // Regular 15/21 two lines, "View idea" Semibold 13; "Make with" and "More to explore" Semibold 20 ink, 28 above and 12
 // below; squares 52 r14 with Regular 13 ink labels ("Soon" 11 grey under); More to explore the Home masonry.
 const CARD_INSET = 8
@@ -575,6 +574,10 @@ const RATIO = 1.25
 const PICTURE_MIN = 300
 const PICTURE_MAX = 0.75
 const BLUR = 40
+/** The saved pill: the name's part at most 180 (padding included), ˅'s 44. */
+const SPLIT_NAME = 180
+const SPLIT_PAD = 14
+const SPLIT_CHEVRON = 44
 // Icons are SF Symbols (the Home hold menu's set). A symbol's glyph draws at about 0.8 of its size (HoldArc: size 30
 // is a 24 pt glyph), so a 28 pt glyph is size 35 and a 24 pt one size 30. Stroke is the symbol's weight: regular is
 // about 1.8, medium about 2.
@@ -601,7 +604,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colour.Surface },
   centered: { alignItems: 'center', justifyContent: 'center', padding: space.margin },
   grey: { color: GREY },
-  picture: { marginHorizontal: CARD_INSET, borderRadius: CARD_RADIUS, overflow: 'hidden' },
+  // Its width is set (screen − 2 × 8) and centred, so nothing inside it — a poster, a drawn form — can widen it.
+  picture: { alignSelf: 'center', borderRadius: CARD_RADIUS, overflow: 'hidden' },
   form: { borderRadius: 0, justifyContent: 'flex-end', paddingTop: CHROME_H },
   statusBand: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colour.Surface },
   chrome: { position: 'absolute', left: CARD_INSET + CHROME_INSET, right: CARD_INSET + CHROME_INSET, flexDirection: 'row', justifyContent: 'space-between' },
@@ -609,16 +613,15 @@ const styles = StyleSheet.create({
   frost: { backgroundColor: 'rgba(255,255,255,0.78)' },
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.margin, paddingTop: 16 },
   icons: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  iconRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  iconRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   icon: { width: ICON, height: ICON, alignItems: 'center', justifyContent: 'center' },
-  count: { fontSize: 12, color: GREY },
-  save: { minWidth: 84, height: 44, borderRadius: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', maxWidth: 220 },
+  count: { fontSize: 14, color: colour.Ink },
+  save: { minWidth: 84, height: 44, borderRadius: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
   unsaved: { backgroundColor: colour.Lime },
   saved: { backgroundColor: colour.Ink, flexDirection: 'row', paddingHorizontal: 0, overflow: 'hidden' },
-  splitName: { flexShrink: 1, height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 14, paddingRight: 12 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
+  splitName: { maxWidth: SPLIT_NAME, height: 44, justifyContent: 'center', paddingHorizontal: SPLIT_PAD },
   divider: { width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.3)' },
-  splitChevron: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' },
+  splitChevron: { width: SPLIT_CHEVRON, height: 44, alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.6 },
   saveText: { fontSize: 15, fontWeight: '600', color: colour.Ink },
   savedText: { color: colour.Surface },

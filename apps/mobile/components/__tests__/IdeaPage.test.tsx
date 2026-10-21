@@ -182,7 +182,9 @@ describe('Idea page (B.8a)', () => {
 
   it("saved: Pinterest's split pill — the name opens the project, ˅ opens Save to", async () => {
     await open(SAVED)
-    expect(screen.getByTestId('idea-save')).toHaveTextContent('Launch video')
+    // Just the name (no colour dot), then ˅.
+    expect(screen.getByLabelText('Saved to Launch video. Open it')).toBeTruthy()
+    expect(screen.getByTestId('idea-saved-name')).toHaveTextContent(/^Launch video/)
     await fireEvent.press(screen.getByTestId('idea-saved-project'))
     expect(router.push).toHaveBeenLastCalledWith({ pathname: '/project/[id]', params: { id: 'p-launch' } })
     await fireEvent.press(screen.getByTestId('idea-save-change'))
@@ -204,10 +206,11 @@ describe('Idea page (B.8a)', () => {
     expect(screen.getAllByTestId('frost')).toHaveLength(2)
   })
 
-  it('who: her name and "{duration} · {project}"', async () => {
-    await open(SAVED)
+  it('who: her name and "{day} {time} · {project}" — no duration', async () => {
+    await open(idea({ ...SAVED, recordedAt: new Date(2026, 9, 19, 7, 40).toISOString() }))
     expect(screen.getByText('Tim Dwyer')).toBeTruthy()
-    expect(screen.getByTestId('idea-who')).toHaveTextContent('0:31 · Launch video')
+    expect(screen.getByTestId('idea-who')).toHaveTextContent('Mon 7:40 · Launch video')
+    expect(screen.queryByText(/0:31/)).toBeNull()
   })
 
   it("who-line avatar: her initials on the blue gradient, never Clerk's purple placeholder", async () => {
