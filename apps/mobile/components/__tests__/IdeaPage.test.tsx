@@ -189,13 +189,13 @@ describe('Idea page (B.8a)', () => {
     expect(router.push).toHaveBeenLastCalledWith({ pathname: '/idea/save/[id]', params: { id: 'c1', projectId: 'p-launch' } })
   })
 
-  it('counts after ♥ and ◯ only when there are some', async () => {
+  it('a count after ◯ only when there is one; none after ♥, even liked', async () => {
     await open(base as unknown as Idea)
     expect(screen.queryByTestId('idea-like-count')).toBeNull()
     expect(screen.queryByTestId('idea-thread-count')).toBeNull()
     loadIvyThread.mockResolvedValue({ title: 'Rooftop', ideas: [{ id: 'c2', title: 'Second take' }], directions: [], notes: [{ id: 'n1', text: 'x', at: '' }] })
     await open(idea({ heartedAt: '2026-10-20T00:00:00Z' }))
-    expect(screen.getByTestId('idea-like-count')).toHaveTextContent('1')
+    expect(screen.queryByTestId('idea-like-count')).toBeNull()
     expect(screen.getByTestId('idea-thread-count')).toHaveTextContent('2')
   })
 

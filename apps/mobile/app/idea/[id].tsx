@@ -9,7 +9,7 @@
 //      deferred (B.8a, 21 Oct).
 //   2. One action row, as Pinterest's: ♥ (outline; filled only once liked) · ◯ (a plain round speech bubble — View
 //      idea, I3, a bottom sheet over the page) · ↑ (Share) left, 28 pt outline icons, regular weight, 20 apart, with a
-//      small grey count after ♥ and ◯ when there's one; Save right — lime 84 × 44 r12, or, once it's filed in one of
+//      small grey count after ◯ when there's one (♥ gets one once other people can like an idea); Save right — lime 84 × 44 r12, or, once it's filed in one of
 //      her projects, Pinterest's split ink pill: the project's name (opens it) | ˅ (Save to, I2, to move or remove it).
 //   3. Who: her avatar 32, her name, "{duration} · {project}" grey.
 //   4. The snippet: her words in quotes, two lines, 15 — tap to hear them — then "View idea" (I3).
@@ -320,8 +320,8 @@ export default function IdeaPage() {
         {/* 2. The action row */}
         <View style={styles.actions}>
           <View style={styles.icons}>
-            {/* One creator, so ♥'s count is hers: 1 once she's liked it. */}
-            <Icon name={idea.heartedAt ? 'heart.fill' : 'heart'} label={idea.heartedAt ? 'Unlike' : 'Like'} count={idea.heartedAt ? 1 : 0} onPress={heart} testID="idea-like" />
+            {/* ♥ has no count until other people can like an idea: hers alone would always read 1. */}
+            <Icon name={idea.heartedAt ? 'heart.fill' : 'heart'} label={idea.heartedAt ? 'Unlike' : 'Like'} onPress={heart} testID="idea-like" />
             <Icon name="message" label="View idea" count={comments} onPress={() => router.push(`/idea/view/${idea.id}`)} testID="idea-thread" />
             <Icon name="square.and.arrow.up" label="Share" onPress={() => setSheet('share')} testID="idea-share" />
           </View>
