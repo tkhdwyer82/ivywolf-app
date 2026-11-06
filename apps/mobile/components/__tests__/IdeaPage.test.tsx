@@ -70,6 +70,8 @@ jest.mock('@/components/IdeaTile', () => {
 })
 jest.mock('@/lib/idea', () => ({ ...jest.requireActual('@/lib/idea'), loadIdea: jest.fn() }))
 jest.mock('@/lib/related', () => ({ loadRelated: jest.fn() }))
+// The Ivy library (inspiration demo): off unless a test turns it on.
+jest.mock('@/lib/inspiration', () => ({ ...jest.requireActual('@/lib/inspiration'), searchLibrary: jest.fn() }))
 jest.mock('@/lib/recipes', () => ({
   MAKE_LABEL: { write: 'Make words', still: 'Make stills', video: 'Make video', cut: 'Make a cut' },
   loadStepCard: jest.fn(async () => null),
@@ -87,6 +89,7 @@ jest.mock('@/lib/saveTo', () => ({ removeFromProject: jest.fn(async () => {}) })
 const { router } = jest.requireMock('expo-router') as { router: { push: jest.Mock } }
 const { loadIdea } = jest.requireMock('@/lib/idea') as { loadIdea: jest.Mock }
 const { loadRelated } = jest.requireMock('@/lib/related') as { loadRelated: jest.Mock }
+const { searchLibrary, LibraryOff } = jest.requireMock('@/lib/inspiration') as { searchLibrary: jest.Mock; LibraryOff: new () => Error }
 const { draftCount, loadStepCard } = jest.requireMock('@/lib/recipes') as { draftCount: jest.Mock; loadStepCard: jest.Mock }
 const { loadTodo } = jest.requireMock('@/lib/todo') as { loadTodo: jest.Mock }
 const { loadIvyThread } = jest.requireMock('@/lib/viewIdea') as { loadIvyThread: jest.Mock }
@@ -150,6 +153,7 @@ async function open(i: Idea) {
 beforeEach(() => {
   jest.clearAllMocks()
   loadRelated.mockResolvedValue([])
+  searchLibrary.mockRejectedValue(new LibraryOff())
   draftCount.mockResolvedValue(0)
   loadStepCard.mockResolvedValue(null)
   loadIvyThread.mockResolvedValue({ title: null, ideas: [], directions: [], notes: [] })
@@ -399,5 +403,48 @@ describe('snapshots', () => {
     const r = await render(<TodoPage />)
     await screen.findByText('Get some milk')
     expect(r.toJSON()).toMatchSnapshot()
+  })
+})
+
+describe('More to explore with the Ivy library (inspiration demo)', () => {
+  const pic = (id: string, kind: 'photo' | 'video' = 'photo') => ({
+    id, path: `nothing/${id}.jpeg`, kind, folder: 'nothing', width: 720, height: 1280, caption: `Caption ${id}`,
+    keywords: [], colours: [], shot: 'product', people: 'none', url: `https://x/${id}`,
+  })
+
+  it('flag on: the library comes first, captioned "Ivy library", searched with the idea’s words, six at most', async () => {
+    searchLibrary.mockResolvedValue([pic('lib1'), pic('lib2', 'video')])
+    loadRelated.mockResolvedValue([card({ id: 'c7', title: 'Stairwell burst' })])
+    await open(base as unknown as Idea)
+    expect(await screen.findByText('Ivy library')).toHaveStyle({ fontSize: 13, color: '#6E6E73' })
+    expect(searchLibrary).toHaveBeenCalledTimes(1)
+    expect(searchLibrary).toHaveBeenCalledWith('tok', 'Rooftop chase, night. She leaps the roof and radios through.', { limit: 6 })
+    // In reading order: the header, the caption, the library's tiles, then her own ideas.
+    const order = screen.getAllByText(/^(More to explore|Ivy library|TILE:.*)$/).map((n) => n.props.children)
+    expect(order).toEqual(['More to explore', 'Ivy library', 'TILE:Stairwell burst'])
+    expect(screen.getByTestId('library-tile-lib1')).toBeTruthy()
+    expect(screen.getByLabelText('Clip: Caption lib2')).toBeTruthy()
+  })
+
+  it('a library tile opens its library page, not an idea page', async () => {
+    searchLibrary.mockResolvedValue([pic('lib1')])
+    await open(base as unknown as Idea)
+    await fireEvent.press(await screen.findByTestId('library-tile-lib1'))
+    expect(router.push).toHaveBeenCalledWith('/inspiration/lib1')
+  })
+
+  it('library only, no related ideas: More to explore still shows', async () => {
+    searchLibrary.mockResolvedValue([pic('lib1')])
+    await open(base as unknown as Idea)
+    expect(await screen.findByTestId('more-to-explore')).toBeTruthy()
+    expect(screen.getByTestId('ivy-library')).toBeTruthy()
+  })
+
+  it('flag off (search 404s): no Ivy library, More to explore exactly as before', async () => {
+    loadRelated.mockResolvedValue([card({ id: 'c7', title: 'Stairwell burst' })])
+    await open(base as unknown as Idea)
+    await screen.findByTestId('tile-c7')
+    expect(screen.queryByText('Ivy library')).toBeNull()
+    expect(screen.queryByTestId('ivy-library')).toBeNull()
   })
 })

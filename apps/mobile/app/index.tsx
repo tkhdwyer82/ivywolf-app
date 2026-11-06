@@ -52,6 +52,7 @@ import {
 import { colour, hueLineOf, size, type } from '@ivywolf/ui'
 import { IvyNote, DISSOLVE_AFTER_MS, THINGS_DISSOLVE_MS } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
+import { Wordmark } from '@/components/Wordmark'
 import { ProjectChips } from '@/components/HomeChrome'
 import { CollapsingHeader, LOGO_ROW_H, useCollapsingHeader, useHeaderInset } from '@/components/CollapsingHeader'
 import { Nav } from '@/components/Nav'
@@ -430,13 +431,6 @@ function toRows(groups: DayGroup[], direction: HomeDirection | null): Row[] {
   return rows
 }
 
-function Wordmark() {
-  return (
-    <Text style={styles.wordmark} accessibilityRole="header">
-      IVY
-    </Text>
-  )
-}
 
 /**
  * The logo row's right: My things (Ivy, B.6 — her own 44 pt tap), search and the avatar (Voice notes). No + — adding
@@ -509,7 +503,6 @@ const styles = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: GRID.margin },
   secondary: { color: colour.Grey, textAlign: 'center' },
   error: { color: colour.Grey, paddingHorizontal: GRID.margin, paddingTop: GRID.gutter },
-  wordmark: type['Title / Wordmark'],
   avatar: { width: size.icon, height: size.icon, alignItems: 'center', justifyContent: 'center' },
   avatarGlyph: { width: size.icon / 2, height: size.icon / 2 },
   // The list is inset by margin − gutter/2 and every cell pads gutter/2, so tiles sit at the margin, a gutter apart;

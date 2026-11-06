@@ -50,6 +50,9 @@ function Routes() {
         <Stack.Screen name="idea/edit/[id]" options={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="mini" options={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: '#000' } }} />
         <Stack.Screen name="search" options={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: hero.room } }} />
+        {/* The Ivy library (inspiration demo): hidden, from a long-press on Home's IVY wordmark. */}
+        <Stack.Screen name="inspiration/index" options={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: hero.room } }} />
+        <Stack.Screen name="inspiration/[id]" options={{ headerShown: false, contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen name="explore" options={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: hero.room } }} />
         <Stack.Screen
           name="notes"

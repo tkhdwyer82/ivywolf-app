@@ -95,3 +95,21 @@ export async function transcribe(audioUrl: string): Promise<Transcript> {
 
   return { duration_ms: Math.round((raw.metadata?.duration ?? 0) * 1000), utterances, raw }
 }
+
+/**
+ * A few seconds of speech → its words, for a spoken search query (the inspiration demo's mic). The bytes go straight
+ * to Deepgram in the request and are kept nowhere — this is a query, not a recording, so it never becomes one.
+ */
+export async function transcribeQuery(audio: ArrayBuffer, contentType: string): Promise<string> {
+  const key = process.env.DEEPGRAM_API_KEY
+  if (!key) throw new Error('DEEPGRAM_API_KEY is not set')
+  const params = new URLSearchParams({ model: 'nova-3', smart_format: 'true', punctuate: 'false' })
+  const res = await fetch(`${DEEPGRAM_URL}?${params}`, {
+    method: 'POST',
+    headers: { Authorization: `Token ${key}`, 'Content-Type': contentType },
+    body: audio,
+  })
+  if (!res.ok) throw new Error(`Deepgram failed: ${res.status} ${res.statusText} ${await res.text()}`)
+  const raw = (await res.json()) as { results?: { channels?: { alternatives?: { transcript?: string }[] }[] } }
+  return (raw.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? '').trim()
+}
