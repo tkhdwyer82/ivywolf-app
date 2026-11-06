@@ -21,6 +21,7 @@ import { Nav } from '@/components/Nav'
 import { BAR_BOTTOM } from '@/components/ActionBar'
 import { PickIdeaSheet } from '@/components/PickIdeaSheet'
 import { PasteReelSheet } from '@/components/PasteReelSheet'
+import { AvatarInitials } from '@/components/AvatarInitials'
 import { useSupabase } from '@/lib/supabase'
 import { loadShelf, type Recipe } from '@/lib/recipes'
 
@@ -105,9 +106,7 @@ export default function Explore() {
                   accessibilityLabel={`${r.title}, by @${r.handle}. ${r.uses} used.`}
                   testID={`recipe-${r.id}`}
                 >
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{(r.author?.name ?? r.handle).slice(0, 1).toUpperCase()}</Text>
-                  </View>
+                  <AvatarInitials name={r.author?.name ?? r.handle} size={32} />
                   <Text style={styles.recipeTitle} numberOfLines={3}>
                     {r.title}
                   </Text>
@@ -225,14 +224,12 @@ const styles = StyleSheet.create({
   name: { fontSize: 14, fontWeight: '600', color: colour.Ink, marginTop: 8 },
   line: { fontSize: 11, color: colour.Grey, marginTop: 2, marginBottom: GRID.after },
   empty: { fontSize: 15, color: colour.Grey, marginHorizontal: GRID.margin, marginTop: 20 },
-  // B.10 R1: recipe tiles 140 × 150 on the field fill, radius 18 like the tool tiles; the author's initial in a lime 32.
+  // B.10 R1: recipe tiles 140 × 150 on the field fill, radius 18 like the tool tiles; the author's avatar 32.
   shelfTitle: { fontSize: 17, fontWeight: '700', color: colour.Ink, marginHorizontal: GRID.margin, marginTop: 4 },
   shelf: { paddingHorizontal: GRID.margin, gap: GRID.gutter, paddingTop: 10, paddingBottom: 16 },
   recipe: { width: 140, height: 150, borderRadius: 18, borderCurve: 'continuous', backgroundColor: FIELD, padding: 12, justifyContent: 'space-between' },
   recipeAdd: { alignItems: 'center', justifyContent: 'center', gap: 8 },
   recipeAddText: { fontSize: 13, fontWeight: '600', color: colour.Ink, textAlign: 'center' },
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: colour.Lime, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontWeight: '700', color: colour.Ink },
   recipeTitle: { fontSize: 14, fontWeight: '600', color: colour.Ink },
   recipeMeta: { fontSize: 11, color: colour.Grey },
 })
