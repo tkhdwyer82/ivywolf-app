@@ -4,6 +4,7 @@
 // graph and never stored (rule 2 — each sentence keeps what it's about, recording + time, in `cites`).
 // Pure functions below the loader so the grouping and wording can be tested without a device.
 
+import { captureInfo, captureMeta, gotItLine, type CaptureInfo } from './capture'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CardBoard, CardDiagram, CardQuote, CardShape } from '@ivywolf/schema'
 import type { HueName } from '@ivywolf/ui'
@@ -78,6 +79,8 @@ export interface CardItem extends Base {
   heartedAt: string | null
   /** How many ideas it's linked to (card_links, 0034). Filled in by the screen's loader. */
   links: number
+  /** How it came in on the capture screen (B.11): said, typed, photos. Null for anything captured before it. */
+  capture?: CaptureInfo | null
 }
 export interface ActionItem extends Base {
   kind: 'action'
@@ -128,7 +131,7 @@ function need<T>(label: string, r: { data: T; error: { message: string } | null 
 
 /** The columns every card tile needs. Callers add their own thread embedding (for size and stage). */
 export const CARD_COLUMNS =
-  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, reference_picture, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source), projects(name, hue, kind)'
+  'id, recording_id, project_id, title, gist, play_from_ms, confidence, frame_url, frame_status, frame_at, created_at, source, shape, quote, diagram, board, frame_attribution, reference_picture, pinned_at, shared_at, hearted_at, recordings(recorded_at, storage_path, source, kind, meta_capture:meta->capture), projects(name, hue, kind)'
 
 export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
@@ -136,7 +139,7 @@ export type CardRow = {
   created_at: string; source?: string | null; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
   frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string } | null
   reference_picture?: ReferencePicture | null
-  recordings: { recorded_at: string | null; storage_path?: string | null; source?: string } | null
+  recordings: { recorded_at: string | null; storage_path?: string | null; source?: string; kind?: string | null; meta_capture?: unknown } | null
   pinned_at?: string | null
   shared_at?: string | null
   hearted_at?: string | null
@@ -210,6 +213,7 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     sharedAt: c.shared_at ?? null,
     heartedAt: c.hearted_at ?? null,
     links: 0,
+    capture: captureInfo(c.recordings),
   }
 }
 
@@ -638,8 +642,26 @@ export function metaLine(item: Item, projects: Project[]): string {
     const when = item.done ? 'done' : item.dueDate ? WEEK[new Date(`${item.dueDate}T12:00:00`).getDay()].slice(0, 3) : null
     return [project?.name ?? 'My things', when].filter(Boolean).join(' · ')
   }
+  // C4: "typed + said · 2 photos" when it came in more than one way; voice only keeps the time it was said.
+  const how = captureMeta(item.capture ?? null)
+  if (how) return how
   const s = Math.floor(item.playFromMs / 1000)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+/**
+ * C4: Ivy confirms a capture once its cards have landed — "Got it — one idea, two photos." — citing it (rule 2).
+ * Null until the capture's cards are in.
+ */
+export function gotItSentence(items: Item[], capture: { recordingId: string; photos: number }): IvySentence | null {
+  const cards = items.filter((i): i is CardItem => i.kind === 'card' && i.recordingId === capture.recordingId)
+  if (cards.length === 0) return null
+  const first = [...cards].sort((a, b) => a.playFromMs - b.playFromMs)[0]
+  return {
+    text: gotItLine(cards.length, capture.photos),
+    cites: cards.map((c) => ({ recordingId: c.recordingId, ms: c.playFromMs })),
+    cite: citeOf(first),
+  }
 }
 
 /** Retry a failed recording: clear the failed run's partial writes and queue it (0020), then ask for processing. */

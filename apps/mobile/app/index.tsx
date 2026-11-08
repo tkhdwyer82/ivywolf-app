@@ -47,8 +47,10 @@ import {
   feedItems,
   GRID,
   thingsSentence,
+  gotItSentence,
   type CardItem,
 } from '@/lib/home'
+import { pendingCapture, setPendingCapture } from '@/lib/capture'
 import { colour, hueLineOf, size, type } from '@ivywolf/ui'
 import { IvyNote, DISSOLVE_AFTER_MS, THINGS_DISSOLVE_MS } from '@/components/IvyNote'
 import { Tile } from '@/components/Tile'
@@ -179,6 +181,18 @@ function HomeScreen() {
     }
     markSeen(supabase, userId, data.items).catch(() => {})
   }, [data, focused, ivy, supabase, userId])
+
+  // C4 (B.11): once a capture's cards land, Ivy confirms it in one line — "Got it — one idea, two photos."
+  useEffect(() => {
+    const capture = pendingCapture()
+    if (!data || !focused || !capture) return
+    const line = gotItSentence(data.items, capture)
+    if (!line) return
+    setPendingCapture(null)
+    setDissolve(false)
+    setIvyAfter(DISSOLVE_AFTER_MS)
+    setIvy([line])
+  }, [data, focused])
 
   // A recording whose process request never arrived (server down, no signal): ask again, once per open.
   useEffect(() => {
@@ -349,7 +363,7 @@ function HomeScreen() {
             {linking ? (
               <LinkBanner title={linking.from.title} />
             ) : (
-              ivy && ivy.length > 0 && <IvyNote sentences={ivy} dissolve={dissolve} after={ivyAfter} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
+              ivy && ivy.length > 0 && <IvyNote key={ivy.map((x) => x.text).join('|')} sentences={ivy} dissolve={dissolve} after={ivyAfter} onGone={() => setIvy([])} onPlay={(c) => play('ivy', c.storagePath, c.ms)} />
             )}
             {error && <Text style={[type['Body / Small'], styles.error]}>{error}</Text>}
             {failed}

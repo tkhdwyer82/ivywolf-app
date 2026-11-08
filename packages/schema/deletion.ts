@@ -8,7 +8,7 @@
 // segments, cards, actions, loose ends and requests, and removes any thread left empty (0007).
 //
 // Imports (0018): an added image or video's original (private `imports`) goes with its card; its poster is the
-// card's frame.
+// card's frame. Capture photos (0043) are stored the same way and all go, whichever became the card's picture.
 // Frames (0015): a card's frame is its own and always goes. A to-do's frame is shared by every to-do with the same
 // brief (frames.ts cache), so it goes only when no to-do outside this recording still uses it.
 //
@@ -55,7 +55,16 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
     ...trashed.filter((t): t is Trashed & { frame_url: string } => t.kind === 'to-do' && !!t.frame_url),
   ]
 
-  const paths = cards.map((c) => framePath(c.frame_url)).filter((p): p is string => p !== null)
+  // Photos added on the capture screen (B.11, 0043): every one goes, not only the one that became the picture.
+  const photos = (need(
+    'capture photos',
+    await supabase.from('capture_photos').select('storage_path, poster_path').eq('capture_id', recording.id)
+  ) ?? []) as { storage_path: string; poster_path: string }[]
+
+  const paths = [
+    ...cards.map((c) => framePath(c.frame_url)).filter((p): p is string => p !== null),
+    ...photos.map((p) => p.poster_path),
+  ]
   for (const url of new Set(actions.map((a) => a.frame_url))) {
     const { count, error } = await supabase
       .from('actions')
@@ -72,13 +81,13 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
     const removed = await supabase.storage.from('recordings').remove([recording.storage_path])
     if (removed.error) throw new Error(`audio: ${removed.error.message}`)
   }
-  const originals = cards.map((c) => c.media_path).filter((p): p is string => !!p)
+  const originals = [...new Set([...cards.map((c) => c.media_path), ...photos.map((p) => p.storage_path)].filter((p): p is string => !!p))]
   if (originals.length) {
     const gone = await supabase.storage.from('imports').remove(originals)
     if (gone.error) throw new Error(`imports: ${gone.error.message}`)
   }
   if (paths.length) {
-    const frames = await supabase.storage.from('frames').remove(paths)
+    const frames = await supabase.storage.from('frames').remove([...new Set(paths)])
     if (frames.error) throw new Error(`frames: ${frames.error.message}`)
   }
 
