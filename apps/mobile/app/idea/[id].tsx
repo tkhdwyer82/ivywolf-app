@@ -7,7 +7,8 @@
 //      it only two frosted 48 squares: back, and ••• (where Change view, Move to project, Photo credit and the rest
 //      live). An Unsplash photo's attribution is ••• → Photo credit for now; a visible line under the picture is
 //      deferred (B.8a, 21 Oct). B.12: a cover from the Ivy library says "Ivy library" there, and with the library on
-//      ••• → Change cover offers its six nearest photos (CoverSheet) — never over her own picture.
+//      ••• → Change cover offers its six nearest photos (CoverSheet) — never over her own picture — and ••• → Restore
+//      previous cover puts back what the ladder or Change cover replaced.
 //   2. One action row, as Pinterest's: ♥ (outline; filled only once liked) · ◯ (a plain round speech bubble — View
 //      idea, I3, a bottom sheet over the page) · ↑ (Share) left, 28 pt outline icons, regular weight, 20 apart, with a
 //      count 6 after ◯ when there's one (♥ gets one once other people can like an idea); Save right — lime 84 × 44
@@ -51,7 +52,7 @@ import { ShareSheet } from '@/components/ShareSheet'
 import { AddContextSheet } from '@/components/AddContextSheet'
 import { RecipeSheet } from '@/components/RecipeSheet'
 import { CoverSheet } from '@/components/CoverSheet'
-import { canChangeCover, coverCredit } from '@/lib/covers'
+import { canChangeCover, coverCredit, restorePreviousCover } from '@/lib/covers'
 import { CardFace, SHAPE_NAME } from '@/components/CardFace'
 import { distinct, ThreeUp } from '@/components/IdeaTile'
 import { Tile } from '@/components/Tile'
@@ -237,6 +238,20 @@ export default function IdeaPage() {
       await removeFromProject(supabase, idea.id)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That didn’t change')
+    }
+    load()
+  }
+
+  /** ••• → Restore previous cover (B.12): back to the picture the ladder or Change cover replaced. */
+  async function restoreCover() {
+    if (!idea) return
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Signed out')
+      await restorePreviousCover(token, idea.id)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That cover didn’t change back')
     }
     load()
   }
@@ -496,6 +511,7 @@ export default function IdeaPage() {
             ...(idea.recordingId ? [{ icon: 'text.alignleft' as const, label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) }] : []),
             { icon: 'rectangle.3.group', label: 'Change view', onPress: changeView },
             ...(canChangeCover(!!library && library.length > 0, picture.source) ? [{ icon: 'photo.on.rectangle' as const, label: 'Change cover', onPress: () => setSheet('cover') }] : []),
+            ...(idea.card.hasPreviousCover ? [{ icon: 'arrow.uturn.backward' as const, label: 'Restore previous cover', onPress: restoreCover }] : []),
             { icon: 'square.on.square', label: 'Copy', onPress: copy },
             ...((idea.card.credit && picture.source === 'unsplash') || coverCredit(picture) ? [{ icon: 'camera' as const, label: 'Photo credit', onPress: photoCredit }] : []),
             { icon: 'folder', label: 'Move to project', onPress: openSaveTo },

@@ -81,6 +81,8 @@ export interface CardItem extends Base {
   links: number
   /** How it came in on the capture screen (B.11): said, typed, photos. Null for anything captured before it. */
   capture?: CaptureInfo | null
+  /** The ladder or Change cover replaced a picture and kept it (B.12): ••• → Restore previous cover. */
+  hasPreviousCover?: boolean
 }
 export interface ActionItem extends Base {
   kind: 'action'
@@ -137,7 +139,7 @@ export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
   confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
   created_at: string; source?: string | null; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
-  frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string; caption?: string } | null
+  frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string; caption?: string; previous?: unknown } | null
   reference_picture?: ReferencePicture | null
   recordings: { recorded_at: string | null; storage_path?: string | null; source?: string; kind?: string | null; meta_capture?: unknown } | null
   pinned_at?: string | null
@@ -226,6 +228,7 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     heartedAt: c.hearted_at ?? null,
     links: 0,
     capture: captureInfo(c.recordings),
+    hasPreviousCover: !!c.frame_attribution?.previous,
   }
 }
 

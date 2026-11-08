@@ -31,6 +31,22 @@ export function framePath(url: string | null): string | null {
   return i === -1 ? null : decodeURIComponent(url.slice(i + FRAMES_PREFIX.length).split('?')[0])
 }
 
+type CardFiles = {
+  frame_url: string | null
+  media_path: string | null
+  frame_attribution?: { previous?: { frame_url?: string | null } | null } | null
+  reference_picture?: { url?: string } | null
+}
+
+/**
+ * Every frames file a card holds: its picture, the previous cover kept for Restore (B.12), and its Pixabay copy
+ * (B.12, references/). Unsplash links are hotlinks, so they map to nothing.
+ */
+export function cardFramePaths(c: CardFiles): string[] {
+  const paths = [framePath(c.frame_url), framePath(c.frame_attribution?.previous?.frame_url ?? null), framePath(c.reference_picture?.url ?? null)]
+  return [...new Set(paths.filter((p): p is string => p !== null))]
+}
+
 function need<T>(label: string, r: { data: T; error: { message: string } | null }): T {
   if (r.error) throw new Error(`${label}: ${r.error.message}`)
   return r.data
@@ -43,8 +59,8 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
   const cards = [
     ...(need(
       'cards',
-      await supabase.from('cards').select('frame_url, media_path').eq('recording_id', recording.id)
-    ) as { frame_url: string | null; media_path: string | null }[]),
+      await supabase.from('cards').select('frame_url, media_path, frame_attribution, reference_picture').eq('recording_id', recording.id)
+    ) as CardFiles[]),
     ...trashed.filter((t) => t.kind === 'idea'),
   ]
   const actions = [
@@ -62,7 +78,7 @@ export async function deleteRecording(supabase: SupabaseClient, recording: { id:
   ) ?? []) as { storage_path: string; poster_path: string }[]
 
   const paths = [
-    ...cards.map((c) => framePath(c.frame_url)).filter((p): p is string => p !== null),
+    ...cards.flatMap((c) => cardFramePaths(c)),
     ...photos.map((p) => p.poster_path),
   ]
   for (const url of new Set(actions.map((a) => a.frame_url))) {
@@ -113,12 +129,12 @@ export async function discardRecording(supabase: SupabaseClient, recording: { id
 export async function deleteCard(supabase: SupabaseClient, cardId: string) {
   const card = need(
     'card',
-    await supabase.from('cards').select('frame_url, media_path').eq('id', cardId).maybeSingle()
-  ) as { frame_url: string | null; media_path: string | null } | null
+    await supabase.from('cards').select('frame_url, media_path, frame_attribution, reference_picture').eq('id', cardId).maybeSingle()
+  ) as CardFiles | null
   if (!card) return
-  const frame = framePath(card.frame_url)
-  if (frame) {
-    const r = await supabase.storage.from('frames').remove([frame])
+  const frames = cardFramePaths(card)
+  if (frames.length) {
+    const r = await supabase.storage.from('frames').remove(frames)
     if (r.error) throw new Error(`frame: ${r.error.message}`)
   }
   if (card.media_path) {

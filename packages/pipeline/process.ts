@@ -24,8 +24,8 @@ export { purgePlan, purgeTrash, TRASH_DAYS } from './trash'
 export { backfillTodoRenders, housePrompt, nounOf, thumbOf } from './houseRender'
 // For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
 export { photoForCard } from './frames'
-export { chooseLibraryCover, coverChoices, coversEnabled, type CoverChoice } from './covers'
-export { backfillReferencePictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
+export { chooseLibraryCover, coverChoices, coversEnabled, rebuildPrevious, restoreCover, type CoverChoice } from './covers'
+export { backfillReferencePictures, keepPixabayPictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
 export { findReferences, pinterestAvailable, trackReferenceUse, type Reference, type ReferenceSource } from './references'
 export { generateDirections, shouldGenerate, MIN_CARDS as DIRECTIONS_MIN_CARDS } from './suggest'
 export {

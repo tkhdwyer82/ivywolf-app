@@ -66,3 +66,93 @@ test('a ladder cover is told apart from Unsplash and her own', () => {
   assert.ok(!ladderCover({ frame_attribution: { provider: 'unsplash' } }))
   assert.ok(!ladderCover({ frame_attribution: null }))
 })
+
+// ─── Undoable covers ────────────────────────────────────────────────────────────────────────────────────────────
+import { COVER_USD, DRAWS, drawChecked, droppedFiles, ladderFile, snapshot } from '../covers'
+import { cardFramePaths } from '../../schema/deletion'
+import { keepPicture, referencePath } from '../references/picture'
+
+const F = 'https://x.supabase.co/storage/v1/object/public/frames/'
+const unsplash = { provider: 'unsplash', photo_id: 'p1', photographer: 'Ana', photographer_url: 'u', photo_url: 'u', download_location: 'd' }
+
+test('the previous picture is kept whole — link, status, credit — and only one step back', () => {
+  const slot = { frame_url: 'https://images.unsplash.com/x', frame_status: 'done', frame_at: '2026-10-20T00:00:00Z', frame_attribution: { ...unsplash, previous: { frame_url: 'old' } as never } }
+  const prev = snapshot(slot)
+  assert.deepEqual(prev, { frame_url: 'https://images.unsplash.com/x', frame_status: 'done', frame_at: '2026-10-20T00:00:00Z', frame_attribution: unsplash })
+  assert.deepEqual(snapshot({ frame_url: null, frame_status: 'typographic', frame_at: null, frame_attribution: null }).frame_attribution, null)
+})
+
+test('a replacement deletes only the step that falls out of history, never the picture now kept as previous', () => {
+  const before = (prev: string | null) => ({
+    frame_url: `${F}u/covers/c1-2.jpg`, frame_status: 'done', frame_at: null,
+    frame_attribution: { provider: 'ivy_library', previous: { frame_url: prev, frame_status: 'done', frame_at: null, frame_attribution: null } },
+  })
+  assert.deepEqual(droppedFiles(before(`${F}u/covers/c1-1.jpg`), `${F}u/covers/c1-3.jpg`), ['u/covers/c1-1.jpg'])
+  assert.deepEqual(droppedFiles(before('https://images.unsplash.com/x'), `${F}u/covers/c1-3.jpg`), [], 'a hotlink has no file')
+  assert.deepEqual(droppedFiles(before(`${F}u/imports/her.jpg`), `${F}u/covers/c1-3.jpg`), [], 'never her poster')
+  assert.deepEqual(droppedFiles(before(null), `${F}u/covers/c1-3.jpg`), [])
+  assert.equal(ladderFile(`${F}u/covers/a.jpg`), 'u/covers/a.jpg')
+  assert.equal(ladderFile(`${F}u/imports/a.jpg`), null)
+})
+
+test('deleting a card takes its picture, its kept previous cover and its Pixabay copy; never a hotlink', () => {
+  assert.deepEqual(
+    cardFramePaths({
+      frame_url: `${F}u/covers/c1-2.jpg`, media_path: null,
+      frame_attribution: { previous: { frame_url: `${F}u/covers/c1-1.jpg` } },
+      reference_picture: { url: `${F}u/references/c1-99.jpg` },
+    }).sort(),
+    ['u/covers/c1-1.jpg', 'u/covers/c1-2.jpg', 'u/references/c1-99.jpg']
+  )
+  assert.deepEqual(cardFramePaths({ frame_url: 'https://images.unsplash.com/x', media_path: null, frame_attribution: { previous: { frame_url: 'https://images.unsplash.com/y' } }, reference_picture: { url: 'https://pixabay.com/get/abc' } }), [])
+})
+
+// ─── Lettering check ────────────────────────────────────────────────────────────────────────────────────────────
+
+const jpeg = (n: number) => Buffer.from([n])
+test('a clean first draw is kept: one draw, one charge', async () => {
+  const r = await drawChecked(async () => jpeg(1), async () => ({ lettering: false, what: '' }))
+  assert.deepEqual([r.jpeg?.[0], r.attempts, r.spent, r.rejected], [1, 1, COVER_USD, []])
+})
+
+test('lettering on the first draw: rejected, drawn once more, the clean second kept — both paid for', async () => {
+  let n = 0
+  const seen: string[] = []
+  const r = await drawChecked(
+    async () => jpeg(++n),
+    async (j) => (j[0] === 1 ? { lettering: true, what: 'brand name on the box lid' } : { lettering: false, what: '' }),
+    async (what) => void seen.push(what)
+  )
+  assert.equal(r.jpeg?.[0], 2)
+  assert.equal(r.attempts, 2)
+  assert.equal(r.spent, 2 * COVER_USD)
+  assert.deepEqual(seen, ['brand name on the box lid'])
+})
+
+test('lettering twice: no cover (the idea stays at d); never a third draw', async () => {
+  let n = 0
+  const r = await drawChecked(async () => jpeg(++n), async () => ({ lettering: true, what: 'NEW HORIZONS' }))
+  assert.equal(r.jpeg, null)
+  assert.equal(n, DRAWS)
+  assert.deepEqual(r.rejected, ['NEW HORIZONS', 'NEW HORIZONS'])
+})
+
+test('the prompt keeps her subject and takes only light, palette and material from the references', () => {
+  const p = coverPrompt('a gym floor')
+  assert.match(p, /Keep the idea’s subject; take only light, palette and material from the references/)
+  assert.doesNotMatch(p, /framing — but make/)
+})
+
+// ─── Pixabay kept ───────────────────────────────────────────────────────────────────────────────────────────────
+
+test('Unsplash stays a hotlink: nothing fetched or copied', async () => {
+  const pic = { source: 'unsplash' as const, id: 'u1', url: 'https://images.unsplash.com/u1', thumb_url: 't', link_url: 'l', credit: { name: 'Ana', url: 'u' }, width: 1, height: 1 }
+  let fetched = false
+  const kept = await keepPicture('u', 'c1', pic, (async () => { fetched = true; throw new Error('no') }) as unknown as typeof fetch)
+  assert.equal(kept, pic)
+  assert.equal(fetched, false)
+})
+
+test('a Pixabay copy lives in her frames folder, one per card and picture', () => {
+  assert.equal(referencePath('user_1', 'c1', '12345'), 'user_1/references/c1-12345.jpg')
+})

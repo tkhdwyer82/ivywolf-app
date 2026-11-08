@@ -35,6 +35,7 @@ jest.mock('expo-symbols', () => ({ SymbolView: () => null }))
 jest.mock('@ivywolf/schema', () => ({ LOW_CONFIDENCE: 0.6 }))
 jest.mock('@/components/ShareSheet', () => ({ ShareSheet: () => null }))
 jest.mock('@/components/AddContextSheet', () => ({ AddContextSheet: () => null }))
+jest.mock('@/lib/covers', () => ({ ...jest.requireActual('@/lib/covers'), restorePreviousCover: jest.fn(async () => {}) }))
 jest.mock('@/components/CoverSheet', () => {
   const { Text } = require('react-native')
   return { CoverSheet: ({ cardId }: { cardId: string }) => <Text>{`COVER SHEET ${cardId}`}</Text> }
@@ -490,5 +491,24 @@ describe('Cover ladder on the idea page (B.12)', () => {
     await fireEvent.press(screen.getByText('Photo credit'))
     expect(alert).toHaveBeenCalledWith('Photo credit', 'Ivy library\nBlack gift box on dark grey')
     alert.mockRestore()
+  })
+})
+
+describe('Restore previous cover (B.12)', () => {
+  const { restorePreviousCover } = jest.requireMock('@/lib/covers') as { restorePreviousCover: jest.Mock }
+
+  it('••• offers it when the cover replaced something, and restores then reloads', async () => {
+    await open(idea({ card: card({ hasPreviousCover: true }) }))
+    const loads = loadIdea.mock.calls.length
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    await fireEvent.press(screen.getByText('Restore previous cover'))
+    expect(restorePreviousCover).toHaveBeenCalledWith('tok', 'c1')
+    expect(loadIdea.mock.calls.length).toBeGreaterThan(loads)
+  })
+
+  it('with nothing kept, it isn\'t offered — library on or off', async () => {
+    await open(base as unknown as Idea)
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    expect(screen.queryByText('Restore previous cover')).toBeNull()
   })
 })

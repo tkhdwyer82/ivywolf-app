@@ -16,6 +16,14 @@
 //
 // A cover lives in the card's one frame slot (frame_url + frame_attribution), so Home, the idea page and deletion
 // (packages/schema/deletion.ts removes frames/<path> with the card) need no new column.
+//
+// Undoable: whenever the ladder or Change cover replaces a picture, what was there (frame_url, frame_status, frame_at,
+// frame_attribution — the link, the credit, where it came from) is kept as frame_attribution.previous, one step back.
+// ••• → Restore previous cover puts it back (restoreCover). A reference picture lives in its own column and is never
+// touched, so it comes back by itself when the slot is restored.
+//
+// Step c is checked: a generated cover with visible writing or a brand mark (coverCheck.ts) is rejected and drawn
+// once more; a second rejection leaves the idea at (d). Every draw is logged and paid for.
 
 import { createHash } from 'node:crypto'
 import sharp from 'sharp'
@@ -24,6 +32,7 @@ import { embed } from './embed'
 import { INSPIRATION_BUCKET, inspirationDb, type InspirationItem } from './inspiration'
 import { peopleFor, stripPeople } from './redact'
 import { uploadBuffer } from './storage'
+import { checkLettering, type LetteringVerdict } from './coverCheck'
 
 /** Step b's bar: the cosine similarity between the idea's words and a library photo's tags. 0.45 (Tim, 8 Nov): 0.30–0.43 matched the nearest Nothing/box picture, not a fitting one. */
 export const LIBRARY_THRESHOLD = 0.45
@@ -44,17 +53,30 @@ export const COVER_USD = 0.0398
 const COVER_PX = 1200
 
 export type CoverProvider = 'ivy_library' | 'ivy_generated'
+/** What was in the frame slot before the ladder or Change cover replaced it. */
+export interface CoverSnapshot {
+  frame_url: string | null
+  frame_status: string
+  frame_at: string | null
+  frame_attribution: Record<string, unknown> | null
+  /** Set when the snapshot was rebuilt rather than kept (a backfill made before covers were undoable). */
+  refound?: boolean
+}
 export interface LibraryAttribution {
   provider: 'ivy_library'
   item_id: string
   caption: string
   similarity: number
+  previous?: CoverSnapshot
 }
 export interface GeneratedAttribution {
   provider: 'ivy_generated'
   model: string
   refs: string[]
   cost_usd: number
+  /** Draws it took (2 when the first had lettering). */
+  attempts?: number
+  previous?: CoverSnapshot
 }
 
 export const coversEnabled = () =>
@@ -115,7 +137,7 @@ export function coverSubject(card: Pick<CoverCard, 'visual_query' | 'title'>, pe
 export function coverPrompt(subject: string): string {
   return [
     `A photograph of: ${subject.replace(/\.$/, '')}.`,
-    'Match the reference images’ look — their light, colour, materials, surfaces and framing — but make a new picture of this subject; do not copy their products.',
+    'Keep the idea’s subject; take only light, palette and material from the references — not their objects, products, layout or framing.',
     'No text, no lettering, no logos, no brand marks, no faces.',
   ].join(' ')
 }
@@ -168,33 +190,113 @@ export async function generateCover(subject: string, refs: LibraryMatch[], lib: 
 }
 
 /** The old cover file, if the ladder made it (never her poster, never an Unsplash URL). */
-async function removeOldCover(supabase: SupabaseClient, frameUrl: string | null) {
+/** A frames path the ladder owns (a cover it made, or a reference copy) — the only files it may delete. */
+export function ladderFile(frameUrl: string | null | undefined): string | null {
   const marker = '/storage/v1/object/public/frames/'
   const i = frameUrl?.indexOf(marker) ?? -1
-  if (!frameUrl || i < 0) return
+  if (!frameUrl || i < 0) return null
   const path = decodeURIComponent(frameUrl.slice(i + marker.length).split('?')[0])
-  if (!/^[^/]+\/covers\//.test(path)) return
-  const { error } = await supabase.storage.from('frames').remove([path])
-  if (error) console.error(`[covers] old cover ${path}: ${error.message}`)
+  return /^[^/]+\/covers\//.test(path) ? path : null
+}
+
+type Slot = { frame_url: string | null; frame_status: string; frame_at: string | null; frame_attribution: (Record<string, unknown> & { previous?: CoverSnapshot }) | null }
+const SLOT = 'frame_url, frame_status, frame_at, frame_attribution'
+
+/** The slot as it is, without its own history: one step back is kept, never a chain. */
+export function snapshot(slot: Slot): CoverSnapshot {
+  const { previous: _drop, ...attribution } = slot.frame_attribution ?? {}
+  return {
+    frame_url: slot.frame_url,
+    frame_status: slot.frame_status,
+    frame_at: slot.frame_at,
+    frame_attribution: slot.frame_attribution ? attribution : null,
+  }
+}
+
+/**
+ * The files a replacement leaves unused: the step that falls out of history (the old previous), unless it is still
+ * the picture now or the one just set. The picture being replaced is kept — it is now the previous.
+ */
+export function droppedFiles(before: Slot, newUrl: string): string[] {
+  const old = before.frame_attribution?.previous?.frame_url ?? null
+  if (!old || old === before.frame_url || old === newUrl) return []
+  const path = ladderFile(old)
+  return path ? [path] : []
+}
+
+async function removeFiles(supabase: SupabaseClient, paths: string[]) {
+  if (paths.length === 0) return
+  const { error } = await supabase.storage.from('frames').remove(paths)
+  if (error) console.error(`[covers] remove ${paths.join(', ')}: ${error.message}`)
 }
 
 async function setCover(supabase: SupabaseClient, card: CoverCard, url: string, attribution: LibraryAttribution | GeneratedAttribution) {
-  const { data: before } = await supabase.from('cards').select('frame_url').eq('id', card.id).single()
+  const { data: before, error: readError } = await supabase.from('cards').select(SLOT).eq('id', card.id).single()
+  if (readError || !before) throw new Error(`card ${card.id}: ${readError?.message ?? 'missing'}`)
   const { error } = await supabase
     .from('cards')
-    .update({ frame_url: url, frame_status: 'done', frame_at: new Date().toISOString(), frame_attribution: attribution })
+    .update({ frame_url: url, frame_status: 'done', frame_at: new Date().toISOString(), frame_attribution: { ...attribution, previous: snapshot(before as Slot) } })
     .eq('id', card.id)
     .eq('creator_id', card.creator_id)
   if (error) throw new Error(`card ${card.id}: ${error.message}`)
-  if (before?.frame_url && before.frame_url !== url) await removeOldCover(supabase, before.frame_url as string)
+  await removeFiles(supabase, droppedFiles(before as Slot, url))
+}
+
+/**
+ * ••• → Restore previous cover: the previous picture goes back in the slot; the one it replaced is let go (its file
+ * too, if the ladder made it). One step: after a restore there is nothing further back.
+ */
+export async function restoreCover(creatorId: string, cardId: string, supabase: SupabaseClient = db()): Promise<'ok' | 'no-card' | 'none'> {
+  const { data: card, error } = await supabase.from('cards').select(`id, ${SLOT}`).eq('id', cardId).eq('creator_id', creatorId).maybeSingle()
+  if (error) throw new Error(`card ${cardId}: ${error.message}`)
+  if (!card) return 'no-card'
+  const prev = (card as Slot).frame_attribution?.previous
+  if (!prev) return 'none'
+  const { error: upError } = await supabase
+    .from('cards')
+    .update({ frame_url: prev.frame_url, frame_status: prev.frame_status, frame_at: prev.frame_at, frame_attribution: prev.frame_attribution })
+    .eq('id', cardId)
+    .eq('creator_id', creatorId)
+  if (upError) throw new Error(`card ${cardId}: ${upError.message}`)
+  const current = ladderFile((card as Slot).frame_url)
+  if (current && (card as Slot).frame_url !== prev.frame_url) await removeFiles(supabase, [current])
+  return 'ok'
 }
 
 export interface CoverOutcome {
   step: CoverStep['step']
   top: LibraryMatch | null
   cost_usd: number
+  /** What the lettering check saw on draws it rejected. */
+  rejected?: string[]
   error?: string
 }
+
+/** Step c draws at most this many times: the first, and one retry if it shows lettering. */
+export const DRAWS = 2
+
+/**
+ * Draw, check, and draw once more if the check finds lettering. Every draw is paid for (COVER_USD), kept or not.
+ * Returns the first clean picture, or null after DRAWS rejections.
+ */
+export async function drawChecked(
+  draw: () => Promise<Buffer>,
+  check: (jpeg: Buffer) => Promise<LetteringVerdict>,
+  onReject: (what: string, attempt: number) => Promise<void> = async () => {}
+): Promise<{ jpeg: Buffer | null; attempts: number; spent: number; rejected: string[] }> {
+  const rejected: string[] = []
+  let spent = 0
+  for (let attempt = 1; attempt <= DRAWS; attempt++) {
+    const jpeg = await draw()
+    spent += COVER_USD
+    const verdict = await check(jpeg)
+    if (!verdict.lettering) return { jpeg, attempts: attempt, spent, rejected }
+    rejected.push(verdict.what || 'lettering')
+    await onReject(verdict.what || 'lettering', attempt)
+  }
+  return { jpeg: null, attempts: DRAWS, spent, rejected }
+}
+const round4 = (n: number) => Math.round(n * 10000) / 10000
 
 /**
  * Run the ladder for one card and write the result. `dryRun` decides and reports without writing or spending.
@@ -202,7 +304,17 @@ export interface CoverOutcome {
  */
 export async function coverCard(
   card: CoverCard,
-  opts: { supabase?: SupabaseClient; lib?: SupabaseClient; people?: string[]; threshold?: number; dryRun?: boolean } = {}
+  opts: {
+    supabase?: SupabaseClient
+    lib?: SupabaseClient
+    people?: string[]
+    threshold?: number
+    dryRun?: boolean
+    /** Draw step c whatever the library scores (a regeneration). */
+    forceGenerate?: boolean
+    /** The lettering check (tests replace it). */
+    check?: (jpeg: Buffer) => Promise<LetteringVerdict>
+  } = {}
 ): Promise<CoverOutcome> {
   if (ownCover(card)) return { step: 'own', top: null, cost_usd: 0 }
   const supabase = opts.supabase ?? db()
@@ -210,7 +322,9 @@ export async function coverCard(
   try {
     const lib = opts.lib ?? inspirationDb()
     const matches = await libraryMatches(card, lib)
-    const choice = chooseCover(card, matches, opts.threshold)
+    const ladder = chooseCover(card, matches, opts.threshold)
+    const photos = matches.filter((m) => m.kind === 'photo').sort((a, b) => b.similarity - a.similarity)
+    const choice: CoverStep = opts.forceGenerate && !ownCover(card) && photos.length ? { step: 'generate', refs: photos.slice(0, STYLE_REFS) } : ladder
     top = matches.filter((m) => m.kind === 'photo').sort((a, b) => b.similarity - a.similarity)[0] ?? null
     if (opts.dryRun || choice.step === 'fallback' || choice.step === 'own') return { step: choice.step, top, cost_usd: 0 }
 
@@ -231,18 +345,34 @@ export async function coverCard(
         creator_id: card.creator_id, card_id: card.id, kind: 'card', model: COVER_MODEL,
         brief_hash: createHash('sha256').update(subject.toLowerCase()).digest('hex'), ...row,
       }).then(({ error }) => error && console.error(`[covers] cost log for card ${card.id}: ${error.message}`))
-    try {
-      const jpeg = await generateCover(subject, choice.refs, lib)
-      const url = await uploadBuffer({ bucket: 'frames', buffer: jpeg, path: coverPath(card.creator_id, card.id), contentType: 'image/jpeg' })
-      await setCover(supabase, card, url, { provider: 'ivy_generated', model: COVER_MODEL, refs: choice.refs.map((r) => r.id), cost_usd: COVER_USD })
-      await log({ status: 'done', frame_url: url, cost_usd: COVER_USD })
-      console.log(`[covers] card ${card.id}: generated on ${COVER_MODEL} from ${choice.refs.length} refs, $${COVER_USD}`)
-      return { step: 'generate', top, cost_usd: COVER_USD }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
-      await log({ status: 'failed', error: message.slice(0, 2000) })
-      throw err
+    const drawn = await drawChecked(
+      async () => {
+        try {
+          return await generateCover(subject, choice.refs, lib)
+        } catch (err) {
+          await log({ status: 'failed', error: (err instanceof Error ? err.message : String(err)).slice(0, 2000) })
+          throw err
+        }
+      },
+      async (jpeg) =>
+        (opts.check ?? checkLettering)(jpeg).catch((err): LetteringVerdict => {
+          // The check couldn't run: keep the cover rather than lose it, and say so.
+          console.warn(`[covers] card ${card.id}: lettering check failed (${err instanceof Error ? err.message : err}); kept`)
+          return { lettering: false, what: '' }
+        }),
+      async (what, attempt) => {
+        await log({ status: 'failed', cost_usd: COVER_USD, error: `rejected: lettering (${what})`.slice(0, 2000) })
+        console.log(`[covers] card ${card.id}: draw ${attempt} rejected — ${what}`)
+      }
+    )
+    if (!drawn.jpeg) {
+      return { step: 'fallback', top, cost_usd: drawn.spent, rejected: drawn.rejected, error: `lettering in ${DRAWS} draws: ${drawn.rejected.join('; ')}` }
     }
+    const url = await uploadBuffer({ bucket: 'frames', buffer: drawn.jpeg, path: coverPath(card.creator_id, card.id), contentType: 'image/jpeg' })
+    await setCover(supabase, card, url, { provider: 'ivy_generated', model: COVER_MODEL, refs: choice.refs.map((r) => r.id), cost_usd: round4(drawn.spent), attempts: drawn.attempts })
+    await log({ status: 'done', frame_url: url, cost_usd: COVER_USD })
+    console.log(`[covers] card ${card.id}: generated on ${COVER_MODEL} from ${choice.refs.length} refs in ${drawn.attempts} draw(s), $${drawn.spent.toFixed(4)}`)
+    return { step: 'generate', top, cost_usd: drawn.spent, ...(drawn.rejected.length ? { rejected: drawn.rejected } : {}) }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[covers] card ${card.id}: ${message}`)
@@ -319,4 +449,49 @@ export async function chooseLibraryCover(creatorId: string, cardId: string, item
   const url = await copyLibraryPhoto(creatorId, cardId, item.path as string, lib)
   await setCover(supabase, card, url, { provider: 'ivy_library', item_id: itemId, caption: item.caption as string, similarity: round(similarity) })
   return 'ok'
+}
+
+// ─── Repairs for covers set before they were undoable ───────────────────────────────────────────────────────────
+
+/**
+ * What a ladder cover with no previous most likely replaced, for covers set before covers kept one (the B.12 backfill,
+ * 8 Nov). A photo card with no reference picture had an Unsplash photo: it is searched again with the same words and
+ * palette (Unsplash ranks the same query the same way, so it is usually the same photo; marked refound). Anything else
+ * had no picture of its own in the slot — its reference picture or hue showed — so the slot is put back empty.
+ */
+export async function rebuildPrevious(
+  creatorId: string,
+  opts: { supabase?: SupabaseClient; search?: (query: string, palette: string[]) => Promise<{ url: string; attribution: Record<string, unknown> } | null> } = {}
+): Promise<{ rebuilt: number; refound: string[]; empty: number }> {
+  const supabase = opts.supabase ?? db()
+  const search = opts.search ?? (await import('./unsplash')).searchPhoto
+  const { data, error } = await supabase
+    .from('cards')
+    .select(`id, title, shape, visual_query, reference_picture, ${SLOT}`)
+    .eq('creator_id', creatorId)
+    .in('frame_attribution->>provider', ['ivy_library', 'ivy_generated'])
+  if (error) throw new Error(`cards: ${error.message}`)
+  const { data: pack } = await supabase.from('style_packs').select('palette').eq('creator_id', creatorId).maybeSingle()
+  const palette = (pack?.palette as string[] | undefined) ?? []
+  const out = { rebuilt: 0, refound: [] as string[], empty: 0 }
+  for (const c of (data ?? []) as (Slot & { id: string; title: string; shape: string | null; visual_query: string | null; reference_picture: unknown })[]) {
+    if (c.frame_attribution?.previous) continue
+    let previous: CoverSnapshot = { frame_url: null, frame_status: c.shape ? 'typographic' : 'none', frame_at: null, frame_attribution: null }
+    if (c.shape === 'photo' && !c.reference_picture && c.visual_query?.trim()) {
+      const photo = await search(c.visual_query.trim(), palette)
+      if (photo) {
+        previous = { frame_url: photo.url, frame_status: 'done', frame_at: null, frame_attribution: photo.attribution, refound: true }
+        out.refound.push(c.title)
+      }
+    }
+    if (!previous.frame_url) out.empty++
+    const { error: upError } = await supabase
+      .from('cards')
+      .update({ frame_attribution: { ...c.frame_attribution, previous } })
+      .eq('id', c.id)
+      .eq('creator_id', creatorId)
+    if (upError) throw new Error(`card ${c.id}: ${upError.message}`)
+    out.rebuilt++
+  }
+  return out
 }

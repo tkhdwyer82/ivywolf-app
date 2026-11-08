@@ -7,8 +7,10 @@
 //   npm run backfill:covers -w @ivywolf/pipeline -- --creator <id> --preview 5 --out <dir> [--threshold 0.3]
 //       before/after for N (d) ideas, written to <dir> (before.jpg / after.jpg + preview.json). No card is changed;
 //       a generated "after" is spent ($0.0398 each) but stored only in <dir>
-//   npm run backfill:covers -w @ivywolf/pipeline -- --creator <id> --apply [--threshold 0.3]
+//   npm run backfill:covers -w @ivywolf/pipeline -- --creator <id> --apply [--threshold 0.45]
 //       run the ladder on every (d) idea and write the covers
+//   npm run backfill:covers -w @ivywolf/pipeline -- --creator <id> --regenerate <card id>,<card id>
+//       draw step c again for these ideas (lettering-checked); what they wear now is kept for Restore
 //
 // Production data: reads with the service role. Keys come from .env.local and are never printed.
 
@@ -160,11 +162,25 @@ async function apply() {
   if (failed.length) process.exitCode = 1
 }
 
+async function regenerate(ids: string[]) {
+  const { data, error } = await db.from('cards').select(COLUMNS).eq('creator_id', creator!).in('id', ids)
+  if (error) throw new Error(`cards: ${error.message}`)
+  let spent = 0
+  for (const c of data as Row[]) {
+    const r = await coverCard(c, { supabase: db, lib, forceGenerate: true })
+    spent += r.cost_usd
+    console.log(`  ${r.step.padEnd(8)} ${c.title}${r.rejected?.length ? `  (rejected: ${r.rejected.join('; ')})` : ''}${r.error ? `  — ${r.error}` : ''}`)
+    if (r.step !== 'generate') process.exitCode = 1
+  }
+  console.log(`\n${data!.length} regenerated; spent $${spent.toFixed(4)}`)
+}
+
 async function main() {
   if (!creator) throw new Error('--creator <id> is required')
   if (arg('scores')) return scores(Number(arg('scores')))
   if (arg('preview')) return preview(Number(arg('preview')), arg('out') ?? 'covers-preview')
   if (process.argv.includes('--apply')) return apply()
+  if (arg('regenerate')) return regenerate(arg('regenerate')!.split(','))
   throw new Error('one of --scores N, --preview N --out <dir>, --apply')
 }
 

@@ -39,6 +39,13 @@ export async function setCover(token: string, cardId: string, itemId: string): P
   if (!res.ok) throw new Error('That cover didn’t change')
 }
 
+/** ••• → Restore previous cover: the picture the ladder or Change cover replaced goes back. */
+export async function restorePreviousCover(token: string, cardId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/cards/${cardId}/covers/restore`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 409) throw new Error('There’s no earlier cover to go back to')
+  if (!res.ok) throw new Error('That cover didn’t change back')
+}
+
 /** ••• → Photo credit for a ladder cover. */
 export function coverCredit(p: { source: string; caption?: string | null }): { title: string; body: string } | null {
   if (p.source === 'library') return { title: 'Photo credit', body: p.caption ? `Ivy library\n${p.caption}` : 'Ivy library' }

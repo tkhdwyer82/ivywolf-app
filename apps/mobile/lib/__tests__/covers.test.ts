@@ -1,5 +1,5 @@
 // B.12: the cover ladder in the app — where a ladder cover sits in the picture order, its credit, and Change cover.
-import { canChangeCover, coverCredit, CoversOff, loadCoverChoices, setCover } from '@/lib/covers'
+import { canChangeCover, coverCredit, CoversOff, loadCoverChoices, restorePreviousCover, setCover } from '@/lib/covers'
 import { cardPicture, ladderCoverOf, toCardItem, type CardRow } from '@/lib/home'
 import { resolvePicture } from '@/lib/picture'
 
@@ -36,6 +36,10 @@ describe('a card row with a ladder cover', () => {
     expect(toCardItem(row()).picture.source).toBe('library')
     expect(toCardItem(row({ frame_attribution: { provider: 'ivy_generated' } })).picture.source).toBe('generated')
     expect(ladderCoverOf(row({ frame_status: 'queued' }))).toBeNull()
+  })
+  it('knows when there is a previous cover to restore', () => {
+    expect(toCardItem(row()).hasPreviousCover).toBe(false)
+    expect(toCardItem(row({ frame_attribution: { provider: 'ivy_generated', previous: { frame_url: null } } })).hasPreviousCover).toBe(true)
   })
   it('an import is still her own picture', () => {
     expect(toCardItem(row({ source: 'import', frame_attribution: null })).picture.source).toBe('own')
@@ -74,6 +78,13 @@ describe('the covers API', () => {
     fetchMock.mockResolvedValueOnce({ status: 200, ok: true })
     await setCover('tok', 'c1', 'i1')
     expect(fetchMock).toHaveBeenLastCalledWith(expect.stringMatching(/\/api\/cards\/c1\/covers$/), expect.objectContaining({ method: 'POST', body: JSON.stringify({ item_id: 'i1' }) }))
+  })
+  it('restore posts to the card; 409 says there is nothing to go back to', async () => {
+    fetchMock.mockResolvedValueOnce({ status: 200, ok: true })
+    await restorePreviousCover('tok', 'c1')
+    expect(fetchMock).toHaveBeenLastCalledWith(expect.stringMatching(/\/api\/cards\/c1\/covers\/restore$/), expect.objectContaining({ method: 'POST' }))
+    fetchMock.mockResolvedValueOnce({ status: 409, ok: false })
+    await expect(restorePreviousCover('tok', 'c1')).rejects.toThrow('There’s no earlier cover to go back to')
   })
   it('409: her own picture is never swapped', async () => {
     fetchMock.mockResolvedValue({ status: 409, ok: false })
