@@ -8,12 +8,12 @@ import { LIBRARY_THRESHOLD, STYLE_REFS, libraryThreshold, chooseCover, coverProm
 const m = (id: string, similarity: number, kind: 'photo' | 'video' = 'photo'): LibraryMatch => ({ id, path: `box/${id}.jpeg`, kind, caption: id, similarity })
 const card = { source: null }
 
-test('the threshold starts at 0.30, and the server can tune it without a deploy', () => {
-  assert.equal(LIBRARY_THRESHOLD, 0.3)
-  assert.equal(libraryThreshold(undefined), 0.3)
+test('the threshold is 0.45, and the server can tune it without a deploy', () => {
+  assert.equal(LIBRARY_THRESHOLD, 0.45)
+  assert.equal(libraryThreshold(undefined), 0.45)
   assert.equal(libraryThreshold('0.42'), 0.42)
-  assert.equal(libraryThreshold('nonsense'), 0.3)
-  assert.equal(libraryThreshold('4'), 0.3)
+  assert.equal(libraryThreshold('nonsense'), 0.45)
+  assert.equal(libraryThreshold('4'), 0.45)
 })
 
 test('a. her photo from the capture is the cover; nothing below runs', () => {
@@ -21,19 +21,20 @@ test('a. her photo from the capture is the cover; nothing below runs', () => {
 })
 
 test('b. the best library photo at or above the bar', () => {
-  const c = chooseCover(card, [m('low', 0.2), m('best', 0.41), m('next', 0.35)])
+  const c = chooseCover(card, [m('low', 0.2), m('best', 0.53), m('next', 0.46)])
   assert.equal(c.step, 'library')
   assert.equal(c.step === 'library' && c.item.id, 'best')
-  assert.equal(chooseCover(card, [m('edge', 0.3)]).step, 'library', 'the bar itself counts')
+  assert.equal(chooseCover(card, [m('edge', 0.45)]).step, 'library', 'the bar itself counts')
+  assert.equal(chooseCover(card, [m('under', 0.44)]).step, 'generate')
 })
 
 test('b. a clip is never a cover, however close', () => {
-  const c = chooseCover(card, [m('clip', 0.6, 'video'), m('photo', 0.31)])
+  const c = chooseCover(card, [m('clip', 0.6, 'video'), m('photo', 0.47)])
   assert.equal(c.step === 'library' && c.item.id, 'photo')
 })
 
 test('c. below the bar: generate, styled on the top 2–3 library photos', () => {
-  const c = chooseCover(card, [m('p1', 0.29), m('p4', 0.1), m('p2', 0.25), m('v', 0.28, 'video'), m('p3', 0.2)])
+  const c = chooseCover(card, [m('p1', 0.43), m('p4', 0.1), m('p2', 0.25), m('v', 0.44, 'video'), m('p3', 0.2)])
   assert.equal(c.step, 'generate')
   assert.deepEqual(c.step === 'generate' && c.refs.map((r) => r.id), ['p1', 'p2', 'p3'])
   assert.equal(STYLE_REFS, 3)

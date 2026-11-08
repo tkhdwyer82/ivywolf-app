@@ -25,8 +25,8 @@ import { INSPIRATION_BUCKET, inspirationDb, type InspirationItem } from './inspi
 import { peopleFor, stripPeople } from './redact'
 import { uploadBuffer } from './storage'
 
-/** Step b's bar: the cosine similarity between the idea's words and a library photo's tags. Tuned on her ideas. */
-export const LIBRARY_THRESHOLD = 0.3
+/** Step b's bar: the cosine similarity between the idea's words and a library photo's tags. 0.45 (Tim, 8 Nov): 0.30–0.43 matched the nearest Nothing/box picture, not a fitting one. */
+export const LIBRARY_THRESHOLD = 0.45
 /** The bar in use: COVER_LIBRARY_THRESHOLD on the server when set (tuning without a deploy), else LIBRARY_THRESHOLD. */
 export function libraryThreshold(env: string | undefined = process.env.COVER_LIBRARY_THRESHOLD): number {
   const n = Number(env)
