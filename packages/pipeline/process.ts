@@ -10,9 +10,11 @@ import { transcribe, type Transcript } from './transcribe'
 import { textUtterances } from './text'
 import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
 import { frameRecording } from './frames'
+import { coversForRecording } from './covers'
 import { referencePicturesForRecording } from './references/picture'
 import { shapeCards, type Analysed } from './shape'
-import { attachImport, parseImport } from './imports'
+import { attachImport, parseImport, type Import } from './imports'
+import { bestPhoto, loadCapture, mergeNotes, photoAsImport, type Capture, type CaptureNote } from './capture'
 import { loadCreatorContext, markDone, markJunk, threadNewCards, writeClassification, type NewCard } from './graph'
 import { Discarded, stillWanted } from './discard'
 
@@ -22,7 +24,8 @@ export { purgePlan, purgeTrash, TRASH_DAYS } from './trash'
 export { backfillTodoRenders, housePrompt, nounOf, thumbOf } from './houseRender'
 // For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
 export { photoForCard } from './frames'
-export { backfillReferencePictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
+export { chooseLibraryCover, coverChoices, coversEnabled, rebuildPrevious, restoreCover, type CoverChoice } from './covers'
+export { backfillReferencePictures, keepPixabayPictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
 export { findReferences, pinterestAvailable, trackReferenceUse, type Reference, type ReferenceSource } from './references'
 export { generateDirections, shouldGenerate, MIN_CARDS as DIRECTIONS_MIN_CARDS } from './suggest'
 export {
@@ -41,6 +44,7 @@ export { transcribe } from './transcribe'
 export { embed } from './embed'
 export { cosine } from './threading'
 export { textUtterances, MAX_TEXT_CHARS } from './text'
+export { bestPhoto, mergeNotes } from './capture'
 
 const MIN_DURATION_MS = 3000
 
@@ -57,11 +61,15 @@ export async function analyse(args: {
   promptVersion?: PromptVersion
   /** An import's spoken line may be short ("for the reel"): skip the too-short gate (imports.ts). */
   keepShort?: boolean
+  /** What she typed while it recorded (B.11, capture.ts): merged into the transcript by time before classify. */
+  notes?: CaptureNote[]
 }): Promise<ProcessResult> {
-  const transcript = await transcribe(args.audioUrl)
+  const heard = await transcribe(args.audioUrl)
+  const notes = args.notes ?? []
+  const transcript: Transcript = notes.length ? { ...heard, utterances: mergeNotes(heard.utterances, notes) } : heard
 
-  // Junk gates run before the model: never summarise junk.
-  if (!args.keepShort && transcript.duration_ms > 0 && transcript.duration_ms < MIN_DURATION_MS) {
+  // Junk gates run before the model: never summarise junk. Typed notes are words she meant, however short the audio.
+  if (!args.keepShort && !notes.length && transcript.duration_ms > 0 && transcript.duration_ms < MIN_DURATION_MS) {
     return { junk: 'too_short', transcript }
   }
   if (transcript.utterances.length === 0) return { junk: 'no_speech', transcript }
@@ -104,8 +112,12 @@ export async function analyseText(args: {
   return { junk: null, transcript, out }
 }
 
-/** A text row's utterances: what the MCP server wrote (textUtterances), or, failing that, its meta.text re-split. */
-function storedUtterances(rec: { transcript: unknown; meta: unknown }): Utterance[] {
+/**
+ * A text row's utterances: its typed notes in time order (B.11, a typed-only capture from the app); what the MCP
+ * server wrote (textUtterances); or, failing those, its meta.text re-split.
+ */
+function storedUtterances(rec: { transcript: unknown; meta: unknown }, notes: CaptureNote[] = []): Utterance[] {
+  if (notes.length) return mergeNotes([], notes)
   if (Array.isArray(rec.transcript)) return rec.transcript as Utterance[]
   const text = (rec.meta as { text?: unknown } | null)?.text
   return typeof text === 'string' ? textUtterances(text) : []
@@ -142,7 +154,10 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   const creator = await loadCreatorContext(rec.creator_id, rec.project_id)
   const recorded = recordedDay(rec.recorded_at, rec.recorded_tz)
 
-  if (rec.kind === 'text') return processText(supabase, rec, creator, recorded)
+  // Notes and photos added on the capture screen (B.11, 0043). None for anything recorded before it.
+  const capture = await loadCapture(rec.id, rec.creator_id, supabase)
+
+  if (rec.kind === 'text') return processText(supabase, rec, creator, recorded, capture)
 
   const audioUrl = await signedUrl('recordings', rec.storage_path, 15 * 60)
   // Voice correction (the mic on P9 or P17) — a stub for now: the note is kept, transcribed and tagged to its card
@@ -160,10 +175,10 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   }
 
   const imported = parseImport(rec.meta, rec.creator_id)
-  const result = await analyse({ audioUrl, source: rec.source, creator, recorded, keepShort: !!imported })
+  const result = await analyse({ audioUrl, source: rec.source, creator, recorded, keepShort: !!imported, notes: capture.notes })
   await stillWanted(supabase, rec.id)
 
-  if (result.junk && !imported) {
+  if (result.junk && !imported && capture.photos.length === 0) {
     await markJunk(rec.id, result.junk, result.transcript.raw)
     return result
   }
@@ -180,8 +195,10 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
       projectId: rec.project_id,
     }))
   }
-  if (imported) {
-    // Silence is fine for an import: the picture is the idea. Keep the (empty) transcript on the recording.
+  // An import's picture, or the capture's best photo (B.11): her own picture goes on the first card.
+  const picture = imported ?? capturePicture(capture, result)
+  if (picture) {
+    // Silence is fine with a picture: the picture is the idea. Keep the (empty) transcript on the recording.
     if (result.junk) {
       await supabase.from('recordings').update({ transcript: result.transcript.utterances }).eq('id', rec.id)
     }
@@ -189,7 +206,7 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
       creatorId: rec.creator_id,
       recordingId: rec.id,
       projectId: rec.project_id,
-      imported,
+      imported: picture,
       cards,
       title: result.junk ? null : result.out.title,
       words: result.transcript.utterances.map((u) => u.text).join(' '),
@@ -200,29 +217,53 @@ export async function processRecording(recordingId: string): Promise<ProcessResu
   return result
 }
 
+/** The capture's best photo for the first card: the one added nearest the moment that idea was said. */
+function capturePicture(capture: Capture, result: ProcessResult): Import | null {
+  const first = result.junk ? null : result.out.cards[0]
+  const best = bestPhoto(capture.photos, first ? first.play_from_ms : null)
+  return best ? photoAsImport(best) : null
+}
+
 type Rec = { id: string; creator_id: string; project_id: string | null; transcript: unknown; meta: unknown }
 
 async function processText(
   supabase: SupabaseClient,
   rec: Rec,
   creator: CreatorContext,
-  recorded: RecordedDay | null
+  recorded: RecordedDay | null,
+  capture: Capture = { notes: [], photos: [] }
 ): Promise<ProcessResult> {
-  const result = await analyseText({ utterances: storedUtterances(rec), creator, recorded })
+  const result = await analyseText({ utterances: storedUtterances(rec, capture.notes), creator, recorded })
   await stillWanted(supabase, rec.id)
-  if (result.junk) {
+  if (result.junk && capture.photos.length === 0) {
     await markJunk(rec.id, result.junk, result.transcript.utterances)
     return result
   }
   await supabase.from('recordings').update({ duration_ms: result.transcript.duration_ms }).eq('id', rec.id)
-  const { cards } = await writeClassification({
-    creatorId: rec.creator_id,
-    recordingId: rec.id,
-    transcript: result.transcript.utterances,
-    out: result.out,
-    promptVersion: PROMPT_VERSION,
-    projectId: rec.project_id,
-  })
+  let cards: NewCard[] = []
+  if (!result.junk) {
+    ;({ cards } = await writeClassification({
+      creatorId: rec.creator_id,
+      recordingId: rec.id,
+      transcript: result.transcript.utterances,
+      out: result.out,
+      promptVersion: PROMPT_VERSION,
+      projectId: rec.project_id,
+    }))
+  }
+  // Typed + photos (B.11): the best photo is the first card's picture, as on the audio path.
+  const picture = capturePicture(capture, result)
+  if (picture) {
+    cards = await attachImport({
+      creatorId: rec.creator_id,
+      recordingId: rec.id,
+      projectId: rec.project_id,
+      imported: picture,
+      cards,
+      title: result.junk ? null : result.out.title,
+      words: result.transcript.utterances.map((u) => u.text).join(' '),
+    })
+  }
   await finish(supabase, rec, cards)
   return result
 }
@@ -247,6 +288,13 @@ async function finish(supabase: SupabaseClient, rec: Pick<Rec, 'id' | 'creator_i
   await stillWanted(supabase, rec.id)
   await markDone(rec.id)
 
+  // The cover ladder first (covers.ts, behind INSPIRATION_ENABLED): an Ivy library photo or one styled on it. Cards
+  // it covers are 'done', so frames.ts and the reference pictures below pass them by.
+  try {
+    await coversForRecording(rec.creator_id, rec.id)
+  } catch (err) {
+    console.error(`[pipeline] ${rec.id}: covers failed`, err)
+  }
   // Frames after the card is visible: a slow or failed frame never holds it back (frames.ts sets 'failed' per frame).
   try {
     await frameRecording(rec.creator_id, rec.id)

@@ -34,6 +34,10 @@ export async function submitRecording(args: {
   meta?: Record<string, unknown>
   /** A DJI import from the Mini tab: its source, a long-recording kind, and the file's own container. */
   session?: { source: 'dji_import'; extension: string; contentType: string }
+  /** Set by the capture screen, so its notes and photos (0043) can be written against it before processing. */
+  recordingId?: string
+  /** Runs after the row exists and before processing is asked for: the capture's notes and photos (B.11). */
+  beforeProcess?: (recordingId: string) => Promise<void>
 }): Promise<{ recordingId: string; storagePath: string }> {
   const { supabase, userId } = args
 
@@ -41,7 +45,7 @@ export async function submitRecording(args: {
   const creator = await supabase.from('creators').upsert({ id: userId }, { onConflict: 'id', ignoreDuplicates: true })
   if (creator.error) throw new Error(`creator: ${creator.error.message}`)
 
-  const recordingId = randomUUID()
+  const recordingId = args.recordingId ?? randomUUID()
   const storagePath = `${userId}/${recordingId}.${args.session?.extension ?? 'm4a'}`
   const bytes = await new File(args.fileUri).arrayBuffer()
 
@@ -66,6 +70,7 @@ export async function submitRecording(args: {
     meta: args.meta ?? {},
   })
   if (row.error) throw new Error(`recording row: ${row.error.message}`)
+  await args.beforeProcess?.(recordingId)
 
   // Once the row exists the take is safe: if the server can't be reached now, Home asks again (requestProcessing).
   await requestProcessing(recordingId, args.token).catch((e) => console.warn(`[record] ${recordingId}: ${e.message}`))

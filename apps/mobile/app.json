@@ -39,7 +39,7 @@
         "expo-image-picker",
         {
           "photosPermission": "Ivy opens your library only when you add an image or video to your ideas.",
-          "cameraPermission": false,
+          "cameraPermission": "Ivy opens the camera only when you tap the photo on the capture screen to add one to your idea.",
           "microphonePermission": false
         }
       ],
@@ -64,7 +64,14 @@
         }
       ],
       "expo-image",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-speech-recognition",
+        {
+          "speechRecognitionPermission": "Ivy shows your words as you speak, on this phone only. The audio isn't sent anywhere for it.",
+          "microphonePermission": "Ivy records only after you tap record, so your spoken ideas can become cards."
+        }
+      ]
     ],
     "extra": {
       "router": {},

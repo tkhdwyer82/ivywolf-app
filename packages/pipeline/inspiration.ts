@@ -50,6 +50,78 @@ export function pendingPaths(listed: string[], done: Set<string>): string[] {
   return listed.filter((p) => kindOf(p) && !done.has(p)).sort()
 }
 
+// ─── Upload names ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/** A slug's longest length; longer titles are cut at a hyphen. */
+export const SLUG_MAX = 80
+
+/**
+ * A file's title as a path segment: accents folded, lowercase, anything else a hyphen, cut at SLUG_MAX on a word.
+ * "Introducing, the Shaving Stick - Yanko Design" → "introducing-the-shaving-stick-yanko-design".
+ */
+export function slugOf(name: string): string {
+  const s = name
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  if (s.length <= SLUG_MAX) return s
+  const cut = s.slice(0, SLUG_MAX + 1)
+  return (cut.includes('-') ? cut.slice(0, cut.lastIndexOf('-')) : cut.slice(0, SLUG_MAX)).replace(/-+$/, '')
+}
+
+/**
+ * A title that says nothing — a camera roll name (IMG_2421), a saved-image number ("_ (10)"), a hash, or no letters
+ * at all once folded (a title in small caps or another script) — is numbered in its folder instead.
+ */
+export function genericName(slug: string): boolean {
+  const letters = slug.replace(/[^a-z]/g, '')
+  return (
+    letters.length < 3 ||
+    /^(img|dsc|dscn|pxl|image|photo|video|vid|mov|screenshot)-?\d+/.test(slug) ||
+    /^[0-9a-f]{16,}$/.test(slug)
+  )
+}
+
+/** Library paths keep one extension per kind: photos are .jpeg (HEIC is converted), videos keep theirs. */
+export function libraryExt(original: string): string | null {
+  const ext = original.split('.').pop()?.toLowerCase() ?? ''
+  if (['jpg', 'jpeg', 'heic', 'heif'].includes(ext)) return 'jpeg'
+  if (['png', 'webp', 'mp4', 'mov'].includes(ext)) return ext
+  return null
+}
+
+/**
+ * Where each local file goes in `folder`: its slug, or `<folder>-NNN` / `<folder>-clip-NNN` when its name is generic
+ * (numbered on from the highest already there), "-2" on a clash. Deterministic for the same files and bucket, so a
+ * re-run maps every file to the same path. Files that aren't a photo or video are left out.
+ */
+export function libraryPaths(files: string[], folder: string, existing: string[]): Map<string, string> {
+  const taken = new Set(existing)
+  const base = folder.split('/').pop()!
+  const highest = (prefix: string) =>
+    Math.max(0, ...existing.map((p) => new RegExp(`^${folder}/${prefix}-(\\d+)\\.`).exec(p)?.[1]).filter(Boolean).map(Number))
+  const next = { photo: highest(base), video: highest(`${base}-clip`) }
+  const out = new Map<string, string>()
+  for (const f of [...files].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))) {
+    const ext = libraryExt(f)
+    if (!ext) continue
+    const kind = kindOf(`x.${ext}`)!
+    const stem = slugOf(f.replace(/\.[^.]+$/, ''))
+    let name: string
+    if (genericName(stem)) name = kind === 'video' ? `${base}-clip-${String(++next.video).padStart(3, '0')}` : `${base}-${String(++next.photo).padStart(3, '0')}`
+    else {
+      name = stem
+      for (let n = 2; taken.has(`${folder}/${name}.${ext}`); n++) name = `${stem}-${n}`
+    }
+    const path = `${folder}/${name}.${ext}`
+    taken.add(path)
+    out.set(f, path)
+  }
+  return out
+}
+
 // ─── Search and "more like this" ────────────────────────────────────────────────────────────────────────────────
 
 export interface InspirationItem {
@@ -81,6 +153,8 @@ export const VIDEO_EVERY = 5
  */
 export const NEAR_DUPLICATE = 0.76
 const MORE_POOL = 24
+/** "More like this": at most one tile in this many from another folder than the item's. */
+export const OTHER_FOLDER_EVERY = 4
 
 const stem = (w: string) => w.replace(/(es|s)$/, '')
 const words = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).map(stem)
@@ -134,6 +208,7 @@ export function cosine(a: number[], b: number[]): number {
 
 export interface MoreCandidate {
   id: string
+  folder?: string
   source: 'alike' | 'look'
   score: number
   image_embedding: number[]
@@ -143,8 +218,15 @@ export interface MoreCandidate {
  * "More like this": alternate the pictures that look alike (image neighbours) with ones from the same folder (same
  * look, closest by tags), never the item itself, and never two near-duplicates side by side — including the first
  * tile against the item. A candidate that can't be placed next to the last tile waits for a later slot.
+ *
+ * It stays mostly in the item's folder (a library category: "nothing", "box"): at most one tile in OTHER_FOLDER_EVERY
+ * comes from another folder, until the item's own folder runs out.
  */
-export function pickMore<T extends MoreCandidate>(item: { id: string; image_embedding: number[] }, candidates: T[], limit: number): T[] {
+export function pickMore<T extends MoreCandidate>(
+  item: { id: string; image_embedding: number[]; folder?: string },
+  candidates: T[],
+  limit: number
+): T[] {
   const bySource = (s: MoreCandidate['source']) =>
     candidates.filter((c) => c.source === s && c.id !== item.id).sort((a, b) => b.score - a.score)
   const alike = bySource('alike'), look = bySource('look')
@@ -155,8 +237,13 @@ export function pickMore<T extends MoreCandidate>(item: { id: string; image_embe
 
   const out: T[] = []
   let prev = item.image_embedding
+  const away = (c: T) => item.folder !== undefined && c.folder !== undefined && c.folder !== item.folder
   while (out.length < limit) {
-    const i = merged.findIndex((c) => cosine(prev, c.image_embedding) < NEAR_DUPLICATE)
+    const awayOk = out.filter(away).length < Math.floor((out.length + 1) / OTHER_FOLDER_EVERY)
+    const fits = (c: T) => cosine(prev, c.image_embedding) < NEAR_DUPLICATE
+    let i = merged.findIndex((c) => fits(c) && (awayOk || !away(c)))
+    // Its own folder has nothing left that fits: let the others fill.
+    if (i < 0) i = merged.findIndex(fits)
     if (i < 0) break
     const [next] = merged.splice(i, 1)
     out.push(next)
@@ -204,12 +291,12 @@ export async function searchInspiration(
 
 /** GET /api/inspiration/{id}/more. Null if there is no such item. */
 export async function moreLikeThis(db: SupabaseClient, id: string, limit: number): Promise<Signed<InspirationItem>[] | null> {
-  const { data: item, error } = await db.from('inspiration_items').select('id, image_embedding').eq('id', id).maybeSingle()
+  const { data: item, error } = await db.from('inspiration_items').select('id, folder, image_embedding').eq('id', id).maybeSingle()
   if (error) throw new Error(`item: ${error.message}`)
   if (!item) return null
   const { data, error: rpcError } = await db.rpc('inspiration_more', { item_id: id, pool: MORE_POOL })
   if (rpcError) throw new Error(`more: ${rpcError.message}`)
   const candidates = (data as (InspirationItem & MoreCandidate)[]).map((c) => ({ ...c, image_embedding: vec(c.image_embedding) }))
-  const picked = pickMore({ id, image_embedding: vec(item.image_embedding) }, candidates, limit)
+  const picked = pickMore({ id, folder: item.folder as string, image_embedding: vec(item.image_embedding) }, candidates, limit)
   return sign(db, picked.map(({ source: _s, score: _sc, image_embedding: _e, ...r }) => r))
 }

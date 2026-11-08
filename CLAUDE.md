@@ -60,6 +60,10 @@ apps/mobile (Expo) · apps/web (Next.js) · packages/schema (zod types shared) �
   shipping version's. Checks that don't vary stay single-run. `PROMPT_VERSION` in packages/pipeline/classify.ts records
   which version ships and what it was ratcheted over (method: docs/rnd/eval-method-repeat-runs.md).
 - Run `supabase config diff` before `supabase config push` — push applies even when you answer "n" at its prompt.
+- Production web (Vercel `ivywolf-api`) deploys only from main or from a branch rebased on main. Merging to main deploys
+  production by itself (Git integration). Before any `vercel deploy --prod`, diff against what production runs (its
+  commit: `vercel api /v13/deployments/<url>` → meta.githubCommitSha, or the commit a CLI deploy was made from) and
+  confirm the branch contains it, so nothing on production is dropped.
 - Third-party auth (Clerk) is set via the Management API (`/v1/projects/{ref}/config/auth/third-party-auth`), not config.toml — config push does not sync it.
 
 ## Branches and builds

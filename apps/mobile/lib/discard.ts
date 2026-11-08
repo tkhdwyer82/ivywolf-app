@@ -22,10 +22,12 @@ export type CloseDecision = 'drop' | 'ask'
 
 /**
  * What × does: drop only a take with no speech in it; ask about every other, however short. `peakDb` null means the
- * mic never reported a level, or hasn't yet — not the same as silence, so it asks.
+ * mic never reported a level, or hasn't yet — not the same as silence, so it asks. `added`: she typed a note or added
+ * a photo on the capture screen (B.11).
  */
-export function closeDecision(take: { peakDb: number | null; imported: boolean }): CloseDecision {
-  if (take.imported) return 'ask'
+export function closeDecision(take: { peakDb: number | null; imported: boolean; added?: boolean }): CloseDecision {
+  // B.11: something typed or a photo added is hers, as speech is — × asks.
+  if (take.imported || take.added) return 'ask'
   if (take.peakDb !== null && take.peakDb < SILENT_DB) return 'drop'
   return 'ask'
 }
@@ -33,7 +35,8 @@ export function closeDecision(take: { peakDb: number | null; imported: boolean }
 // ── Undo hand-off: Record → Home ────────────────────────────────────────────────────────────────────────────────
 
 /** `shownAt`: when the take was handed to Home — the start of the 6 s. */
-export type JustRecorded = { recordingId: string; storagePath: string; shownAt: number }
+/** `storagePath` null: a typed-only capture (B.11) — a text recording, no audio. */
+export type JustRecorded = { recordingId: string; storagePath: string | null; shownAt: number }
 
 let current: JustRecorded | null = null
 const listeners = new Set<(j: JustRecorded | null) => void>()
