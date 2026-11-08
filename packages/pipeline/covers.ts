@@ -27,6 +27,11 @@ import { uploadBuffer } from './storage'
 
 /** Step b's bar: the cosine similarity between the idea's words and a library photo's tags. Tuned on her ideas. */
 export const LIBRARY_THRESHOLD = 0.3
+/** The bar in use: COVER_LIBRARY_THRESHOLD on the server when set (tuning without a deploy), else LIBRARY_THRESHOLD. */
+export function libraryThreshold(env: string | undefined = process.env.COVER_LIBRARY_THRESHOLD): number {
+  const n = Number(env)
+  return env && Number.isFinite(n) && n > 0 && n < 1 ? n : LIBRARY_THRESHOLD
+}
 /** Step c sends this many of the nearest library photos as style references. */
 export const STYLE_REFS = 3
 /** Library candidates looked at per idea (photos only — a clip has no still to copy). */
@@ -92,7 +97,7 @@ export type CoverStep =
   | { step: 'fallback' }
 
 /** The ladder, as a decision: nothing is fetched or written here. Videos never become covers or references. */
-export function chooseCover(card: Pick<CoverCard, 'source'>, matches: LibraryMatch[], threshold = LIBRARY_THRESHOLD): CoverStep {
+export function chooseCover(card: Pick<CoverCard, 'source'>, matches: LibraryMatch[], threshold = libraryThreshold()): CoverStep {
   if (ownCover(card)) return { step: 'own' }
   const photos = matches.filter((m) => m.kind === 'photo').sort((a, b) => b.similarity - a.similarity)
   if (photos.length === 0) return { step: 'fallback' }

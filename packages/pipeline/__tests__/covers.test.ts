@@ -3,12 +3,18 @@
 //   npm test -w @ivywolf/pipeline
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { LIBRARY_THRESHOLD, STYLE_REFS, chooseCover, coverPrompt, coverQuery, coverSubject, ladderCover, type LibraryMatch } from '../covers'
+import { LIBRARY_THRESHOLD, STYLE_REFS, libraryThreshold, chooseCover, coverPrompt, coverQuery, coverSubject, ladderCover, type LibraryMatch } from '../covers'
 
 const m = (id: string, similarity: number, kind: 'photo' | 'video' = 'photo'): LibraryMatch => ({ id, path: `box/${id}.jpeg`, kind, caption: id, similarity })
 const card = { source: null }
 
-test('the threshold starts at 0.30', () => assert.equal(LIBRARY_THRESHOLD, 0.3))
+test('the threshold starts at 0.30, and the server can tune it without a deploy', () => {
+  assert.equal(LIBRARY_THRESHOLD, 0.3)
+  assert.equal(libraryThreshold(undefined), 0.3)
+  assert.equal(libraryThreshold('0.42'), 0.42)
+  assert.equal(libraryThreshold('nonsense'), 0.3)
+  assert.equal(libraryThreshold('4'), 0.3)
+})
 
 test('a. her photo from the capture is the cover; nothing below runs', () => {
   assert.deepEqual(chooseCover({ source: 'import' }, [m('a', 0.9)]), { step: 'own' })

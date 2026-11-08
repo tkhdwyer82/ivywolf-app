@@ -19,7 +19,7 @@ import sharp from 'sharp'
 import { INSPIRATION_BUCKET, inspirationDb } from '../inspiration'
 import { peopleFor } from '../redact'
 import {
-  COVER_MODEL, COVER_USD, LIBRARY_THRESHOLD, chooseCover, coverCard, coverSubject, generateCover, ladderCover,
+  COVER_MODEL, COVER_USD, chooseCover, libraryThreshold, coverCard, coverSubject, generateCover, ladderCover,
   libraryMatches, ownCover, type CoverCard,
 } from '../covers'
 
@@ -29,7 +29,7 @@ const arg = (name: string) => {
   return i < 0 ? undefined : process.argv[i + 1]
 }
 const creator = arg('creator')
-const threshold = Number(arg('threshold') ?? LIBRARY_THRESHOLD)
+const threshold = Number(arg('threshold') ?? libraryThreshold())
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } })
 const lib = inspirationDb()
 
