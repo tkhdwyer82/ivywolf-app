@@ -26,7 +26,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   // Already has a picture (a credited Unsplash photo, or one she imported): never replace it with a search. A frame
   // drawn before Job B isn't one — the app never shows it (Job I, cardPicture) — so it doesn't block the search; its
   // URL stays in frame_generations and its file in storage.
-  const credited = (card.frame_attribution as { provider?: string } | null)?.provider === 'unsplash'
+  // A cover from the ladder (B.12, Ivy library or made from it) is a picture too.
+  const credited = ['unsplash', 'ivy_library', 'ivy_generated'].includes((card.frame_attribution as { provider?: string } | null)?.provider ?? '')
   if (card.frame_status === 'done' && card.frame_url && (credited || card.source === 'import')) return NextResponse.json({ photo: true })
 
   try {

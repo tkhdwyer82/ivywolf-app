@@ -10,7 +10,7 @@ import type { CardBoard, CardDiagram, CardQuote, CardShape } from '@ivywolf/sche
 import type { HueName } from '@ivywolf/ui'
 import { requestProcessing } from './record'
 import { loadLinks, withLinks, type Links } from './links'
-import { resolvePicture, type OwnPicture, type Picture, type ReferencePicture } from './picture'
+import { resolvePicture, type LadderCover, type OwnPicture, type Picture, type ReferencePicture } from './picture'
 
 export interface Project {
   id: string
@@ -81,6 +81,8 @@ export interface CardItem extends Base {
   links: number
   /** How it came in on the capture screen (B.11): said, typed, photos. Null for anything captured before it. */
   capture?: CaptureInfo | null
+  /** The ladder or Change cover replaced a picture and kept it (B.12): ••• → Restore previous cover. */
+  hasPreviousCover?: boolean
 }
 export interface ActionItem extends Base {
   kind: 'action'
@@ -137,7 +139,7 @@ export type CardRow = {
   id: string; recording_id: string; project_id: string; title: string; gist: string; play_from_ms: number
   confidence: number; frame_url: string | null; frame_status: Base['frameStatus']; frame_at: string | null
   created_at: string; source?: string | null; shape: CardShape | null; quote: CardQuote | null; diagram: CardDiagram | null; board: CardBoard | null
-  frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string } | null
+  frame_attribution: { provider?: string; photographer?: string; photographer_url?: string; photo_url?: string; caption?: string; previous?: unknown } | null
   reference_picture?: ReferencePicture | null
   recordings: { recorded_at: string | null; storage_path?: string | null; source?: string; kind?: string | null; meta_capture?: unknown } | null
   pinned_at?: string | null
@@ -155,7 +157,17 @@ export function cardPicture(r: Pick<CardRow, 'frame_url' | 'frame_status' | 'fra
   if (r.frame_status !== 'done' || !r.frame_url) return null
   const a = r.frame_attribution
   if (a?.provider === 'unsplash' && a.photographer && a.photographer_url && a.photo_url) return r.frame_url
+  if (ladderCoverOf(r)) return r.frame_url
   return r.source === 'import' ? r.frame_url : null
+}
+
+/** The cover ladder's picture (B.12): an Ivy library photo or one Ivy made from it. Null for anything else. */
+export function ladderCoverOf(r: Pick<CardRow, 'frame_url' | 'frame_status' | 'frame_attribution'>): LadderCover | null {
+  const a = r.frame_attribution
+  if (r.frame_status !== 'done' || !r.frame_url) return null
+  if (a?.provider === 'ivy_library') return { url: r.frame_url, from: 'library', caption: a.caption ?? null }
+  if (a?.provider === 'ivy_generated') return { url: r.frame_url, from: 'generated', caption: null }
+  return null
 }
 
 /** A card made before shapes (0033) has none: photo while its photo is coming or there, else text. */
@@ -176,7 +188,8 @@ const unsplashOf = (a: CardRow['frame_attribution']): PhotoCredit | null =>
 export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStage | null } = { size: 1, stage: null }, own: OwnPicture[] = []): CardItem {
   const credit = unsplashOf(c.frame_attribution)
   const frame = cardPicture(c)
-  const imported: OwnPicture[] = frame && !credit ? [{ uri: frame, kind: 'image', at: c.frame_at ?? c.created_at, from: 'context' }] : []
+  const cover = ladderCoverOf(c)
+  const imported: OwnPicture[] = frame && !credit && !cover ? [{ uri: frame, kind: 'image', at: c.frame_at ?? c.created_at, from: 'context' }] : []
   return {
     kind: 'card',
     id: c.id,
@@ -200,6 +213,7 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     credit,
     picture: resolvePicture({
       own: [...imported, ...own],
+      cover,
       unsplash: credit && frame ? { url: frame, ...credit } : null,
       reference: c.reference_picture ?? null,
     }),
@@ -214,6 +228,7 @@ export function toCardItem(c: CardRow, thread: { size: number; stage: ThreadStag
     heartedAt: c.hearted_at ?? null,
     links: 0,
     capture: captureInfo(c.recordings),
+    hasPreviousCover: !!c.frame_attribution?.previous,
   }
 }
 

@@ -10,6 +10,8 @@
     "ingest": "tsx --env-file=../../.env.local ingest.ts",
     "test": "tsx --test __tests__/*.test.ts",
     "eval:recipes": "tsx --env-file-if-exists=../../.env.local eval/recipes/run.ts",
+    "upload:inspiration": "tsx --env-file=../../.env.local scripts/upload-inspiration.ts",
+    "backfill:covers": "tsx --env-file=../../.env.local scripts/backfill-covers.ts",
     "index:inspiration": "tsx --env-file=../../.env.local scripts/index-inspiration.ts",
     "test:inspiration": "tsx --env-file=../../.env.local scripts/test-inspiration-api.ts"
   },
