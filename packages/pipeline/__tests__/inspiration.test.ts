@@ -4,8 +4,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  NEAR_DUPLICATE, VIDEO_EVERY, cosine, folderOf, inspirationDb, keywordHits, kindOf, mixKinds, pendingPaths, pickMore,
-  rankByQuery, type MoreCandidate,
+  NEAR_DUPLICATE, OTHER_FOLDER_EVERY, VIDEO_EVERY, cosine, folderOf, genericName, inspirationDb, keywordHits, kindOf,
+  libraryPaths, mixKinds, pendingPaths, pickMore, rankByQuery, slugOf, type MoreCandidate,
 } from '../inspiration'
 import { enforceTags } from '../inspirationTag'
 
@@ -141,4 +141,44 @@ test('a candidate in both lists appears once; the limit holds', () => {
   const picked = pickMore(item, [...many, cand('x0', 'look', 0.99, 40)], 6)
   assert.equal(picked.length, 6)
   assert.equal(new Set(picked.map((p) => p.id)).size, 6)
+})
+
+test('more like this stays mostly in the item\'s folder; other folders fill when it runs out', () => {
+  const item = { id: 'me', folder: 'box', image_embedding: at(0) }
+  const c = (id: string, folder: string, score: number, deg: number): MoreCandidate => ({ ...cand(id, 'alike', score, deg), folder })
+  // The nearest pictures are all from another folder; the box ones score lower.
+  const others = Array.from({ length: 6 }, (_, i) => c(`n${i}`, 'nothing', 0.95 - i / 100, 40 + i * 40))
+  const boxes = Array.from({ length: 6 }, (_, i) => c(`b${i}`, 'box', 0.8 - i / 100, 60 + i * 40))
+  const picked = pickMore(item, [...others, ...boxes], 8)
+  assert.equal(picked.length, 8)
+  for (let n = 1; n <= picked.length; n++) {
+    const away = picked.slice(0, n).filter((p) => p.folder !== 'box').length
+    assert.ok(away <= Math.floor(n / OTHER_FOLDER_EVERY), `${away} from other folders in the first ${n}`)
+  }
+  // Only two box pictures left: the rest fill from elsewhere rather than stopping short.
+  assert.equal(pickMore(item, [...others, ...boxes.slice(0, 2)], 6).length, 6)
+})
+
+// ─── upload names ───────────────────────────────────────────────────────────────────────────────────────────────
+
+test('upload names: titles become slugs, generic names are numbered, clashes get -2, photos are .jpeg', () => {
+  assert.equal(slugOf('Introducing, the Shaving Stick - Yanko Design'), 'introducing-the-shaving-stick-yanko-design')
+  assert.equal(slugOf('Custom Reliëf 5g'), 'custom-relief-5g')
+  assert.ok(slugOf('a '.repeat(60)).length <= 80)
+  for (const g of ['img-2421', '10', '92df0655eaaf58feab0bf45169dff13b', '27-2025', '']) assert.ok(genericName(g), g)
+  assert.ok(!genericName('blackthings'))
+
+  const paths = libraryPaths(
+    ['IMG_2421.JPG', '_ (10).jpeg', '_ (4).jpeg', 'Black Things.jpeg', 'black things.HEIC', 'clip.mov', 'abc123abc123abc123.mp4', 'notes.txt'],
+    'box',
+    ['box/box-002.jpeg', 'box/black-things.jpeg']
+  )
+  assert.equal(paths.get('_ (4).jpeg'), 'box/box-003.jpeg', 'numbered on from the highest, in natural order')
+  assert.equal(paths.get('_ (10).jpeg'), 'box/box-004.jpeg')
+  assert.equal(paths.get('IMG_2421.JPG'), 'box/box-005.jpeg')
+  assert.equal(paths.get('black things.HEIC'), 'box/black-things-2.jpeg')
+  assert.equal(paths.get('Black Things.jpeg'), 'box/black-things-3.jpeg')
+  assert.equal(paths.get('clip.mov'), 'box/clip.mov')
+  assert.equal(paths.get('abc123abc123abc123.mp4'), 'box/box-clip-001.mp4')
+  assert.ok(!paths.has('notes.txt'))
 })
