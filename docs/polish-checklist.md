@@ -63,3 +63,4 @@ apart. `scripts/build-ios.sh` prints the line to add after each build.
 | 35 | PREVIEW: job-b8a-idea-page (local) | 617a435 |
 | 38 | PREVIEW: job-b11-capture-one-screen (local) | 9f3ea47 |
 | 39 | PREVIEW: job-b12-library-covers (local) | 344e7d9 |
+| 40 | main | fd328bf |
