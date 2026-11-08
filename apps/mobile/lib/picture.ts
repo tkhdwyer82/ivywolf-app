@@ -2,6 +2,8 @@
 // Every idea carries a picture (Home v4, Figma 1737:2). cards.picture resolves in this order:
 //   1. her own — an image she added with Add context (card_context, for this idea or both), an import's picture, or a
 //      take from the Create flow (generation_runs); the newest of them;
+//   1b. the cover ladder's (B.12, packages/pipeline/covers.ts, behind INSPIRATION_ENABLED): an Ivy library photo, or
+//      one Ivy made styled on the library — credited "Ivy library" in ••• → Photo credit;
 //   2. the credited Unsplash photo Job B found for it (frame_attribution);
 //   3. its reference picture (0039): the first Unsplash or Pixabay result of findReferences, never Pinterest;
 //   4. the project hue, as a flat block, while a picture is being found.
@@ -16,7 +18,7 @@ export interface Credit {
   provider: 'Unsplash' | 'Pixabay'
 }
 
-export type PictureSource = 'own' | 'created' | 'unsplash' | 'reference' | 'hue'
+export type PictureSource = 'own' | 'created' | 'library' | 'generated' | 'unsplash' | 'reference' | 'hue'
 
 export interface Picture {
   source: PictureSource
@@ -28,6 +30,8 @@ export interface Picture {
   linkUrl: string | null
   /** Unsplash's download_location, hit once when she uses it. */
   trackUrl: string | null
+  /** A library cover's caption (what the picture is), for ••• → Photo credit. */
+  caption?: string | null
 }
 
 /** An image or take that is hers. */
@@ -58,17 +62,26 @@ export interface ReferencePicture {
   track_url?: string
 }
 
+/** A cover the ladder set (frame_attribution provider ivy_library / ivy_generated). */
+export interface LadderCover {
+  url: string
+  from: 'library' | 'generated'
+  caption: string | null
+}
+
 export interface PictureInputs {
   own: OwnPicture[]
+  cover?: LadderCover | null
   unsplash: UnsplashFrame | null
   reference: ReferencePicture | null
 }
 
 const unsplashCredit = (name: string, url: string): Credit => ({ line: `Photo by ${name} on Unsplash`, name, url, provider: 'Unsplash' })
 
-export function resolvePicture({ own, unsplash, reference }: PictureInputs): Picture {
+export function resolvePicture({ own, cover, unsplash, reference }: PictureInputs): Picture {
   const mine = [...own].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))[0]
   if (mine) return { source: mine.from === 'created' ? 'created' : 'own', uri: mine.uri, kind: mine.kind, credit: null, linkUrl: null, trackUrl: null }
+  if (cover) return { source: cover.from, uri: cover.url, kind: 'image', credit: null, linkUrl: null, trackUrl: null, caption: cover.caption }
   if (unsplash)
     return {
       source: 'unsplash',

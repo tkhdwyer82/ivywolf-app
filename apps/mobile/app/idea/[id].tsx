@@ -6,7 +6,8 @@
 //      board's 3-up once its thread has three pictures; any other form drawn large on its hue (CardFace, as B.5). Over
 //      it only two frosted 48 squares: back, and ••• (where Change view, Move to project, Photo credit and the rest
 //      live). An Unsplash photo's attribution is ••• → Photo credit for now; a visible line under the picture is
-//      deferred (B.8a, 21 Oct).
+//      deferred (B.8a, 21 Oct). B.12: a cover from the Ivy library says "Ivy library" there, and with the library on
+//      ••• → Change cover offers its six nearest photos (CoverSheet) — never over her own picture.
 //   2. One action row, as Pinterest's: ♥ (outline; filled only once liked) · ◯ (a plain round speech bubble — View
 //      idea, I3, a bottom sheet over the page) · ↑ (Share) left, 28 pt outline icons, regular weight, 20 apart, with a
 //      count 6 after ◯ when there's one (♥ gets one once other people can like an idea); Save right — lime 84 × 44
@@ -49,6 +50,8 @@ import { draftCount, loadStepCard, MAKE_LABEL, type StepCard } from '@/lib/recip
 import { ShareSheet } from '@/components/ShareSheet'
 import { AddContextSheet } from '@/components/AddContextSheet'
 import { RecipeSheet } from '@/components/RecipeSheet'
+import { CoverSheet } from '@/components/CoverSheet'
+import { canChangeCover, coverCredit } from '@/lib/covers'
 import { CardFace, SHAPE_NAME } from '@/components/CardFace'
 import { distinct, ThreeUp } from '@/components/IdeaTile'
 import { Tile } from '@/components/Tile'
@@ -75,7 +78,7 @@ export default function IdeaPage() {
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
   const [menu, setMenu] = useState(false)
-  const [sheet, setSheet] = useState<'share' | 'context' | 'recipe' | null>(null)
+  const [sheet, setSheet] = useState<'share' | 'context' | 'recipe' | 'cover' | null>(null)
   // A card a recipe made (B.10): its "Step n of … · @handle" tag and its Make square.
   const [step, setStep] = useState<StepCard | null>(null)
   const [drafts, setDrafts] = useState(0)
@@ -238,8 +241,13 @@ export default function IdeaPage() {
     load()
   }
 
-  /** ••• → Photo credit: the Unsplash credit that used to sit under the picture. */
+  /** ••• → Photo credit: the Unsplash credit that used to sit under the picture, or "Ivy library" for a ladder cover. */
   function photoCredit() {
+    const ivy = idea ? coverCredit(idea.card.picture) : null
+    if (ivy) {
+      Alert.alert(ivy.title, ivy.body)
+      return
+    }
     const c = idea?.card.credit
     if (!c) return
     Alert.alert('Photo credit', `Photo by ${c.photographer} on Unsplash`, [
@@ -487,8 +495,9 @@ export default function IdeaPage() {
             { icon: 'pencil', label: 'Edit idea', onPress: () => router.push(`/idea/edit/${idea.id}`) },
             ...(idea.recordingId ? [{ icon: 'text.alignleft' as const, label: 'View transcript', onPress: () => router.push(`/idea/transcript/${idea.id}`) }] : []),
             { icon: 'rectangle.3.group', label: 'Change view', onPress: changeView },
+            ...(canChangeCover(!!library && library.length > 0, picture.source) ? [{ icon: 'photo.on.rectangle' as const, label: 'Change cover', onPress: () => setSheet('cover') }] : []),
             { icon: 'square.on.square', label: 'Copy', onPress: copy },
-            ...(idea.card.credit && picture.source === 'unsplash' ? [{ icon: 'camera' as const, label: 'Photo credit', onPress: photoCredit }] : []),
+            ...((idea.card.credit && picture.source === 'unsplash') || coverCredit(picture) ? [{ icon: 'camera' as const, label: 'Photo credit', onPress: photoCredit }] : []),
             { icon: 'folder', label: 'Move to project', onPress: openSaveTo },
             ...(saved ? [{ icon: 'minus.circle' as const, label: `Remove from ${saved}`, onPress: unsave }] : []),
             { icon: 'trash', label: 'Move to trash', onPress: trash, destructive: true },
@@ -498,6 +507,16 @@ export default function IdeaPage() {
       {toast && <Pill label={toast} tone="grey" testID="make-toast" />}
       {sheet === 'share' && <ShareSheet card={idea.card} onClose={() => setSheet(null)} onShared={load} />}
       {sheet === 'context' && <AddContextSheet card={idea.card} onClose={() => setSheet(null)} />}
+      {sheet === 'cover' && (
+        <CoverSheet
+          cardId={idea.id}
+          onClose={() => setSheet(null)}
+          onChanged={() => {
+            setSheet(null)
+            load()
+          }}
+        />
+      )}
       {sheet === 'recipe' && (
         <RecipeSheet
           idea={idea.card}

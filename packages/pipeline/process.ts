@@ -10,6 +10,7 @@ import { transcribe, type Transcript } from './transcribe'
 import { textUtterances } from './text'
 import { classify, PROMPT_VERSION, recordedDay, type CreatorContext, type PromptVersion, type RecordedDay } from './classify'
 import { frameRecording } from './frames'
+import { coversForRecording } from './covers'
 import { referencePicturesForRecording } from './references/picture'
 import { shapeCards, type Analysed } from './shape'
 import { attachImport, parseImport, type Import } from './imports'
@@ -23,6 +24,7 @@ export { purgePlan, purgeTrash, TRASH_DAYS } from './trash'
 export { backfillTodoRenders, housePrompt, nounOf, thumbOf } from './houseRender'
 // For Change view → Photo (apps/web/app/api/cards/[id]/photo): the same Unsplash lane a new photo card takes.
 export { photoForCard } from './frames'
+export { chooseLibraryCover, coverChoices, coversEnabled, type CoverChoice } from './covers'
 export { backfillReferencePictures, referencePicturesForRecording, toReferencePicture, type ReferencePicture } from './references/picture'
 export { findReferences, pinterestAvailable, trackReferenceUse, type Reference, type ReferenceSource } from './references'
 export { generateDirections, shouldGenerate, MIN_CARDS as DIRECTIONS_MIN_CARDS } from './suggest'
@@ -286,6 +288,13 @@ async function finish(supabase: SupabaseClient, rec: Pick<Rec, 'id' | 'creator_i
   await stillWanted(supabase, rec.id)
   await markDone(rec.id)
 
+  // The cover ladder first (covers.ts, behind INSPIRATION_ENABLED): an Ivy library photo or one styled on it. Cards
+  // it covers are 'done', so frames.ts and the reference pictures below pass them by.
+  try {
+    await coversForRecording(rec.creator_id, rec.id)
+  } catch (err) {
+    console.error(`[pipeline] ${rec.id}: covers failed`, err)
+  }
   // Frames after the card is visible: a slow or failed frame never holds it back (frames.ts sets 'failed' per frame).
   try {
     await frameRecording(rec.creator_id, rec.id)

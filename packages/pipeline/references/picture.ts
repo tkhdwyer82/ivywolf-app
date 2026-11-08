@@ -58,8 +58,10 @@ type CardRow = {
 }
 const COLUMNS = 'id, creator_id, recording_id, title, gist, visual_query, shape, source, frame_status, frame_attribution, reference_picture'
 
-/** Already pictured: an Unsplash photo of its own (Job B), or a reference found before. */
-const pictured = (c: CardRow) => !!c.reference_picture || (c.frame_status === 'done' && c.frame_attribution?.provider === 'unsplash')
+/** Already pictured: an Unsplash photo of its own (Job B), a cover from the ladder (covers.ts), or a reference found before. */
+const pictured = (c: CardRow) =>
+  !!c.reference_picture ||
+  (c.frame_status === 'done' && ['unsplash', 'ivy_library', 'ivy_generated'].includes(c.frame_attribution?.provider ?? ''))
 
 /** Find and store one card's reference picture. Returns whether one was stored. */
 export async function referencePictureFor(

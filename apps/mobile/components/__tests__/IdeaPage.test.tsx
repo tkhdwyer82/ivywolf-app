@@ -35,6 +35,10 @@ jest.mock('expo-symbols', () => ({ SymbolView: () => null }))
 jest.mock('@ivywolf/schema', () => ({ LOW_CONFIDENCE: 0.6 }))
 jest.mock('@/components/ShareSheet', () => ({ ShareSheet: () => null }))
 jest.mock('@/components/AddContextSheet', () => ({ AddContextSheet: () => null }))
+jest.mock('@/components/CoverSheet', () => {
+  const { Text } = require('react-native')
+  return { CoverSheet: ({ cardId }: { cardId: string }) => <Text>{`COVER SHEET ${cardId}`}</Text> }
+})
 jest.mock('@/components/RecipeSheet', () => {
   const { Text } = require('react-native')
   return { RecipeSheet: () => <Text>RECIPE SHEET</Text> }
@@ -446,5 +450,45 @@ describe('More to explore with the Ivy library (inspiration demo)', () => {
     await screen.findByTestId('tile-c7')
     expect(screen.queryByText('Ivy library')).toBeNull()
     expect(screen.queryByTestId('ivy-library')).toBeNull()
+  })
+})
+
+describe('Cover ladder on the idea page (B.12)', () => {
+  const libPic = { id: 'lib1', path: 'box/a.jpeg', kind: 'photo', folder: 'box', width: 800, height: 1000, caption: 'Black gift box', keywords: [], colours: [], shot: 'product', people: 'none', url: 'https://lib/a.jpg' }
+  const LIBRARY_COVER = idea({
+    card: card({ picture: { source: 'library', uri: 'https://frames/u/covers/c1.jpg', kind: 'image', credit: null, linkUrl: null, trackUrl: null, caption: 'Black gift box on dark grey' } }),
+  })
+
+  it('library on: ••• → Change cover opens the sheet for this idea', async () => {
+    searchLibrary.mockResolvedValue([libPic])
+    await open(base as unknown as Idea)
+    await screen.findByTestId('ivy-library')
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    await fireEvent.press(screen.getByText('Change cover'))
+    expect(screen.getByText('COVER SHEET c1')).toBeTruthy()
+  })
+
+  it('library off (404): no Change cover', async () => {
+    await open(base as unknown as Idea)
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    expect(screen.queryByText('Change cover')).toBeNull()
+  })
+
+  it('never over her own picture', async () => {
+    searchLibrary.mockResolvedValue([libPic])
+    await open(idea({ card: card({ picture: { source: 'own', uri: 'https://frames/u/imports/p.jpg', kind: 'image', credit: null, linkUrl: null, trackUrl: null } }) }))
+    await screen.findByTestId('ivy-library')
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    expect(screen.queryByText('Change cover')).toBeNull()
+  })
+
+  it('a library cover: ••• → Photo credit says "Ivy library"', async () => {
+    const { Alert } = require('react-native')
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+    await open(LIBRARY_COVER)
+    await fireEvent.press(screen.getByTestId('idea-more'))
+    await fireEvent.press(screen.getByText('Photo credit'))
+    expect(alert).toHaveBeenCalledWith('Photo credit', 'Ivy library\nBlack gift box on dark grey')
+    alert.mockRestore()
   })
 })
