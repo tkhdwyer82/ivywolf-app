@@ -19,7 +19,9 @@
 //      drafts as its badge. On a card a recipe made, the step's square is lime and opens its prompt (TODO(B.8b): the
 //      Make page), and the step's tag shows under the snippet.
 //   6. More to explore: a 2-column masonry of her ideas most like this one (GET /api/cards/{id}/related). Each tile opens
-//      its own idea page; nothing links.
+//      its own idea page; nothing links. When the Ivy library is on (inspiration demo, INSPIRATION_ENABLED), its
+//      pictures for this idea's words come first, captioned "Ivy library" (GET /api/inspiration/search); each opens
+//      its library page. Off, the library call 404s and the section is exactly as before.
 // Gone since B.5: More in this thread (in I3 now), the thread pill, the source badge and the bottom Talk bar — the mic
 // lives in the nav.
 
@@ -39,6 +41,8 @@ import { loadIdea, savedTo, setHeart, setPinned, setShape, snippet, viewsFor, wh
 import { setShared } from '@/lib/share'
 import { masonry, type CardItem } from '@/lib/home'
 import { loadRelated } from '@/lib/related'
+import { ideaQuery, searchLibrary, type InspirationItem } from '@/lib/inspiration'
+import { LibraryGrid } from '@/components/InspirationTile'
 import { loadIvyThread } from '@/lib/viewIdea'
 import { removeFromProject } from '@/lib/saveTo'
 import { draftCount, loadStepCard, MAKE_LABEL, type StepCard } from '@/lib/recipes'
@@ -76,6 +80,8 @@ export default function IdeaPage() {
   const [step, setStep] = useState<StepCard | null>(null)
   const [drafts, setDrafts] = useState(0)
   const [related, setRelated] = useState<CardItem[] | null>(null)
+  // The Ivy library's pictures for this idea's words; [] when the library is off or has none.
+  const [library, setLibrary] = useState<InspirationItem[] | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   // The picture's own height ÷ width, once it has loaded (a drawn form has none: RATIO).
   const [ratio, setRatio] = useState<number | null>(null)
@@ -116,6 +122,23 @@ export default function IdeaPage() {
       live = false
     }
   }, [supabase, id])
+
+  // The Ivy library row: one search per idea's words, once the idea has loaded. Off (404) or failing, it's [] and
+  // More to explore is just her ideas.
+  const libraryQuery = idea ? ideaQuery(idea) : null
+  useEffect(() => {
+    if (!libraryQuery) return
+    let live = true
+    setLibrary(null)
+    tokenRef
+      .current()
+      .then((token) => (token ? searchLibrary(token, libraryQuery, { limit: LIBRARY_LIMIT }) : []))
+      .then((l) => live && setLibrary(l))
+      .catch(() => live && setLibrary([]))
+    return () => {
+      live = false
+    }
+  }, [libraryQuery])
 
   async function play() {
     if (!idea?.storagePath) return
@@ -416,12 +439,18 @@ export default function IdeaPage() {
           </View>
         </View>
 
-        {/* 6. More to explore */}
-        {related && related.length > 0 && (
+        {/* 6. More to explore — the Ivy library first, when it's on */}
+        {((related && related.length > 0) || (library && library.length > 0)) && (
           <View testID="more-to-explore">
             <Text style={[styles.header, styles.exploreHeader]} accessibilityRole="header">
               More to explore
             </Text>
+            {library && library.length > 0 && (
+              <View style={styles.library} testID="ivy-library">
+                <Text style={styles.libraryCaption}>Ivy library</Text>
+                <LibraryGrid items={library} tileWidth={(screenSize.width - 2 * PAD - space.gutter) / 2} />
+              </View>
+            )}
             <View style={styles.grid}>
               {[left, right].map((col, i) => (
                 <View key={i} style={styles.column}>
@@ -593,6 +622,8 @@ const CHROME_H = CHROME_INSET + FROST_SQUARE + 12
 const TOOL = 52
 const AVATAR = 32
 const TOAST_MS = 2000
+/** The Ivy library row: six, so her own ideas still start on the first screenful below it. */
+const LIBRARY_LIMIT = 6
 /** The Make squares, in W1's order, before Recipe. Placeholders until B.8b. */
 const MAKES: { kind: Exclude<MakeKind, 'write' | 'none'>; label: string; name: string; icon: SFSymbol }[] = [
   { kind: 'video', label: 'Video', name: 'Make video', icon: 'video' },
@@ -643,6 +674,8 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', top: -5, right: -5, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: colour.Ink, alignItems: 'center', justifyContent: 'center' },
   badgeText: { fontSize: 11, fontWeight: '700', color: colour.Surface },
   exploreHeader: { paddingHorizontal: PAD },
+  library: { paddingHorizontal: PAD, marginBottom: 12 },
+  libraryCaption: { fontSize: 13, color: GREY, marginBottom: 8 },
   grid: { flexDirection: 'row', gap: space.gutter, paddingHorizontal: PAD },
   column: { flex: 1 },
   cell: { marginBottom: space.gutter },
